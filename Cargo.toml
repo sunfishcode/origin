@@ -14,7 +14,7 @@ edition = "2021"
 linux-raw-sys = { version = "0.4.3", default-features = false, features = ["general", "no_std"] }
 rustix = { version = "0.38.1", default-features = false, features = ["mm", "thread", "time", "runtime", "param", "process"] }
 bitflags = "2.4.0"
-memoffset = { version = "0.8.0", optional = true }
+memoffset = { version = "0.9.0", optional = true }
 log = { version = "0.4.14", default-features = false, optional = true }
 lock_api = { version = "0.4.7", features = ["nightly"] }
 

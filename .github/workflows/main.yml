@@ -19,4 +19,132 @@ jobs:
         toolchain: stable
     - run: cargo fmt --all -- --check
 
-# TODO: Add tests for origin.
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    env:
+      QEMU_BUILD_VERSION: 7.0.0
+    strategy:
+      matrix:
+        build: [ubuntu, ubuntu-20.04, i686-linux, aarch64-linux, riscv64-linux]
+        include:
+          - build: ubuntu
+            os: ubuntu-latest
+            rust: nightly-2023-06-27
+            host_target: x86_64-unknown-linux-gnu
+            mustang_target: x86_64-mustang-linux-gnu
+          - build: ubuntu-20.04
+            os: ubuntu-20.04
+            rust: nightly-2023-06-27
+            host_target: x86_64-unknown-linux-gnu
+            mustang_target: x86_64-mustang-linux-gnu
+          - build: i686-linux
+            os: ubuntu-latest
+            rust: nightly-2023-06-27
+            target: i686-unknown-linux-gnu
+            gcc_package: gcc-i686-linux-gnu
+            gcc: i686-linux-gnu-gcc
+            libc_package: libc-dev-i386-cross
+            host_target: i686-unknown-linux-gnu
+            mustang_target: i686-mustang-linux-gnu
+          - build: aarch64-linux
+            os: ubuntu-latest
+            rust: nightly-2023-06-27
+            target: aarch64-unknown-linux-gnu
+            gcc_package: gcc-aarch64-linux-gnu
+            gcc: aarch64-linux-gnu-gcc
+            qemu: qemu-aarch64 -L /usr/aarch64-linux-gnu
+            qemu_target: aarch64-linux-user
+            host_target: aarch64-unknown-linux-gnu
+            mustang_target: aarch64-mustang-linux-gnu
+          - build: riscv64-linux
+            os: ubuntu-latest
+            rust: nightly-2023-06-27
+            target: riscv64gc-unknown-linux-gnu
+            gcc_package: gcc-riscv64-linux-gnu
+            gcc: riscv64-linux-gnu-gcc
+            qemu: qemu-riscv64 -L /usr/riscv64-linux-gnu
+            qemu_target: riscv64-linux-user
+            host_target: riscv64gc-unknown-linux-gnu
+            mustang_target: riscv64gc-mustang-linux-gnu
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - uses: ./.github/actions/install-rust
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Configure Cargo target
+      run: |
+        echo CARGO_BUILD_TARGET=${{ matrix.target }} >> $GITHUB_ENV
+        rustup target add ${{ matrix.target }}
+      if: matrix.target != ''
+
+    - uses: actions/cache@v3
+      with:
+        path: ${{ runner.tool_cache }}/qemu
+        key: qemu-${{ matrix.target }}-${{ env.QEMU_BUILD_VERSION }}-patched
+      if: matrix.target != '' && matrix.os == 'ubuntu-latest'
+
+    - name: Install cross-compilation tools
+      run: |
+        set -ex
+        sudo apt-get update
+        sudo apt-get install -y ${{ matrix.gcc_package }} ninja-build
+        upcase=$(echo ${{ matrix.host_target }} | awk '{ print toupper($0) }' | sed 's/-/_/g')
+        echo CARGO_TARGET_${upcase}_LINKER=${{ matrix.gcc }} >> $GITHUB_ENV
+        upcase=$(echo ${{ matrix.mustang_target }} | awk '{ print toupper($0) }' | sed 's/-/_/g')
+        echo CARGO_TARGET_${upcase}_LINKER=${{ matrix.gcc }} >> $GITHUB_ENV
+        # Configure the `*-mustang` C compiler for the `cc` crate per
+        # <https://github.com/sunfishcode/mustang/blob/main/README.md#the-c-runtime>
+        echo CC_${{ matrix.mustang_target }}=${{ matrix.gcc }} >> $GITHUB_ENV
+        echo CC_${{ matrix.target }}=${{ matrix.gcc }} >> $GITHUB_ENV
+      if: matrix.gcc_package != '' && matrix.os == 'ubuntu-latest'
+
+    - name: Install cross-compilation libraries
+      run: |
+        set -ex
+        sudo apt-get update
+        sudo apt-get install -y ${{ matrix.libc_package }}
+      if: matrix.libc_package != '' && matrix.os == 'ubuntu-latest'
+
+    - name: Install qemu
+      run: |
+        set -ex
+
+        # Configure Cargo for cross compilation and tell it how it can run
+        # cross executables
+        upcase=$(echo ${{ matrix.host_target }} | awk '{ print toupper($0) }' | sed 's/-/_/g')
+        echo CARGO_TARGET_${upcase}_RUNNER=${{ runner.tool_cache }}/qemu/bin/${{ matrix.qemu }} >> $GITHUB_ENV
+        upcase=$(echo ${{ matrix.mustang_target }} | awk '{ print toupper($0) }' | sed 's/-/_/g')
+        echo CARGO_TARGET_${upcase}_RUNNER=${{ runner.tool_cache }}/qemu/bin/${{ matrix.qemu }} >> $GITHUB_ENV
+
+        # See if qemu is already in the cache
+        if [ -f ${{ runner.tool_cache }}/qemu/bin/${{ matrix.qemu }} ]; then
+          exit 0
+        fi
+
+        # Download and build qemu from source since the most recent release is
+        # way faster at arm emulation than the current version github actions'
+        # ubuntu image uses. Disable as much as we can to get it to build
+        # quickly.
+        cd
+        curl https://download.qemu.org/qemu-$QEMU_BUILD_VERSION.tar.xz | tar xJf -
+        cd qemu-$QEMU_BUILD_VERSION
+        patch -p1 < $GITHUB_WORKSPACE/ci/translate-errno.patch
+        patch -p1 < $GITHUB_WORKSPACE/ci/getsockopt-timeouts.patch
+        ./configure --target-list=${{ matrix.qemu_target }} --prefix=${{ runner.tool_cache }}/qemu --disable-tools --disable-slirp --disable-fdt --disable-capstone --disable-docs
+        ninja -C build install
+      if: matrix.qemu != '' && matrix.os == 'ubuntu-latest'
+
+    - name: Install rust-src
+      run: |
+        rustup component add rust-src --toolchain nightly-2023-06-27-x86_64-unknown-linux-gnu
+
+    - name: test origin-as-just-a-library in non-mustang mode
+      working-directory: test-crates/origin-as-just-a-library
+      run: |
+        cargo +nightly-2023-06-27 run --target=${{ matrix.host_target }}
+      env:
+        RUST_BACKTRACE: 1

@@ -138,13 +138,9 @@ jobs:
         ninja -C build install
       if: matrix.qemu != '' && matrix.os == 'ubuntu-latest'
 
-    - name: Install rust-src
-      run: |
-        rustup component add rust-src --toolchain nightly-2023-06-27-x86_64-unknown-linux-gnu
-
     - name: test origin-as-just-a-library in non-mustang mode
       working-directory: test-crates/origin-as-just-a-library
       run: |
-        cargo +nightly-2023-06-27 run --target=${{ matrix.host_target }}
+        cargo run --target=${{ matrix.host_target }}
       env:
         RUST_BACKTRACE: 1

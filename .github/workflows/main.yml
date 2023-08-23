@@ -138,9 +138,8 @@ jobs:
         ninja -C build install
       if: matrix.qemu != '' && matrix.os == 'ubuntu-latest'
 
-    - name: test origin-as-just-a-library in non-mustang mode
-      working-directory: test-crates/origin-as-just-a-library
+    - name: cargo test
       run: |
-        cargo run --target=${{ matrix.host_target }}
+        cargo test
       env:
         RUST_BACKTRACE: 1

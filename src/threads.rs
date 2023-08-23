@@ -1,7 +1,7 @@
 //! Threads runtime implemented using rustix, asm, and raw Linux syscalls.
 //!
-//! This implementation is only used on mustang targets. See
-//! threads_via_pthreads.rs for the non-mustang implementation.
+//! This implementation implements threads in Rust. See threads_via_pthreads.rs
+//! for an implementation that uses libc.
 
 use crate::arch::{
     clone, get_thread_pointer, munmap_and_exit_thread, set_thread_pointer, TLS_OFFSET,

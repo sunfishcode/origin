@@ -1,0 +1,17 @@
+[package]
+name = "no-std"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# Origin can be depended on just like any other crate. For no_std, disable
+# the default features. And enable "libc" to enable the libc implementations.
+origin = { path = "../..", default-features = false, features = ["libc"] }
+
+# Crates to help writing no_std code.
+atomic-dbg = { version = "0.1.7", default-features = false }
+rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
+
+# This is just an example crate, and not part of the origin workspace.
+[workspace]

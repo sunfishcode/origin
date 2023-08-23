@@ -1,14 +1,17 @@
-use alloc::boxed::Box;
-use core::any::Any;
 use core::arch::asm;
-use core::ffi::c_void;
-use core::ptr::invalid;
-use linux_raw_sys::general::{
-    __NR_clone, __NR_exit, __NR_munmap, __NR_rt_sigreturn, __NR_sigreturn,
+use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
+#[cfg(feature = "origin-threads")]
+use {
+    alloc::boxed::Box,
+    core::any::Any,
+    core::ffi::c_void,
+    core::ptr::invalid,
+    linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
+    rustix::process::RawPid,
 };
-use rustix::process::RawPid;
 
 /// A wrapper around the Linux `clone` system call.
+#[cfg(feature = "origin-threads")]
 #[inline]
 pub(super) unsafe fn clone(
     flags: u32,
@@ -84,7 +87,7 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-threads")]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     let mut user_desc = rustix::runtime::UserDesc {
@@ -108,6 +111,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 }
 
 /// Read the value of the platform thread-pointer register.
+#[cfg(feature = "origin-threads")]
 #[inline]
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;
@@ -118,10 +122,12 @@ pub(super) fn get_thread_pointer() -> *mut c_void {
 }
 
 /// TLS data ends at the location pointed to by the thread pointer.
+#[cfg(feature = "origin-threads")]
 pub(super) const TLS_OFFSET: usize = 0;
 
 /// `munmap` the current thread, then carefully exit the thread without
 /// touching the deallocated stack.
+#[cfg(feature = "origin-threads")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
     asm!(

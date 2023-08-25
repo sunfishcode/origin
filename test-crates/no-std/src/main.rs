@@ -2,6 +2,7 @@
 
 #![no_std]
 #![feature(lang_items)]
+#![allow(internal_features)]
 #![feature(start)]
 #![feature(core_intrinsics)]
 

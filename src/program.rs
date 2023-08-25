@@ -1,24 +1,24 @@
-#[cfg(target_vendor = "mustang")]
-use crate::sync::Mutex;
-#[cfg(target_vendor = "mustang")]
-#[cfg(feature = "threads")]
+#[cfg(feature = "origin-program")]
+#[cfg(feature = "origin-threads")]
 use crate::threads::initialize_main_thread;
 use alloc::boxed::Box;
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
 use alloc::vec::Vec;
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
 use core::arch::asm;
 use core::ffi::c_void;
-#[cfg(not(target_vendor = "mustang"))]
+#[cfg(not(feature = "origin-program"))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
+#[cfg(feature = "origin-program")]
+use rustix_futex_sync::Mutex;
 
 /// The entrypoint where Rust code is first executed when the program starts.
 ///
 /// # Safety
 ///
 /// `mem` should point to the stack as provided by the operating system.
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     extern "C" {
         fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
@@ -29,6 +29,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // release-mode startup code simple to disassemble and inspect, while we're
     // getting started.
     #[cfg(debug_assertions)]
+    #[cfg(feature = "origin-start")]
     {
         extern "C" {
             #[link_name = "llvm.frameaddress"]
@@ -71,13 +72,12 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     debug_assert_eq!(*mem, argc as _);
     debug_assert_eq!(*argv.add(argc as usize), core::ptr::null_mut());
 
-    // Explicitly initialize `rustix`. On non-mustang platforms, `rustix` uses
-    // a .init_array hook to initialize itself automatically, but for mustang,
-    // we do it manually so that we can control the initialization order.
+    // Explicitly initialize `rustix` so that we can control the initialization
+    // order.
     rustix::param::init(envp);
 
     // Initialize the main thread.
-    #[cfg(feature = "threads")]
+    #[cfg(feature = "origin-threads")]
     initialize_main_thread(mem.cast());
 
     // Call the functions registered via `.init_array`.
@@ -98,7 +98,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 }
 
 /// Call the constructors in the `.init_array` section.
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
 unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
     extern "C" {
         static __init_array_start: c_void;
@@ -130,7 +130,7 @@ unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
 }
 
 /// Functions registered with [`at_exit`].
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
 static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 
 /// Register a function to be called when [`exit`] is called.
@@ -140,13 +140,13 @@ static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 /// This arranges for `func` to be called, and passed `obj`, when the program
 /// exits.
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
-    #[cfg(target_vendor = "mustang")]
+    #[cfg(feature = "origin-program")]
     {
         let mut funcs = DTORS.lock();
         funcs.push(func);
     }
 
-    #[cfg(not(target_vendor = "mustang"))]
+    #[cfg(not(feature = "origin-program"))]
     {
         extern "C" {
             // <https://refspecs.linuxbase.org/LSB_3.1.0/LSB-generic/LSB-generic/baselib---cxa-atexit.html>
@@ -172,14 +172,14 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 /// `.fini_array` section, and exit the program.
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
-    #[cfg(target_vendor = "mustang")]
-    #[cfg(feature = "threads")]
+    #[cfg(feature = "origin-program")]
+    #[cfg(feature = "origin-threads")]
     crate::threads::call_thread_dtors(crate::current_thread());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`
     // unlocked while making the call so that functions can add more functions
     // to the end of the list.
-    #[cfg(target_vendor = "mustang")]
+    #[cfg(feature = "origin-program")]
     loop {
         let mut dtors = DTORS.lock();
         if let Some(dtor) = dtors.pop() {
@@ -193,7 +193,7 @@ pub fn exit(status: c_int) -> ! {
     }
 
     // Call the `.fini_array` functions, in reverse order.
-    #[cfg(target_vendor = "mustang")]
+    #[cfg(feature = "origin-program")]
     unsafe {
         extern "C" {
             static __fini_array_start: c_void;
@@ -217,13 +217,13 @@ pub fn exit(status: c_int) -> ! {
         }
     }
 
-    #[cfg(target_vendor = "mustang")]
+    #[cfg(feature = "origin-program")]
     {
         // Call `exit_immediately` to exit the program.
         exit_immediately(status)
     }
 
-    #[cfg(not(target_vendor = "mustang"))]
+    #[cfg(not(feature = "origin-program"))]
     unsafe {
         // Call `libc` to run *its* dtors, and exit the program.
         libc::exit(status)
@@ -237,13 +237,13 @@ pub fn exit_immediately(status: c_int) -> ! {
     #[cfg(feature = "log")]
     log::trace!("Program exiting");
 
-    #[cfg(target_vendor = "mustang")]
+    #[cfg(feature = "origin-program")]
     {
         // Call `rustix` to exit the program.
         rustix::runtime::exit_group(status)
     }
 
-    #[cfg(not(target_vendor = "mustang"))]
+    #[cfg(not(feature = "origin-program"))]
     unsafe {
         // Call `libc` to exit the program.
         libc::_exit(status)

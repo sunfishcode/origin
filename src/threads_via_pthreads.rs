@@ -1,7 +1,7 @@
 //! Threads runtime implemented using the native libpthread.
 //!
-//! This implementation is only used on non-mustang targets. See threads.rs for
-//! the mustang implementation.
+//! This implementation uses libc to create and manage threads. See threads.rs
+//! for the Rust implementation.
 
 use alloc::boxed::Box;
 use core::any::Any;
@@ -25,7 +25,7 @@ extern "C" {
         stacksize: &mut libc::size_t,
     ) -> libc::c_int;
     fn pthread_attr_setguardsize(
-        attr: *const libc::pthread_attr_t,
+        attr: *mut libc::pthread_attr_t,
         guardsize: libc::size_t,
     ) -> libc::c_int;
 

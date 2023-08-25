@@ -12,27 +12,38 @@ edition = "2021"
 
 [dependencies]
 linux-raw-sys = { version = "0.4.3", default-features = false, features = ["general", "no_std"] }
-rustix = { version = "0.38.1", default-features = false, features = ["mm", "thread", "time", "runtime", "param", "process"] }
+rustix = { version = "0.38.9", default-features = false, features = ["mm", "thread", "time", "param", "process"] }
 bitflags = "2.4.0"
 memoffset = { version = "0.9.0", optional = true }
 log = { version = "0.4.14", default-features = false, optional = true }
-lock_api = { version = "0.4.7", features = ["nightly"] }
+rustix-futex-sync = "0.1.0"
 
 # Optional logging backend. You can use any external logger, but using this
 # feature allows origin to initialize the logger before main, so that you can
 # see the log messages emitted before main is called.
 env_logger = { version = "0.10.0", optional = true }
 
-[target.'cfg(not(target_vendor = "mustang"))'.dependencies]
-libc = { version = "0.2.138", default-features = false }
+# Enable this when disabling origin's implementations.
+libc = { version = "0.2.138", default-features = false, optional = true }
+# FIXME: this needs https://github.com/lambda-fairy/rust-errno/pull/77
+#errno = { version = "0.3.2", default-features = false, optional = true }
 
 # Special dependencies used in rustc-dep-of-std mode.
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
 compiler_builtins = { version = '0.1.49', optional = true }
 
+[target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
+version = "0.1.3"
+default-features = false
+features = [ "unwinder" ]
+
+[dev-dependencies]
+similar-asserts = "1.1.0"
+which = "4.4.0"
+
 [features]
-default = ["std", "threads", "log"]
+default = ["std", "log", "libc"]
 std = ["rustix/std"]
 set_thread_id = []
 rustc-dep-of-std = [
@@ -44,8 +55,24 @@ rustc-dep-of-std = [
     "libc/rustc-dep-of-std",
 ]
 
-# Support for threads.
-threads = ["memoffset"]
+# Use origin's implementations for everything.
+origin-all = [
+    "origin-program",
+    "origin-threads",
+    "origin-signals",
+]
+
+origin-start = []
+external-start = []
+
+# Use origin's implementation of program startup and shutdown.
+origin-program = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
+
+# Use origin's implementation of thread startup and shutdown.
+origin-threads = ["memoffset", "rustix/runtime", "origin-program"]
+
+# Use origin's implementation of signal handle registrtion.
+origin-signals = ["rustix/runtime"]
 
 # Disable logging.
 max_level_off = ["log/max_level_off"]

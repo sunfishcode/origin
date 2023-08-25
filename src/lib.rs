@@ -11,17 +11,19 @@
 #[cfg(not(feature = "rustc-dep-of-std"))]
 extern crate alloc;
 
-pub mod sync;
-
 mod program;
-#[cfg(target_vendor = "mustang")]
-mod signal;
-#[cfg(feature = "threads")]
-#[cfg_attr(not(target_vendor = "mustang"), path = "threads_via_pthreads.rs")]
+#[cfg_attr(not(feature = "origin-signals"), path = "signals_via_libc.rs")]
+mod signals;
+#[cfg_attr(not(feature = "origin-threads"), path = "threads_via_pthreads.rs")]
 mod threads;
+// Unwinding isn't supported on 32-bit arm yet.
+#[cfg(target_arch = "arm")]
+mod unwind;
 
-#[cfg(feature = "threads")]
-#[cfg(target_vendor = "mustang")]
+#[cfg(not(target_arch = "arm"))]
+extern crate unwinding;
+
+#[cfg(any(feature = "origin-threads", feature = "origin-signals"))]
 #[cfg_attr(target_arch = "aarch64", path = "arch-aarch64.rs")]
 #[cfg_attr(target_arch = "x86_64", path = "arch-x86_64.rs")]
 #[cfg_attr(target_arch = "x86", path = "arch-x86.rs")]
@@ -30,12 +32,9 @@ mod threads;
 mod arch;
 
 pub use program::{at_exit, exit, exit_immediately};
-#[cfg(target_vendor = "mustang")]
-pub use signal::{sigaction, Sigaction};
-#[cfg(feature = "threads")]
+pub use signals::{sigaction, Sigaction};
 #[cfg(feature = "set_thread_id")]
 pub use threads::set_current_thread_id_after_a_fork;
-#[cfg(feature = "threads")]
 pub use threads::{
     at_thread_exit, create_thread, current_thread, current_thread_id, current_thread_tls_addr,
     default_guard_size, default_stack_size, detach_thread, join_thread, thread_stack, Thread,
@@ -48,7 +47,8 @@ pub use threads::{
 /// This function should never be called explicitly. It is the first thing
 /// executed in the program, and it assumes that memory is laid out according
 /// to the operating system convention for starting a new program.
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
+#[cfg(feature = "origin-start")]
 #[naked]
 #[no_mangle]
 unsafe extern "C" fn _start() -> ! {
@@ -111,8 +111,26 @@ unsafe extern "C" fn _start() -> ! {
     );
 }
 
+/// A program entry point similar to `_start`, but which is meant to be called
+/// by something else in the program rather than the OS.
+///
+/// # Safety
+///
+/// `mem` must point to a stack with the contents that the OS would provide
+/// on the initial stack.
+#[cfg(feature = "origin-program")]
+#[cfg(feature = "external-start")]
+pub unsafe fn start(mem: *mut usize) -> ! {
+    program::entry(mem)
+}
+
+#[cfg(feature = "origin-program")]
+#[cfg(not(any(feature = "origin-start", feature = "external-start")))]
+compile_error!("origin-program depends on either origin-start or external-start");
+
 /// An ABI-conforming `__dso_handle`.
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
+#[cfg(feature = "origin-start")]
 #[no_mangle]
 static __dso_handle: UnsafeSendSyncVoidStar =
     UnsafeSendSyncVoidStar(&__dso_handle as *const _ as *const _);
@@ -126,16 +144,15 @@ static __dso_handle: UnsafeSendSyncVoidStar =
 /// Note that in C, `__dso_handle`'s type is usually `void *` which would
 /// correspond to `*mut c_void`, however we can assume the pointee is never
 /// actually mutated.
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
 #[repr(transparent)]
 struct UnsafeSendSyncVoidStar(*const core::ffi::c_void);
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
 unsafe impl Send for UnsafeSendSyncVoidStar {}
-#[cfg(target_vendor = "mustang")]
+#[cfg(feature = "origin-program")]
 unsafe impl Sync for UnsafeSendSyncVoidStar {}
 
 /// Initialize logging, if enabled.
-#[cfg(target_vendor = "mustang")]
 #[cfg(feature = "log")]
 #[link_section = ".init_array.00099"]
 #[used]
@@ -149,11 +166,8 @@ static INIT_ARRAY: unsafe extern "C" fn() = {
         // Log the thread id. We initialized the main earlier than this, but
         // we couldn't initialize the logger until after the main thread is
         // intialized :-).
-        #[cfg(feature = "threads")]
+        #[cfg(feature = "origin-threads")]
         log::trace!(target: "origin::threads", "Main Thread[{:?}] initialized", current_thread_id());
     }
     function
 };
-
-// Re-export this so that our users can use the same version we do.
-pub use lock_api;

@@ -1,7 +1,7 @@
 use origin::*;
 
 fn main() {
-    eprintln!("Hello from main");
+    eprintln!("Hello from main thread");
 
     at_exit(Box::new(|| eprintln!("Hello from an at_exit handler")));
     at_thread_exit(Box::new(|| {
@@ -10,9 +10,9 @@ fn main() {
 
     let thread = create_thread(
         Box::new(|| {
-            eprintln!("Hello from thread {:?}", current_thread_id());
+            eprintln!("Hello from child thread");
             at_thread_exit(Box::new(|| {
-                eprintln!("Hello from another thread at_thread_exit handler")
+                eprintln!("Hello from child thread's at_thread_exit handler")
             }));
             None
         }),

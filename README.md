@@ -24,20 +24,33 @@ its own implementations of this functionality, written in Rust.
 
 For a C-ABI-compatible interface to this functionality, see [c-scape].
 
-This is part of the [Mustang] project, building Rust programs written entirely
-in Rust. When compiled for non-mustang targets, this library uses the system
-crt and libpthread libraries.
+This is used by the [Mustang] project, building Rust programs written entirely
+in Rust.
 
-## Using origin in non-mustang programs
+Origin can also be used on its own, in several different configurations:
 
-Origin can also be used as an orginary library, when compiled in non-mustang
-targets, provided you're using nightly Rust. In this configuration, origin
-disables its own program startup and thread implementations and lets libc
-handle those parts. Its API is then implemented in terms of system libc calls,
-including pthread calls.
+ - The [basic example] shows a simple example of using origin as a simple
+   library. In this configuration, libc is doing most of the work.
 
-See the [origin-as-just-a-library example] for more details.
+ - The [no-std example] uses `no_std` and starts the program using Rust's
+   `#[start]` feature, and then hands control to origin. libc is still
+   doing most of the work here.
 
-[origin-as-just-a-library example]: https://github.com/sunfishcode/origin/blob/main/test-crates/origin-as-just-a-library/README.md
+ - The [external-start example] uses `no_std` and `no_main`, and starts the
+   program by taking over control from libc as soon as possible, and then
+   hands control to origin. origin handles program and thread startup and
+   shutdown once it takes control.
+
+ - The [origin-start example] uses `no_std` and `no_main`, and lets origin
+   start the program using its own program entrypoint. This version must be
+   compiled with an explicit `--target=` flag, even if it's the same as the
+   host, because it uses special RUSTFLAGS, and an explicit `--target` flag
+   prevents those flags from being passed to build scripts. origin handles
+   program and thread startup and shutdown and no part of libc is used.
+
+[basic example]: https://github.com/sunfishcode/origin/blob/main/test-crates/basic/README.md
+[no-std example]: https://github.com/sunfishcode/origin/blob/main/test-crates/no-std/README.md
+[external-start example]: https://github.com/sunfishcode/origin/blob/main/test-crates/external-start/README.md
 [Mustang]: https://github.com/sunfishcode/mustang/
+[origin-start example]: https://github.com/sunfishcode/origin/blob/main/test-crates/origin-start/README.md
 [c-scape]: https://crates.io/crates/c-scape/

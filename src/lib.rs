@@ -124,10 +124,6 @@ pub unsafe fn start(mem: *mut usize) -> ! {
     program::entry(mem)
 }
 
-#[cfg(feature = "origin-program")]
-#[cfg(not(any(feature = "origin-start", feature = "external-start")))]
-compile_error!("origin-program depends on either origin-start or external-start");
-
 /// An ABI-conforming `__dso_handle`.
 #[cfg(feature = "origin-program")]
 #[cfg(feature = "origin-start")]

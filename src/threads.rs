@@ -3,9 +3,7 @@
 //! This implementation implements threads in Rust. See threads_via_pthreads.rs
 //! for an implementation that uses libc.
 
-use crate::arch::{
-    clone, get_thread_pointer, munmap_and_exit_thread, set_thread_pointer, TLS_OFFSET,
-};
+use crate::arch::{clone, get_thread_pointer, munmap_and_exit_thread, TLS_OFFSET};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::any::Any;
@@ -18,10 +16,16 @@ use core::sync::atomic::Ordering::SeqCst;
 use core::sync::atomic::{AtomicI32, AtomicU8};
 use memoffset::offset_of;
 use rustix::io;
-use rustix::param::{linux_execfn, page_size};
-use rustix::process::{getrlimit, Pid, Resource};
+use rustix::param::page_size;
+use rustix::process::Pid;
 use rustix::runtime::{set_tid_address, StartupTlsInfo};
 use rustix::thread::gettid;
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
+use {
+    crate::arch::set_thread_pointer,
+    rustix::param::linux_execfn,
+    rustix::process::{getrlimit, Resource},
+};
 
 /// The entrypoint where Rust code is first executed on a new thread.
 ///
@@ -356,6 +360,7 @@ unsafe fn exit_thread() -> ! {
 /// This function is similar to `create_thread` except that the OS thread is
 /// already created, and already has a stack (which we need to locate), and is
 /// already running.
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     use rustix::mm::{mmap_anonymous, MapFlags, ProtFlags};
 

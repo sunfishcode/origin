@@ -1,24 +1,20 @@
-#[cfg(feature = "origin-program")]
-#[cfg(feature = "origin-threads")]
-use crate::threads::initialize_main_thread;
 use alloc::boxed::Box;
-#[cfg(feature = "origin-program")]
-use alloc::vec::Vec;
-#[cfg(feature = "origin-program")]
-use core::arch::asm;
 use core::ffi::c_void;
-#[cfg(not(feature = "origin-program"))]
+#[cfg(not(any(feature = "origin-start", feature = "external-start")))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
-#[cfg(feature = "origin-program")]
-use rustix_futex_sync::Mutex;
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
+use {
+    crate::threads::initialize_main_thread, alloc::vec::Vec, core::arch::asm,
+    rustix_futex_sync::Mutex,
+};
 
 /// The entrypoint where Rust code is first executed when the program starts.
 ///
 /// # Safety
 ///
 /// `mem` should point to the stack as provided by the operating system.
-#[cfg(feature = "origin-program")]
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     extern "C" {
         fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
@@ -98,7 +94,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 }
 
 /// Call the constructors in the `.init_array` section.
-#[cfg(feature = "origin-program")]
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
 unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
     extern "C" {
         static __init_array_start: c_void;
@@ -130,7 +126,7 @@ unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
 }
 
 /// Functions registered with [`at_exit`].
-#[cfg(feature = "origin-program")]
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
 static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 
 /// Register a function to be called when [`exit`] is called.
@@ -140,13 +136,13 @@ static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 /// This arranges for `func` to be called, and passed `obj`, when the program
 /// exits.
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
-    #[cfg(feature = "origin-program")]
+    #[cfg(any(feature = "origin-start", feature = "external-start"))]
     {
         let mut funcs = DTORS.lock();
         funcs.push(func);
     }
 
-    #[cfg(not(feature = "origin-program"))]
+    #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
     {
         extern "C" {
             // <https://refspecs.linuxbase.org/LSB_3.1.0/LSB-generic/LSB-generic/baselib---cxa-atexit.html>
@@ -172,14 +168,13 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 /// `.fini_array` section, and exit the program.
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
-    #[cfg(feature = "origin-program")]
-    #[cfg(feature = "origin-threads")]
+    #[cfg(any(feature = "origin-start", feature = "external-start"))]
     crate::threads::call_thread_dtors(crate::current_thread());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`
     // unlocked while making the call so that functions can add more functions
     // to the end of the list.
-    #[cfg(feature = "origin-program")]
+    #[cfg(any(feature = "origin-start", feature = "external-start"))]
     loop {
         let mut dtors = DTORS.lock();
         if let Some(dtor) = dtors.pop() {
@@ -193,7 +188,7 @@ pub fn exit(status: c_int) -> ! {
     }
 
     // Call the `.fini_array` functions, in reverse order.
-    #[cfg(feature = "origin-program")]
+    #[cfg(any(feature = "origin-start", feature = "external-start"))]
     unsafe {
         extern "C" {
             static __fini_array_start: c_void;
@@ -217,13 +212,13 @@ pub fn exit(status: c_int) -> ! {
         }
     }
 
-    #[cfg(feature = "origin-program")]
+    #[cfg(any(feature = "origin-start", feature = "external-start"))]
     {
         // Call `exit_immediately` to exit the program.
         exit_immediately(status)
     }
 
-    #[cfg(not(feature = "origin-program"))]
+    #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
     unsafe {
         // Call `libc` to run *its* dtors, and exit the program.
         libc::exit(status)
@@ -237,13 +232,13 @@ pub fn exit_immediately(status: c_int) -> ! {
     #[cfg(feature = "log")]
     log::trace!("Program exiting");
 
-    #[cfg(feature = "origin-program")]
+    #[cfg(any(feature = "origin-start", feature = "external-start"))]
     {
         // Call `rustix` to exit the program.
         rustix::runtime::exit_group(status)
     }
 
-    #[cfg(not(feature = "origin-program"))]
+    #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
     unsafe {
         // Call `libc` to exit the program.
         libc::_exit(status)

@@ -51,7 +51,7 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(feature = "origin-threads")]
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     rustix::runtime::set_fs(ptr);

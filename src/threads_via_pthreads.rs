@@ -8,6 +8,7 @@ use core::any::Any;
 use core::ffi::c_void;
 use core::ptr::{from_exposed_addr_mut, null_mut};
 use rustix::io;
+// FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
 use rustix::process::Pid;
 
 // Symbols defined in libc but not declared in the libc crate.

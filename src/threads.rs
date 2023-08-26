@@ -17,6 +17,7 @@ use core::sync::atomic::{AtomicI32, AtomicU8};
 use memoffset::offset_of;
 use rustix::io;
 use rustix::param::page_size;
+// FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
 use rustix::process::Pid;
 use rustix::runtime::{set_tid_address, StartupTlsInfo};
 use rustix::thread::gettid;
@@ -196,9 +197,7 @@ pub fn current_thread() -> Thread {
 /// field in the runtime rather than making a system call.
 #[inline]
 pub fn current_thread_id() -> Pid {
-    let raw = unsafe { (*current_thread().0).thread_id.load(SeqCst) };
-    debug_assert!(raw > 0);
-    let tid = unsafe { Pid::from_raw_unchecked(raw) };
+    let tid = thread_id(current_thread());
     debug_assert_eq!(tid, gettid(), "`current_thread_id` disagrees with `gettid`");
     tid
 }
@@ -254,6 +253,17 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
             .wrapping_add(offset)
             .cast()
     }
+}
+
+/// Return the id of a thread.
+///
+/// This is the same as [`rustix::thread::gettid`], but loads the value from a
+/// field in the runtime rather than making a system call.
+#[inline]
+pub fn thread_id(thread: Thread) -> Pid {
+    let raw = unsafe { (*thread.0).thread_id.load(SeqCst) };
+    debug_assert!(raw > 0);
+    unsafe { Pid::from_raw_unchecked(raw) }
 }
 
 /// Return the current thread's stack address (lowest address), size, and guard

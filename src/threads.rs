@@ -17,8 +17,6 @@ use core::sync::atomic::{AtomicI32, AtomicU8};
 use memoffset::offset_of;
 use rustix::io;
 use rustix::param::page_size;
-// FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
-use rustix::process::Pid;
 use rustix::runtime::{set_tid_address, StartupTlsInfo};
 use rustix::thread::gettid;
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
@@ -27,6 +25,10 @@ use {
     rustix::param::linux_execfn,
     rustix::process::{getrlimit, Resource},
 };
+
+/// A numerical thread identifier.
+// FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
+pub use rustix::process::Pid as ThreadId;
 
 /// The entrypoint where Rust code is first executed on a new thread.
 ///
@@ -159,14 +161,14 @@ const ABANDONED: u8 = 2;
 impl ThreadData {
     #[inline]
     fn new(
-        tid: Option<Pid>,
+        tid: Option<ThreadId>,
         stack_addr: *mut c_void,
         stack_size: usize,
         guard_size: usize,
         map_size: usize,
     ) -> Self {
         Self {
-            thread_id: AtomicI32::new(Pid::as_raw(tid)),
+            thread_id: AtomicI32::new(ThreadId::as_raw(tid)),
             detached: AtomicU8::new(INITIAL),
             stack_addr,
             stack_size,
@@ -196,7 +198,7 @@ pub fn current_thread() -> Thread {
 /// This is the same as [`rustix::thread::gettid`], but loads the value from a
 /// field in the runtime rather than making a system call.
 #[inline]
-pub fn current_thread_id() -> Pid {
+pub fn current_thread_id() -> ThreadId {
     let tid = thread_id(current_thread());
     debug_assert_eq!(tid, gettid(), "`current_thread_id` disagrees with `gettid`");
     tid
@@ -217,7 +219,7 @@ pub fn current_thread_id() -> Pid {
 #[cfg(feature = "set_thread_id")]
 #[doc(hidden)]
 #[inline]
-pub unsafe fn set_current_thread_id_after_a_fork(tid: Pid) {
+pub unsafe fn set_current_thread_id_after_a_fork(tid: ThreadId) {
     assert_ne!(
         tid.as_raw_nonzero().get(),
         (*current_thread().0).thread_id.load(SeqCst),
@@ -260,10 +262,10 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
 /// This is the same as [`rustix::thread::gettid`], but loads the value from a
 /// field in the runtime rather than making a system call.
 #[inline]
-pub fn thread_id(thread: Thread) -> Pid {
+pub fn thread_id(thread: Thread) -> ThreadId {
     let raw = unsafe { (*thread.0).thread_id.load(SeqCst) };
     debug_assert!(raw > 0);
-    unsafe { Pid::from_raw_unchecked(raw) }
+    unsafe { ThreadId::from_raw_unchecked(raw) }
 }
 
 /// Return the current thread's stack address (lowest address), size, and guard
@@ -756,7 +758,7 @@ unsafe fn wait_for_thread_exit(thread: Thread) {
     let thread = &mut *thread.0;
     let thread_id = &mut thread.thread_id;
     let id_value = thread_id.load(SeqCst);
-    if let Some(id_value) = Pid::from_raw(id_value) {
+    if let Some(id_value) = ThreadId::from_raw(id_value) {
         // This doesn't use any shared memory, but we can't use
         // `FutexFlags::PRIVATE` because the wake comes from Linux
         // as arranged by the `CloneFlags::CHILD_CLEARTID` flag,

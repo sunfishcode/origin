@@ -8,8 +8,9 @@ use core::any::Any;
 use core::ffi::c_void;
 use core::ptr::{from_exposed_addr_mut, null_mut};
 use rustix::io;
+
 // FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
-use rustix::process::Pid;
+pub use rustix::process::Pid as ThreadId;
 
 // Symbols defined in libc but not declared in the libc crate.
 extern "C" {
@@ -61,7 +62,7 @@ pub fn current_thread() -> Thread {
 /// This is the same as [`rustix::thread::gettid`], but loads the value from a
 /// field in the runtime rather than making a system call.
 #[inline]
-pub fn current_thread_id() -> Pid {
+pub fn current_thread_id() -> ThreadId {
     // Actually, in the pthread implementation here we do just make a system
     // call, because we don't have access to the pthread internals.
     rustix::thread::gettid()
@@ -82,7 +83,7 @@ pub fn current_thread_id() -> Pid {
 #[cfg(feature = "set_thread_id")]
 #[doc(hidden)]
 #[inline]
-pub unsafe fn set_current_thread_id_after_a_fork(tid: Pid) {
+pub unsafe fn set_current_thread_id_after_a_fork(tid: ThreadId) {
     // Nothing to do here; libc does the update automatically.
     let _ = tid;
 }

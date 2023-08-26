@@ -38,6 +38,7 @@ pub use threads::set_current_thread_id_after_a_fork;
 pub use threads::{
     at_thread_exit, create_thread, current_thread, current_thread_id, current_thread_tls_addr,
     default_guard_size, default_stack_size, detach_thread, join_thread, thread_stack, Thread,
+    ThreadId,
 };
 
 /// The program entry point.

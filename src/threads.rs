@@ -461,12 +461,15 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     );
 
     // Initialize the TLS data with explicit initializer data.
-    slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
-        slice::from_raw_parts(
-            STARTUP_TLS_INFO.addr.cast::<u8>(),
-            STARTUP_TLS_INFO.file_size,
-        ),
-    );
+    // FIXME: Eliminate this `is_null` check by fixing rustix.
+    if !STARTUP_TLS_INFO.addr.is_null() {
+        slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
+            slice::from_raw_parts(
+                STARTUP_TLS_INFO.addr.cast::<u8>(),
+                STARTUP_TLS_INFO.file_size,
+            ),
+        );
+    }
 
     // Initialize the TLS data beyond `file_size` which is zero-filled.
     slice::from_raw_parts_mut(
@@ -592,12 +595,15 @@ pub fn create_thread(
         );
 
         // Initialize the TLS data with explicit initializer data.
-        slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
-            slice::from_raw_parts(
-                STARTUP_TLS_INFO.addr.cast::<u8>(),
-                STARTUP_TLS_INFO.file_size,
-            ),
-        );
+        // FIXME: Eliminate this `is_null` check by fixing rustix.
+        if !STARTUP_TLS_INFO.addr.is_null() {
+            slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
+                slice::from_raw_parts(
+                    STARTUP_TLS_INFO.addr.cast::<u8>(),
+                    STARTUP_TLS_INFO.file_size,
+                ),
+            );
+        }
 
         // The TLS region includes additional data beyond `file_size` which is
         // expected to be zero-initialized, but we don't need to do anything

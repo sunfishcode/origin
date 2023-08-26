@@ -1,5 +1,5 @@
 use core::arch::asm;
-use linux_raw_sys::general::__NR_rt_sigreturn;
+use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
 #[cfg(feature = "origin-threads")]
 use {
     alloc::boxed::Box,

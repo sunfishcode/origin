@@ -24,8 +24,9 @@ its own implementations of this functionality, written in Rust.
 
 For a C-ABI-compatible interface to this functionality, see [c-scape].
 
-This is used by the [Mustang] project, building Rust programs written entirely
-in Rust.
+This is used by the [Mustang] project in its libc implementation, and in the
+[origin-studio] project in its std implementation, which are two different
+ways to support building Rust programs written entirely in Rust.
 
 Origin can also be used on its own, in several different configurations:
 
@@ -52,5 +53,6 @@ Origin can also be used on its own, in several different configurations:
 [no-std example]: https://github.com/sunfishcode/origin/blob/main/test-crates/no-std/README.md
 [external-start example]: https://github.com/sunfishcode/origin/blob/main/test-crates/external-start/README.md
 [Mustang]: https://github.com/sunfishcode/mustang/
+[origin-studio]: https://github.com/sunfishcode/origin-studio
 [origin-start example]: https://github.com/sunfishcode/origin/blob/main/test-crates/origin-start/README.md
 [c-scape]: https://crates.io/crates/c-scape/

@@ -10,7 +10,7 @@ use core::any::Any;
 use core::cmp::max;
 use core::ffi::c_void;
 use core::mem::{align_of, size_of};
-use core::ptr::{self, drop_in_place, null, null_mut};
+use core::ptr::{self, drop_in_place, null, null_mut, NonNull};
 use core::slice;
 use core::sync::atomic::Ordering::SeqCst;
 use core::sync::atomic::{AtomicI32, AtomicU8};
@@ -125,19 +125,34 @@ struct Abi {
 }
 
 /// An opaque pointer to a thread.
+///
+/// This type does not detach on drop. It just leaks the thread. To detach or
+/// join, call `detach_thread` or `join_thread` explicitly.
 #[derive(Copy, Clone)]
-pub struct Thread(*mut ThreadData);
+pub struct Thread(NonNull<ThreadData>);
 
 impl Thread {
     /// Convert to `Self` from a raw pointer.
     #[inline]
     pub fn from_raw(raw: *mut c_void) -> Self {
+        Self(NonNull::new(raw.cast()).unwrap())
+    }
+
+    /// Convert to `Self` from a raw non-null pointer.
+    #[inline]
+    pub fn from_raw_non_null(raw: NonNull<c_void>) -> Self {
         Self(raw.cast())
     }
 
     /// Convert to a raw pointer from a `Self`.
     #[inline]
     pub fn to_raw(self) -> *mut c_void {
+        self.0.cast().as_ptr()
+    }
+
+    /// Convert to a raw non-null pointer from a `Self`.
+    #[inline]
+    pub fn to_raw_non_null(self) -> NonNull<c_void> {
         self.0.cast()
     }
 }
@@ -190,7 +205,7 @@ fn current_metadata() -> *mut Metadata {
 /// Return a raw pointer to the data associated with the current thread.
 #[inline]
 pub fn current_thread() -> Thread {
-    unsafe { Thread(&mut (*current_metadata()).thread) }
+    unsafe { Thread(NonNull::from(&mut (*current_metadata()).thread)) }
 }
 
 /// Return the current thread id.
@@ -222,11 +237,13 @@ pub fn current_thread_id() -> ThreadId {
 pub unsafe fn set_current_thread_id_after_a_fork(tid: ThreadId) {
     assert_ne!(
         tid.as_raw_nonzero().get(),
-        (*current_thread().0).thread_id.load(SeqCst),
+        current_thread().0.as_ref().thread_id.load(SeqCst),
         "current thread ID already matches new thread ID"
     );
     assert_eq!(tid, gettid(), "new thread ID disagrees with `gettid`");
-    (*current_thread().0)
+    current_thread()
+        .0
+        .as_ref()
         .thread_id
         .store(tid.as_raw_nonzero().get(), SeqCst);
 }
@@ -261,9 +278,13 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
 ///
 /// This is the same as [`rustix::thread::gettid`], but loads the value from a
 /// field in the runtime rather than making a system call.
+///
+/// # Safety
+///
+/// `thread` must point to a valid and live thread record.
 #[inline]
 pub fn thread_id(thread: Thread) -> ThreadId {
-    let raw = unsafe { (*thread.0).thread_id.load(SeqCst) };
+    let raw = unsafe { thread.0.as_ref().thread_id.load(SeqCst) };
     debug_assert!(raw > 0);
     unsafe { ThreadId::from_raw_unchecked(raw) }
 }
@@ -276,7 +297,7 @@ pub fn thread_id(thread: Thread) -> ThreadId {
 /// `thread` must point to a valid and live thread record.
 #[inline]
 pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
-    let data = &*thread.0;
+    let data = thread.0.as_ref();
     (data.stack_addr, data.stack_size, data.guard_size)
 }
 
@@ -285,23 +306,25 @@ pub fn at_thread_exit(func: Box<dyn FnOnce()>) {
     // Safety: `current_thread()` points to thread-local data which is valid
     // as long as the thread is alive.
     unsafe {
-        (*current_thread().0).dtors.push(func);
+        current_thread().0.as_mut().dtors.push(func);
     }
 }
 
 /// Call the destructors registered with [`at_thread_exit`].
 pub(crate) fn call_thread_dtors(current: Thread) {
+    let mut current = current;
+
     // Run the `dtors`, in reverse order of registration. Note that destructors
     // may register new destructors.
     //
     // Safety: `current` points to thread-local data which is valid as long
     // as the thread is alive.
-    while let Some(func) = unsafe { (*current.0).dtors.pop() } {
+    while let Some(func) = unsafe { current.0.as_mut().dtors.pop() } {
         #[cfg(feature = "log")]
         if log::log_enabled!(log::Level::Trace) {
             log::trace!(
                 "Thread[{:?}] calling `at_thread_exit`-registered function",
-                unsafe { (*current.0).thread_id.load(SeqCst) },
+                unsafe { current.0.as_ref().thread_id.load(SeqCst) },
             );
         }
 
@@ -320,24 +343,26 @@ unsafe fn exit_thread() -> ! {
     // Read the thread's state, and set it to `ABANDONED` if it was `INITIAL`,
     // which tells `join_thread` to free the memory. Otherwise, it's in the
     // `DETACHED` state, and we free the memory immediately.
-    let state = (*current.0)
+    let state = current
+        .0
+        .as_ref()
         .detached
         .compare_exchange(INITIAL, ABANDONED, SeqCst, SeqCst);
     if let Err(e) = state {
         // The thread was detached. Prepare to free the memory. First read out
         // all the fields that we'll need before freeing it.
         #[cfg(feature = "log")]
-        let current_thread_id = (*current.0).thread_id.load(SeqCst);
-        let current_map_size = (*current.0).map_size;
-        let current_stack_addr = (*current.0).stack_addr;
-        let current_guard_size = (*current.0).guard_size;
+        let current_thread_id = current.0.as_ref().thread_id.load(SeqCst);
+        let current_map_size = current.0.as_ref().map_size;
+        let current_stack_addr = current.0.as_ref().stack_addr;
+        let current_guard_size = current.0.as_ref().guard_size;
 
         #[cfg(feature = "log")]
         log::trace!("Thread[{:?}] exiting as detached", current_thread_id);
         debug_assert_eq!(e, DETACHED);
 
         // Deallocate the `ThreadData`.
-        drop_in_place(current.0);
+        drop_in_place(current.0.as_ptr());
 
         // Free the thread's `mmap` region, if we allocated it.
         let map_size = current_map_size;
@@ -358,7 +383,7 @@ unsafe fn exit_thread() -> ! {
         if log::log_enabled!(log::Level::Trace) {
             log::trace!(
                 "Thread[{:?}] exiting as joinable",
-                (*current.0).thread_id.load(SeqCst)
+                current.0.as_ref().thread_id.load(SeqCst)
             );
         }
     }
@@ -677,7 +702,7 @@ pub fn create_thread(
                 guard_size
             );
 
-            Ok(Thread(&mut (*metadata).thread))
+            Ok(Thread(NonNull::from(&mut (*metadata).thread)))
         } else {
             Err(io::Errno::from_raw_os_error(-clone_res as i32))
         }
@@ -700,7 +725,7 @@ fn round_up(addr: usize, boundary: usize) -> usize {
 #[inline]
 pub unsafe fn detach_thread(thread: Thread) {
     #[cfg(feature = "log")]
-    let thread_id = (*thread.0).thread_id.load(SeqCst);
+    let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
 
     #[cfg(feature = "log")]
     if log::log_enabled!(log::Level::Trace) {
@@ -711,7 +736,7 @@ pub unsafe fn detach_thread(thread: Thread) {
         );
     }
 
-    if (*thread.0).detached.swap(DETACHED, SeqCst) == ABANDONED {
+    if thread.0.as_ref().detached.swap(DETACHED, SeqCst) == ABANDONED {
         wait_for_thread_exit(thread);
 
         #[cfg(feature = "log")]
@@ -729,7 +754,7 @@ pub unsafe fn detach_thread(thread: Thread) {
 /// been detached or joined.
 pub unsafe fn join_thread(thread: Thread) {
     #[cfg(feature = "log")]
-    let thread_id = (*thread.0).thread_id.load(SeqCst);
+    let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
 
     #[cfg(feature = "log")]
     if log::log_enabled!(log::Level::Trace) {
@@ -741,7 +766,7 @@ pub unsafe fn join_thread(thread: Thread) {
     }
 
     wait_for_thread_exit(thread);
-    debug_assert_eq!((*thread.0).detached.load(SeqCst), ABANDONED);
+    debug_assert_eq!(thread.0.as_ref().detached.load(SeqCst), ABANDONED);
 
     #[cfg(feature = "log")]
     log_thread_to_be_freed(thread_id);
@@ -755,8 +780,8 @@ unsafe fn wait_for_thread_exit(thread: Thread) {
     // Check whether the thread has exited already; we set the
     // `CloneFlags::CHILD_CLEARTID` flag on the clone syscall, so we can test
     // for `NONE` here.
-    let thread = &mut *thread.0;
-    let thread_id = &mut thread.thread_id;
+    let thread = thread.0.as_ref();
+    let thread_id = &thread.thread_id;
     let id_value = thread_id.load(SeqCst);
     if let Some(id_value) = ThreadId::from_raw(id_value) {
         // This doesn't use any shared memory, but we can't use
@@ -790,12 +815,12 @@ unsafe fn free_thread_memory(thread: Thread) {
 
     // The thread was detached. Prepare to free the memory. First read out
     // all the fields that we'll need before freeing it.
-    let map_size = (*thread.0).map_size;
-    let stack_addr = (*thread.0).stack_addr;
-    let guard_size = (*thread.0).guard_size;
+    let map_size = thread.0.as_ref().map_size;
+    let stack_addr = thread.0.as_ref().stack_addr;
+    let guard_size = thread.0.as_ref().guard_size;
 
     // Deallocate the `ThreadData`.
-    drop_in_place(thread.0);
+    drop_in_place(thread.0.as_ptr());
 
     // Free the thread's `mmap` region, if we allocated it.
     if map_size != 0 {

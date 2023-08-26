@@ -22,7 +22,7 @@ jobs:
       QEMU_BUILD_VERSION: 8.1.0
     strategy:
       matrix:
-        build: [ubuntu, ubuntu-20.04, i686-linux, aarch64-linux, riscv64-linux]
+        build: [ubuntu, ubuntu-20.04, i686-linux, aarch64-linux, riscv64-linux, arm-linux]
         include:
           - build: ubuntu
             os: ubuntu-latest
@@ -53,6 +53,14 @@ jobs:
             qemu: qemu-riscv64 -L /usr/riscv64-linux-gnu
             qemu_target: riscv64-linux-user
             host_target: riscv64gc-unknown-linux-gnu
+          - build: arm-linux
+            os: ubuntu-latest
+            target: armv5te-unknown-linux-gnueabi
+            gcc_package: gcc-arm-linux-gnueabi
+            gcc: arm-linux-gnueabi-gcc
+            qemu: qemu-arm -L /usr/arm-linux-gnueabi
+            qemu_target: arm-linux-user
+            host_target: armv5te-unknown-linux-gnueabi
     steps:
     - uses: actions/checkout@v3
     - name: Configure Cargo target

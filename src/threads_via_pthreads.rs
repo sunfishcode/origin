@@ -6,7 +6,7 @@
 use alloc::boxed::Box;
 use core::any::Any;
 use core::ffi::c_void;
-use core::ptr::{from_exposed_addr_mut, null_mut};
+use core::ptr::{from_exposed_addr_mut, null_mut, NonNull};
 use rustix::io;
 
 // FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
@@ -44,10 +44,22 @@ impl Thread {
         Self(raw.expose_addr() as libc::pthread_t)
     }
 
+    /// Convert to `Self` from a raw non-null pointer.
+    #[inline]
+    pub fn from_raw_non_null(raw: NonNull<c_void>) -> Self {
+        Self::from_raw(raw.as_ptr())
+    }
+
     /// Convert to a raw pointer from a `Self`.
     #[inline]
     pub fn to_raw(self) -> *mut c_void {
         from_exposed_addr_mut(self.0 as usize)
+    }
+
+    /// Convert to a raw non-null pointer from a `Self`.
+    #[inline]
+    pub fn to_raw_non_null(self) -> NonNull<c_void> {
+        NonNull::new(self.to_raw()).unwrap()
     }
 }
 

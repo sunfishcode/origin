@@ -42,7 +42,6 @@ features = [ "unwinder" ]
 
 [dev-dependencies]
 similar-asserts = "1.1.0"
-which = "4.4.0"
 
 [features]
 default = ["std", "log", "libc"]

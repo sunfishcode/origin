@@ -32,7 +32,7 @@ extern crate unwinding;
 mod arch;
 
 pub use program::{at_exit, exit, exit_immediately};
-pub use signals::{sigaction, Sigaction};
+pub use signals::{sig_ign, sigaction, Sigaction, Sigflags, Sighandler, Signal, SA_RESTART};
 #[cfg(feature = "set_thread_id")]
 pub use threads::set_current_thread_id_after_a_fork;
 #[cfg(feature = "origin-threads")]

@@ -81,3 +81,7 @@ external-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
 
 # Disable logging.
 max_level_off = ["log/max_level_off"]
+
+[package.metadata.docs.rs]
+features = ["set_thread_id"]
+rustdoc-args = ["--cfg", "doc_cfg"]

@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![feature(asm_const)]
 #![feature(naked_functions)]
 #![feature(link_llvm_intrinsics)]

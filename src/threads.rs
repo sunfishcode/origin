@@ -232,6 +232,7 @@ pub fn current_thread_id() -> ThreadId {
 /// threads are created. `tid` must be the same value as what [`gettid`] would
 /// return.
 #[cfg(feature = "set_thread_id")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "set_thread_id")))]
 #[doc(hidden)]
 #[inline]
 pub unsafe fn set_current_thread_id_after_a_fork(tid: ThreadId) {

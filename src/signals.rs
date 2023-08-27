@@ -1,19 +1,19 @@
 use rustix::io;
 #[cfg(not(target_arch = "riscv64"))]
-use {
-    crate::arch,
-    linux_raw_sys::ctypes::c_ulong,
-    linux_raw_sys::general::{SA_RESTORER, SA_SIGINFO},
-};
+use {crate::arch, linux_raw_sys::ctypes::c_ulong, linux_raw_sys::general::SA_RESTORER};
 
 /// A signal action record for use with [`sigaction`].
 pub use rustix::runtime::Sigaction;
 
-/// A signal identifiier for use with [`sigaction`].
+/// A signal identifier for use with [`sigaction`].
 pub use rustix::process::Signal;
 
 /// A signal handler function for use with [`Sigaction`].
 pub use linux_raw_sys::general::__kernel_sighandler_t as Sighandler;
+
+/// A signal information record for use with [`Sigaction`].
+// TODO: Convert the fields of this to friendlier APIs.
+pub use linux_raw_sys::general::siginfo_t as Siginfo;
 
 /// A flags type for use with [`Sigaction`].
 pub use linux_raw_sys::ctypes::c_ulong as Sigflags;
@@ -47,5 +47,14 @@ pub fn sig_ign() -> Sighandler {
     linux_raw_sys::signal_macros::sig_ign()
 }
 
+/// `SIG_DFL`
+pub use linux_raw_sys::signal_macros::SIG_DFL as SigDfl;
+
+// TODO: Convert these to a `bitflags`.
+
 /// `SA_RESTART`
 pub const SA_RESTART: Sigflags = linux_raw_sys::general::SA_RESTART as _;
+/// `SA_ONSTACK`
+pub const SA_ONSTACK: Sigflags = linux_raw_sys::general::SA_ONSTACK as _;
+/// `SA_SIGINFO`
+pub const SA_SIGINFO: Sigflags = linux_raw_sys::general::SA_SIGINFO as _;

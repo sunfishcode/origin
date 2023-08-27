@@ -5,11 +5,15 @@ use rustix::io;
 /// A signal action record for use with [`sigaction`].
 pub type Sigaction = libc::sigaction;
 
-/// A signal identifiier for use with [`sigaction`].
+/// A signal identifier for use with [`sigaction`].
 pub use rustix::process::Signal;
 
 /// A signal handler function for use with [`Sigaction`].
 pub use libc::sighandler_t as Sighandler;
+
+/// A signal information record for use with [`Sigaction`].
+// TODO: Convert the fields of this to friendlier APIs.
+pub use linux_raw_sys::general::siginfo_t as Siginfo;
 
 /// A flags type for use with [`Sigaction`].
 pub use linux_raw_sys::ctypes::c_int as Sigflags;
@@ -41,5 +45,14 @@ pub fn sig_ign() -> Sighandler {
     libc::SIG_IGN
 }
 
+/// `SIG_DFL`
+pub use libc::SIG_DFL as SigDfl;
+
+// TODO: Convert these to a `bitflags`?
+
 /// `SA_RESTART`
 pub const SA_RESTART: Sigflags = libc::SA_RESTART;
+/// `SA_ONSTACK`
+pub const SA_ONSTACK: Sigflags = libc::SA_ONSTACK;
+/// `SA_SIGINFO`
+pub const SA_SIGINFO: Sigflags = libc::SA_SIGINFO;

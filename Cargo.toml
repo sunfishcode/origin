@@ -9,6 +9,9 @@ documentation = "https://docs.rs/origin"
 license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
 repository = "https://github.com/sunfishcode/origin"
 edition = "2021"
+keywords = ["linux"]
+categories = ["no-std"]
+include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
 
 [dependencies]
 linux-raw-sys = { version = "0.4.3", default-features = false, features = ["general", "no_std"] }

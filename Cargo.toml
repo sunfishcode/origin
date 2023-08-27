@@ -83,5 +83,5 @@ external-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
 max_level_off = ["log/max_level_off"]
 
 [package.metadata.docs.rs]
-features = ["set_thread_id"]
+features = []
 rustdoc-args = ["--cfg", "doc_cfg"]

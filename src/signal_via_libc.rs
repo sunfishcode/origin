@@ -1,3 +1,5 @@
+//! Signal handlers.
+
 use core::mem::MaybeUninit;
 use core::ptr::null;
 use rustix::io;
@@ -6,7 +8,7 @@ use rustix::io;
 pub type Sigaction = libc::sigaction;
 
 /// A signal identifier for use with [`sigaction`].
-pub use rustix::process::Signal;
+pub use rustix::runtime::Signal;
 
 /// A signal handler function for use with [`Sigaction`].
 pub use libc::sighandler_t as Sighandler;

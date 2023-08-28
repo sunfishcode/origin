@@ -15,7 +15,7 @@ include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
 
 [dependencies]
 linux-raw-sys = { version = "0.4.3", default-features = false, features = ["general", "no_std"] }
-rustix = { version = "0.38.9", default-features = false, features = ["mm", "thread", "time", "param", "process"] }
+rustix = { version = "0.38.9", default-features = false }
 bitflags = "2.4.0"
 memoffset = { version = "0.9.0", optional = true }
 log = { version = "0.4.14", default-features = false, optional = true }
@@ -44,44 +44,50 @@ features = [ "unwinder" ]
 similar-asserts = "1.1.0"
 
 [features]
-default = ["std", "log", "libc"]
+default = ["std", "log", "libc", "thread"]
 std = ["rustix/std"]
 set_thread_id = []
 rustc-dep-of-std = [
-    "core",
-    "alloc",
+    "dep:core",
+    "dep:alloc",
     "linux-raw-sys/rustc-dep-of-std",
     "bitflags/rustc-dep-of-std",
     "libc/rustc-dep-of-std",
-]
-
-# Use origin's implementations for everything.
-origin-all = [
-    "origin-program",
-    "origin-threads",
-    "origin-signals",
 ]
 
 # Use origin's implementation of program startup and shutdown.
 origin-program = []
 
 # Use origin's implementation of thread startup and shutdown.
-origin-threads = ["memoffset", "rustix/runtime", "origin-program"]
+origin-thread = ["memoffset", "rustix/runtime", "origin-program", "thread"]
 
 # Use origin's implementation of signal handle registrtion.
-origin-signals = ["rustix/runtime"]
+origin-signal = ["rustix/runtime", "signal"]
 
 # Use origin's `_start` definition.
-origin-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
+origin-start = ["rustix/use-explicitly-provided-auxv", "rustix/param", "rustix/runtime"]
 
 # Don't use origin's `_start` definition, but export a `start` function which
 # is meant to be run very early in program startup and passed a pointer to
 # the initial stack. Don't enable this when enabling "origin-start".
-external-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
+external-start = ["rustix/use-explicitly-provided-auxv", "rustix/param", "rustix/runtime"]
 
 # Disable logging.
 max_level_off = ["log/max_level_off"]
 
+# Enable features which depend on the Rust global allocator, such as functions
+# that return owned strings or `Vec`s.
+alloc = ["rustix/alloc"]
+
+# Enable support for threads.
+thread = ["alloc", "rustix/thread", "rustix/mm", "rustix/param", "rustix/process", "rustix/runtime"]
+
+# Enable support for signal handlers.
+signal = ["rustix/runtime"]
+
 [package.metadata.docs.rs]
-features = []
+features = ["origin-program", "origin-thread", "origin-signal", "origin-start"]
 rustdoc-args = ["--cfg", "doc_cfg"]
+
+[patch.crates-io]
+rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "397155aa086fcdddb85319a4ae73652a27a0ab44" }

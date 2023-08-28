@@ -49,6 +49,10 @@ Origin can also be used on its own, in several different configurations:
    prevents those flags from being passed to build scripts. origin handles
    program and thread startup and shutdown and no part of libc is used.
 
+ - The [origin-start-no-alloc example] is like origin-start, but disables the
+   "alloc" and "thread" features, so that it doesn't need to pull in a global
+   allocator.
+
 [basic example]: https://github.com/sunfishcode/origin/blob/main/test-crates/basic/README.md
 [no-std example]: https://github.com/sunfishcode/origin/blob/main/test-crates/no-std/README.md
 [external-start example]: https://github.com/sunfishcode/origin/blob/main/test-crates/external-start/README.md

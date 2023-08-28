@@ -1,13 +1,25 @@
+//! Program startup and shutdown.
+
+#[cfg(feature = "origin-thread")]
+use crate::thread::initialize_main_thread;
+#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
+#[cfg(all(
+    feature = "alloc",
+    any(feature = "origin-start", feature = "external-start")
+))]
+use alloc::vec::Vec;
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
+use core::arch::asm;
 use core::ffi::c_void;
 #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
-use {
-    crate::threads::initialize_main_thread, alloc::vec::Vec, core::arch::asm,
-    rustix_futex_sync::Mutex,
-};
+#[cfg(all(
+    feature = "alloc",
+    any(feature = "origin-start", feature = "external-start")
+))]
+use rustix_futex_sync::Mutex;
 
 /// The entrypoint where Rust code is first executed when the program starts.
 ///
@@ -73,7 +85,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     rustix::param::init(envp);
 
     // Initialize the main thread.
-    #[cfg(feature = "origin-threads")]
+    #[cfg(feature = "origin-thread")]
     initialize_main_thread(mem.cast());
 
     // Call the functions registered via `.init_array`.
@@ -126,7 +138,10 @@ unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
 }
 
 /// Functions registered with [`at_exit`].
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[cfg(all(
+    feature = "alloc",
+    any(feature = "origin-start", feature = "external-start")
+))]
 static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 
 /// Register a function to be called when [`exit`] is called.
@@ -135,6 +150,7 @@ static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 ///
 /// This arranges for `func` to be called, and passed `obj`, when the program
 /// exits.
+#[cfg(feature = "alloc")]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     #[cfg(any(feature = "origin-start", feature = "external-start"))]
     {
@@ -168,13 +184,19 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 /// `.fini_array` section, and exit the program.
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
-    #[cfg(any(feature = "origin-start", feature = "external-start"))]
-    crate::threads::call_thread_dtors(crate::current_thread());
+    #[cfg(all(
+        feature = "thread",
+        any(feature = "origin-start", feature = "external-start")
+    ))]
+    crate::thread::call_thread_dtors(crate::thread::current_thread());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`
     // unlocked while making the call so that functions can add more functions
     // to the end of the list.
-    #[cfg(any(feature = "origin-start", feature = "external-start"))]
+    #[cfg(all(
+        feature = "alloc",
+        any(feature = "origin-start", feature = "external-start")
+    ))]
     loop {
         let mut dtors = DTORS.lock();
         if let Some(dtor) = dtors.pop() {

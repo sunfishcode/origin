@@ -1,8 +1,10 @@
-//! Threads runtime implemented using rustix, asm, and raw Linux syscalls.
-//!
-//! This implementation implements threads in Rust. See threads_via_pthreads.rs
-//! for an implementation that uses libc.
+//! Thread startup and shutdown.
 
+#[cfg(all(
+    feature = "thread",
+    any(feature = "origin-start", feature = "external-start")
+))]
+use crate::arch::set_thread_pointer;
 use crate::arch::{clone, get_thread_pointer, munmap_and_exit_thread, TLS_OFFSET};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -21,14 +23,12 @@ use rustix::runtime::{set_tid_address, StartupTlsInfo};
 use rustix::thread::gettid;
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 use {
-    crate::arch::set_thread_pointer,
     rustix::param::linux_execfn,
     rustix::process::{getrlimit, Resource},
 };
 
 /// A numerical thread identifier.
-// FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
-pub use rustix::process::Pid as ThreadId;
+pub use rustix::thread::Pid as ThreadId;
 
 /// The entrypoint where Rust code is first executed on a new thread.
 ///
@@ -41,7 +41,11 @@ pub(super) unsafe extern "C" fn entry(fn_: *mut Box<dyn FnOnce() -> Option<Box<d
     let fn_ = Box::from_raw(fn_);
 
     #[cfg(feature = "log")]
-    log::trace!("Thread[{:?}] launched", current_thread_id());
+    log::trace!(
+        target: "origin::thread",
+        "Thread[{:?}] launched",
+        current_thread_id()
+    );
 
     // Do some basic precondition checks, to ensure that our assembly code did
     // what we expect it to do. These are debug-only for now, to keep the
@@ -324,6 +328,7 @@ pub(crate) fn call_thread_dtors(current: Thread) {
         #[cfg(feature = "log")]
         if log::log_enabled!(log::Level::Trace) {
             log::trace!(
+                target: "origin::thread",
                 "Thread[{:?}] calling `at_thread_exit`-registered function",
                 unsafe { current.0.as_ref().thread_id.load(SeqCst) },
             );
@@ -359,7 +364,11 @@ unsafe fn exit_thread() -> ! {
         let current_guard_size = current.0.as_ref().guard_size;
 
         #[cfg(feature = "log")]
-        log::trace!("Thread[{:?}] exiting as detached", current_thread_id);
+        log::trace!(
+            target: "origin::thread",
+            "Thread[{:?}] exiting as detached",
+            current_thread_id
+        );
         debug_assert_eq!(e, DETACHED);
 
         // Deallocate the `ThreadData`.
@@ -383,6 +392,7 @@ unsafe fn exit_thread() -> ! {
         #[cfg(feature = "log")]
         if log::log_enabled!(log::Level::Trace) {
             log::trace!(
+                target: "origin::thread",
                 "Thread[{:?}] exiting as joinable",
                 current.0.as_ref().thread_id.load(SeqCst)
             );
@@ -499,15 +509,12 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     );
 
     // Initialize the TLS data with explicit initializer data.
-    // FIXME: Eliminate this `is_null` check by fixing rustix.
-    if !STARTUP_TLS_INFO.addr.is_null() {
-        slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
-            slice::from_raw_parts(
-                STARTUP_TLS_INFO.addr.cast::<u8>(),
-                STARTUP_TLS_INFO.file_size,
-            ),
-        );
-    }
+    slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
+        slice::from_raw_parts(
+            STARTUP_TLS_INFO.addr.cast::<u8>(),
+            STARTUP_TLS_INFO.file_size,
+        ),
+    );
 
     // Initialize the TLS data beyond `file_size` which is zero-filled.
     slice::from_raw_parts_mut(
@@ -633,15 +640,12 @@ pub fn create_thread(
         );
 
         // Initialize the TLS data with explicit initializer data.
-        // FIXME: Eliminate this `is_null` check by fixing rustix.
-        if !STARTUP_TLS_INFO.addr.is_null() {
-            slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
-                slice::from_raw_parts(
-                    STARTUP_TLS_INFO.addr.cast::<u8>(),
-                    STARTUP_TLS_INFO.file_size,
-                ),
-            );
-        }
+        slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
+            slice::from_raw_parts(
+                STARTUP_TLS_INFO.addr.cast::<u8>(),
+                STARTUP_TLS_INFO.file_size,
+            ),
+        );
 
         // The TLS region includes additional data beyond `file_size` which is
         // expected to be zero-initialized, but we don't need to do anything
@@ -696,6 +700,7 @@ pub fn create_thread(
         if clone_res >= 0 {
             #[cfg(feature = "log")]
             log::trace!(
+                target: "origin::thread",
                 "Thread[{:?}] launched thread Thread[{:?}] with stack_size={} and guard_size={}",
                 current_thread_id(),
                 clone_res,
@@ -731,6 +736,7 @@ pub unsafe fn detach_thread(thread: Thread) {
     #[cfg(feature = "log")]
     if log::log_enabled!(log::Level::Trace) {
         log::trace!(
+            target: "origin::thread",
             "Thread[{:?}] marked as detached by Thread[{:?}]",
             thread_id,
             current_thread_id()
@@ -760,6 +766,7 @@ pub unsafe fn join_thread(thread: Thread) {
     #[cfg(feature = "log")]
     if log::log_enabled!(log::Level::Trace) {
         log::trace!(
+            target: "origin::thread",
             "Thread[{:?}] is being joined by Thread[{:?}]",
             thread_id,
             current_thread_id()
@@ -807,7 +814,11 @@ unsafe fn wait_for_thread_exit(thread: Thread) {
 #[cfg(feature = "log")]
 unsafe fn log_thread_to_be_freed(thread_id: i32) {
     if log::log_enabled!(log::Level::Trace) {
-        log::trace!("Thread[{:?}] memory being freed", thread_id);
+        log::trace!(
+            target: "origin::thread",
+            "Thread[{:?}] memory being freed",
+            thread_id
+        );
     }
 }
 

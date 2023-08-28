@@ -18,11 +18,13 @@ extern crate unwinding;
 pub mod program;
 #[cfg(feature = "signal")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "signal")))]
-#[cfg_attr(not(feature = "origin-signal"), path = "signal_via_libc.rs")]
+#[cfg_attr(feature = "origin-signal", path = "signal/linux_raw.rs")]
+#[cfg_attr(not(feature = "origin-signal"), path = "signal/libc.rs")]
 pub mod signal;
 #[cfg(feature = "thread")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "thread")))]
-#[cfg_attr(not(feature = "origin-thread"), path = "thread_via_libpthread.rs")]
+#[cfg_attr(feature = "origin-thread", path = "thread/linux_raw.rs")]
+#[cfg_attr(not(feature = "origin-thread"), path = "thread/libc.rs")]
 pub mod thread;
 
 // Unwinding isn't supported on 32-bit arm yet.
@@ -30,11 +32,11 @@ pub mod thread;
 mod unwind;
 
 #[cfg(any(feature = "origin-thread", feature = "origin-signal"))]
-#[cfg_attr(target_arch = "aarch64", path = "arch-aarch64.rs")]
-#[cfg_attr(target_arch = "x86_64", path = "arch-x86_64.rs")]
-#[cfg_attr(target_arch = "x86", path = "arch-x86.rs")]
-#[cfg_attr(target_arch = "riscv64", path = "arch-riscv64.rs")]
-#[cfg_attr(target_arch = "arm", path = "arch-arm.rs")]
+#[cfg_attr(target_arch = "aarch64", path = "arch/aarch64.rs")]
+#[cfg_attr(target_arch = "x86_64", path = "arch/x86_64.rs")]
+#[cfg_attr(target_arch = "x86", path = "arch/x86.rs")]
+#[cfg_attr(target_arch = "riscv64", path = "arch/riscv64.rs")]
+#[cfg_attr(target_arch = "arm", path = "arch/arm.rs")]
 mod arch;
 
 /// The program entry point.

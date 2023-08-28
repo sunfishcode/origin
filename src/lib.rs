@@ -9,43 +9,33 @@
 #![deny(lossy_provenance_casts)]
 #![no_std]
 
-#[cfg(not(feature = "rustc-dep-of-std"))]
+#[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
 extern crate alloc;
-
-mod program;
-#[cfg_attr(not(feature = "origin-signals"), path = "signals_via_libc.rs")]
-mod signals;
-#[cfg_attr(not(feature = "origin-threads"), path = "threads_via_pthreads.rs")]
-mod threads;
-// Unwinding isn't supported on 32-bit arm yet.
-#[cfg(target_arch = "arm")]
-mod unwind;
 
 #[cfg(not(target_arch = "arm"))]
 extern crate unwinding;
 
-#[cfg(any(feature = "origin-threads", feature = "origin-signals"))]
+pub mod program;
+#[cfg(feature = "signal")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "signal")))]
+#[cfg_attr(not(feature = "origin-signal"), path = "signal_via_libc.rs")]
+pub mod signal;
+#[cfg(feature = "thread")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "thread")))]
+#[cfg_attr(not(feature = "origin-thread"), path = "thread_via_libpthread.rs")]
+pub mod thread;
+
+// Unwinding isn't supported on 32-bit arm yet.
+#[cfg(target_arch = "arm")]
+mod unwind;
+
+#[cfg(any(feature = "origin-thread", feature = "origin-signal"))]
 #[cfg_attr(target_arch = "aarch64", path = "arch-aarch64.rs")]
 #[cfg_attr(target_arch = "x86_64", path = "arch-x86_64.rs")]
 #[cfg_attr(target_arch = "x86", path = "arch-x86.rs")]
 #[cfg_attr(target_arch = "riscv64", path = "arch-riscv64.rs")]
 #[cfg_attr(target_arch = "arm", path = "arch-arm.rs")]
 mod arch;
-
-pub use program::{at_exit, exit, exit_immediately};
-pub use signals::{
-    sig_ign, sigaction, SigDfl, Sigaction, Sigflags, Sighandler, Siginfo, Signal, SA_ONSTACK,
-    SA_RESTART, SA_SIGINFO,
-};
-#[cfg(feature = "set_thread_id")]
-pub use threads::set_current_thread_id_after_a_fork;
-#[cfg(feature = "origin-threads")]
-pub use threads::thread_id;
-pub use threads::{
-    at_thread_exit, create_thread, current_thread, current_thread_id, current_thread_tls_addr,
-    default_guard_size, default_stack_size, detach_thread, join_thread, thread_stack, Thread,
-    ThreadId,
-};
 
 /// The program entry point.
 ///
@@ -169,8 +159,8 @@ static INIT_ARRAY: unsafe extern "C" fn() = {
         // Log the thread id. We initialized the main earlier than this, but
         // we couldn't initialize the logger until after the main thread is
         // intialized :-).
-        #[cfg(feature = "origin-threads")]
-        log::trace!(target: "origin::threads", "Main Thread[{:?}] initialized", current_thread_id());
+        #[cfg(feature = "origin-thread")]
+        log::trace!(target: "origin::thread", "Main Thread[{:?}] initialized", current_thread_id());
     }
     function
 };

@@ -1,17 +1,19 @@
+#[cfg(any(feature = "origin-thread", feature = "origin-signal"))]
 use core::arch::asm;
+#[cfg(feature = "origin-signal")]
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
-#[cfg(feature = "origin-threads")]
+#[cfg(feature = "origin-thread")]
 use {
     alloc::boxed::Box,
     core::any::Any,
     core::ffi::c_void,
     core::ptr::invalid,
     linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
-    rustix::process::RawPid,
+    rustix::thread::RawPid,
 };
 
 /// A wrapper around the Linux `clone` system call.
-#[cfg(feature = "origin-threads")]
+#[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) unsafe fn clone(
     flags: u32,
@@ -76,7 +78,7 @@ pub(super) unsafe fn clone(
         "pop ebp",
         "pop esi",
 
-        entry = sym super::threads::entry,
+        entry = sym super::thread::entry,
         inout("eax") &[newtls as *mut c_void, invalid(__NR_clone as usize), fn_ as *mut c_void] => r0,
         in("ebx") flags,
         in("ecx") child_stack,
@@ -87,7 +89,7 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(feature = "origin-threads")]
+#[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     let mut user_desc = rustix::runtime::UserDesc {
@@ -111,7 +113,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 }
 
 /// Read the value of the platform thread-pointer register.
-#[cfg(feature = "origin-threads")]
+#[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;
@@ -122,12 +124,12 @@ pub(super) fn get_thread_pointer() -> *mut c_void {
 }
 
 /// TLS data ends at the location pointed to by the thread pointer.
-#[cfg(feature = "origin-threads")]
+#[cfg(feature = "origin-thread")]
 pub(super) const TLS_OFFSET: usize = 0;
 
 /// `munmap` the current thread, then carefully exit the thread without
 /// touching the deallocated stack.
-#[cfg(feature = "origin-threads")]
+#[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
     asm!(
@@ -148,6 +150,7 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
 
 /// Invoke the `__NR_rt_sigreturn` system call to return control from a signal
 /// handler.
+#[cfg(feature = "origin-signal")]
 #[naked]
 pub(super) unsafe extern "C" fn return_from_signal_handler() {
     asm!(
@@ -161,6 +164,7 @@ pub(super) unsafe extern "C" fn return_from_signal_handler() {
 
 /// Invoke the appropriate system call to return control from a signal
 /// handler that does not use `SA_SIGINFO`.
+#[cfg(feature = "origin-signal")]
 #[naked]
 pub(super) unsafe extern "C" fn return_from_signal_handler_noinfo() {
     asm!(

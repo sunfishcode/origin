@@ -6,9 +6,8 @@ publish = false
 
 [dependencies]
 # Origin can be depended on just like any other crate. For no_std, disable
-# the default features. And enable "origin-all" to enable the origin implementations.
-origin = { path = "../..", default-features = false, features = ["origin-all", "external-start"] }
-rustix = { version = "0.38.9", default-features = false }
+# the default features, and the desired features.
+origin = { path = "../..", default-features = false, features = ["origin-program", "origin-thread", "external-start"] }
 
 # Ensure that libc gets linked.
 libc = { version = "0.2", default-features = false }
@@ -20,3 +19,6 @@ compiler_builtins = { version = "0.1.101", features = ["mem"] }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]
+
+[patch.crates-io]
+rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "397155aa086fcdddb85319a4ae73652a27a0ab44" }

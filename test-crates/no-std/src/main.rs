@@ -10,7 +10,8 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use atomic_dbg::{dbg, eprintln};
-use origin::*;
+use origin::thread::*;
+use origin::program::*;
 
 #[panic_handler]
 fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {

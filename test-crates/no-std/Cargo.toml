@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 # Origin can be depended on just like any other crate. For no_std, disable
 # the default features. And enable "libc" to enable the libc implementations.
-origin = { path = "../..", default-features = false, features = ["libc"] }
+origin = { path = "../..", default-features = false, features = ["libc", "thread"] }
 
 # Crates to help writing no_std code.
 atomic-dbg = { version = "0.1.7", default-features = false }
@@ -15,3 +15,6 @@ rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]
+
+[patch.crates-io]
+rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "397155aa086fcdddb85319a4ae73652a27a0ab44" }

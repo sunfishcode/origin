@@ -136,3 +136,8 @@ fn test_crate_origin_start() {
     Hello from an at_exit handler\n",
     );
 }
+
+#[test]
+fn test_crate_origin_start_no_alloc() {
+    test_crate("origin-start-no-alloc", "", "", "Hello!\n");
+}

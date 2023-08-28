@@ -1,7 +1,4 @@
-//! Threads runtime implemented using the native libpthread.
-//!
-//! This implementation uses libc to create and manage threads. See threads.rs
-//! for the Rust implementation.
+//! Thread startup and shutdown.
 
 use alloc::boxed::Box;
 use core::any::Any;
@@ -9,8 +6,7 @@ use core::ffi::c_void;
 use core::ptr::{from_exposed_addr_mut, null_mut, NonNull};
 use rustix::io;
 
-// FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
-pub use rustix::process::Pid as ThreadId;
+pub use rustix::thread::Pid as ThreadId;
 
 // Symbols defined in libc but not declared in the libc crate.
 extern "C" {

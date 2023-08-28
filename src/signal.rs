@@ -1,3 +1,5 @@
+//! Signal handlers.
+
 use rustix::io;
 #[cfg(not(target_arch = "riscv64"))]
 use {crate::arch, linux_raw_sys::ctypes::c_ulong, linux_raw_sys::general::SA_RESTORER};
@@ -6,7 +8,7 @@ use {crate::arch, linux_raw_sys::ctypes::c_ulong, linux_raw_sys::general::SA_RES
 pub use rustix::runtime::Sigaction;
 
 /// A signal identifier for use with [`sigaction`].
-pub use rustix::process::Signal;
+pub use rustix::runtime::Signal;
 
 /// A signal handler function for use with [`Sigaction`].
 pub use linux_raw_sys::general::__kernel_sighandler_t as Sighandler;

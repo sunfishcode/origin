@@ -1,0 +1,3 @@
+# Pass -nostartfiles to the linker.
+[build]
+rustflags = ["-C", "link-args=-nostartfiles"]

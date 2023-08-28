@@ -24,12 +24,12 @@ pub(super) unsafe fn clone(
 ) -> isize {
     let r0;
     asm!(
-        "svc 0",
-        "tst r0,r0",
+        "svc 0",              // do the `clone` system call
+        "tst r0,r0",          // branch if we're in the parent thread
         "bne 0f",
 
         // Child thread.
-        "mov r0,{fn_}",       // `fn_`
+        "mov r0,{fn_}",       // pass `fn_` as the first argument
         "mov fp, #0",         // zero the frame address
         "mov lr, #0",         // zero the return address
         "b {entry}",

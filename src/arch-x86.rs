@@ -48,8 +48,8 @@ pub(super) unsafe fn clone(
     // extra hoops here.
     let r0;
     asm!(
-        "push esi",
-        "push ebp",
+        "push esi",          // save incoming register value
+        "push ebp",          // save incoming register value
 
         // Pass `fn_` to the child in ebp.
         "mov ebp,DWORD PTR [eax+8]",
@@ -60,23 +60,23 @@ pub(super) unsafe fn clone(
         // Use `int 0x80` instead of vsyscall, following `clone`'s
         // documentation; vsyscall would attempt to return to the parent stack
         // in the child.
-        "int 0x80",
-        "test eax,eax",
+        "int 0x80",           // do the `clone` system call
+        "test eax,eax",       // branch if we're in the parent
         "jnz 0f",
 
         // Child thread.
         "push eax",           // pad for alignment
         "push eax",           // pad for alignment
         "push eax",           // pad for alignment
-        "push ebp",           // `fn`
+        "push ebp",           // pass `fn` as the first argument
         "xor ebp,ebp",        // zero the frame address
         "push eax",           // zero the return address
         "jmp {entry}",
 
         // Parent thread.
         "0:",
-        "pop ebp",
-        "pop esi",
+        "pop ebp",            // restore incoming register value
+        "pop esi",            // restore incoming register value
 
         entry = sym super::thread::entry,
         inout("eax") &[newtls as *mut c_void, invalid(__NR_clone as usize), fn_ as *mut c_void] => r0,

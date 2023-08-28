@@ -24,14 +24,14 @@ pub(super) unsafe fn clone(
 ) -> isize {
     let r0;
     asm!(
-        "svc 0",
-        "cbnz x0,0f",
+        "svc 0",              // do the `clone` system call
+        "cbnz x0,0f",         // branch if we're in the parent thread
 
         // Child thread.
-        "mov x0,{fn_}",       // `fn_`
+        "mov x0,{fn_}",       // pass `fn_` as the first argument
         "mov x29, xzr",       // zero the frame address
         "mov x30, xzr",       // zero the return address
-        "b {entry}",
+        "b {entry}",          // call `entry`
 
         // Parent thread.
         "0:",
@@ -106,6 +106,7 @@ pub(super) unsafe extern "C" fn return_from_signal_handler() {
 }
 
 /// Invoke the appropriate system call to return control from a signal
-/// handler that does not use `SA_SIGINFO`.
+/// handler that does not use `SA_SIGINFO`. On aarch64, this uses the same
+/// sequence as the `SA_SIGINFO` case.
 #[cfg(feature = "origin-signal")]
 pub(super) use return_from_signal_handler as return_from_signal_handler_noinfo;

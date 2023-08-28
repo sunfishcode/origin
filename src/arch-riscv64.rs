@@ -21,11 +21,11 @@ pub(super) unsafe fn clone(
 ) -> isize {
     let r0;
     asm!(
-        "ecall",
-        "bnez a0,0f",
+        "ecall",              // do the `clone` system call
+        "bnez a0,0f",         // branch if we're in the parent thread
 
         // Child thread.
-        "mv a0,{fn_}",        // `fn_`
+        "mv a0,{fn_}",        // pass `fn_` as the first argument
         "mv fp, zero",        // zero the frame address
         "mv ra, zero",        // zero the return address
         "tail {entry}",
@@ -88,3 +88,5 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
         options(noreturn, nostack)
     );
 }
+
+// RISC-V doesn't use `__NR_rt_sigreturn`

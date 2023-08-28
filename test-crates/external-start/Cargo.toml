@@ -19,6 +19,3 @@ compiler_builtins = { version = "0.1.101", features = ["mem"] }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]
-
-[patch.crates-io]
-rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "397155aa086fcdddb85319a4ae73652a27a0ab44" }

@@ -15,6 +15,3 @@ rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]
-
-[patch.crates-io]
-rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "397155aa086fcdddb85319a4ae73652a27a0ab44" }

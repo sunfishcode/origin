@@ -2,12 +2,14 @@ use core::arch::asm;
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
 #[cfg(feature = "origin-threads")]
 use {
-    alloc::boxed::Box,
     core::any::Any,
     core::ffi::c_void,
     linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
     rustix::process::RawPid,
 };
+
+#[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
+use alloc::boxed::Box;
 
 /// A wrapper around the Linux `clone` system call.
 #[cfg(feature = "origin-threads")]

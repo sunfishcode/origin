@@ -1,13 +1,12 @@
-use alloc::boxed::Box;
 use core::ffi::c_void;
 #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
-use {
-    crate::threads::initialize_main_thread, alloc::vec::Vec, core::arch::asm,
-    rustix_futex_sync::Mutex,
-};
+use {crate::threads::initialize_main_thread, core::arch::asm, rustix_futex_sync::Mutex};
+
+#[cfg(all(feature = "origin-threads", feature = "alloc"))]
+use alloc::{boxed::Box, vec::Vec};
 
 /// The entrypoint where Rust code is first executed when the program starts.
 ///
@@ -127,6 +126,7 @@ unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
 
 /// Functions registered with [`at_exit`].
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[cfg(feature = "alloc")]
 static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 
 /// Register a function to be called when [`exit`] is called.
@@ -135,6 +135,7 @@ static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 ///
 /// This arranges for `func` to be called, and passed `obj`, when the program
 /// exits.
+#[cfg(feature = "alloc")]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     #[cfg(any(feature = "origin-start", feature = "external-start"))]
     {

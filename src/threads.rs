@@ -4,8 +4,6 @@
 //! for an implementation that uses libc.
 
 use crate::arch::{clone, get_thread_pointer, munmap_and_exit_thread, TLS_OFFSET};
-use alloc::boxed::Box;
-use alloc::vec::Vec;
 use core::any::Any;
 use core::cmp::max;
 use core::ffi::c_void;
@@ -26,6 +24,9 @@ use {
     rustix::process::{getrlimit, Resource},
 };
 
+#[cfg(all(feature = "origin-threads", feature = "alloc"))]
+use alloc::{boxed::Box, vec::Vec};
+
 /// A numerical thread identifier.
 // FIXME: When bytecodealliance/rustix#796 lands, switch to rustix::thread.
 pub use rustix::process::Pid as ThreadId;
@@ -37,6 +38,7 @@ pub use rustix::process::Pid as ThreadId;
 /// # Safety
 ///
 /// After calling `fn_`, this terminates the thread.
+#[cfg(all(feature = "origin-threads", feature = "alloc"))]
 pub(super) unsafe extern "C" fn entry(fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>>>) -> ! {
     let fn_ = Box::from_raw(fn_);
 
@@ -158,6 +160,7 @@ impl Thread {
 }
 
 /// Data associated with a thread. This is not `repr(C)` and not ABI-exposed.
+#[cfg(all(feature = "origin-threads", feature = "alloc"))]
 struct ThreadData {
     thread_id: AtomicI32,
     detached: AtomicU8,
@@ -173,6 +176,7 @@ const INITIAL: u8 = 0;
 const DETACHED: u8 = 1;
 const ABANDONED: u8 = 2;
 
+#[cfg(all(feature = "origin-threads", feature = "alloc"))]
 impl ThreadData {
     #[inline]
     fn new(

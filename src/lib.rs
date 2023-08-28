@@ -9,7 +9,7 @@
 #![deny(lossy_provenance_casts)]
 #![no_std]
 
-#[cfg(not(feature = "rustc-dep-of-std"))]
+#[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
 extern crate alloc;
 
 mod program;

@@ -51,6 +51,18 @@ Origin can also be used on its own, in several different configurations:
    "alloc" and "thread" features, so that it doesn't need to pull in a global
    allocator.
 
+## Fully static linking
+
+The resulting executables in the origin-start and origin-start-no-alloc
+examples don't depend on any dynamic libraries, however by default they do
+still depend on a dynamic linker.
+
+Origin doesn't currently support Position-Independent Executables (PIE), so
+linking with just `RUSTFLAGS=-C target-feature=+crt-static` produces executable
+which don't work. A workaround is to disable PIE, using
+`RUSTFLAGS=-C target-feature=+crt-static -C relocation-model=static`. This
+produces a fully static executable.
+
 [basic example]: https://github.com/sunfishcode/origin/blob/main/example-crates/basic/README.md
 [no-std example]: https://github.com/sunfishcode/origin/blob/main/example-crates/no-std/README.md
 [external-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/external-start/README.md

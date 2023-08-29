@@ -1,9 +1,6 @@
 //! Thread startup and shutdown.
 
-#[cfg(all(
-    feature = "thread",
-    any(feature = "origin-start", feature = "external-start")
-))]
+#[cfg(all(any(feature = "origin-start", feature = "external-start")))]
 use crate::arch::set_thread_pointer;
 use crate::arch::{clone, get_thread_pointer, munmap_and_exit_thread, TLS_OFFSET};
 use alloc::boxed::Box;

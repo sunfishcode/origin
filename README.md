@@ -54,7 +54,8 @@ Origin can also be used on its own, in several different configurations:
 [basic example]: https://github.com/sunfishcode/origin/blob/main/example-crates/basic/README.md
 [no-std example]: https://github.com/sunfishcode/origin/blob/main/example-crates/no-std/README.md
 [external-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/external-start/README.md
+[origin-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start/README.md
+[origin-start-no-alloc example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-no-alloc/README.md
 [Mustang]: https://github.com/sunfishcode/mustang/
 [origin-studio]: https://github.com/sunfishcode/origin-studio
-[origin-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start/README.md
 [c-scape]: https://crates.io/crates/c-scape/

@@ -10,7 +10,7 @@ publish = false
 origin = { path = "../..", default-features = false, features = ["origin-program", "origin-start"] }
 
 # Crates to help writing no_std code.
-atomic-dbg = { version = "0.1.7", default-features = false }
+atomic-dbg = { version = "0.1.8", default-features = false }
 compiler_builtins = { version = "0.1.101", features = ["mem"] }
 
 # This is just an example crate, and not part of the origin workspace.

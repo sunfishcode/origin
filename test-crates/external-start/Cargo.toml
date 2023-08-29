@@ -13,7 +13,7 @@ origin = { path = "../..", default-features = false, features = ["origin-program
 libc = { version = "0.2", default-features = false }
 
 # Crates to help writing no_std code.
-atomic-dbg = { version = "0.1.7", default-features = false }
+atomic-dbg = { version = "0.1.8", default-features = false }
 rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
 compiler_builtins = { version = "0.1.101", features = ["mem"] }
 

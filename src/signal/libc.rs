@@ -58,3 +58,8 @@ pub const SA_RESTART: Sigflags = libc::SA_RESTART;
 pub const SA_ONSTACK: Sigflags = libc::SA_ONSTACK;
 /// `SA_SIGINFO`
 pub const SA_SIGINFO: Sigflags = libc::SA_SIGINFO;
+
+/// `SIGSTKSZ`
+pub const SIGSTKSZ: usize = libc::SIGSTKSZ as usize;
+/// `SS_DISABLE`
+pub const SS_DISABLE: i32 = libc::SS_DISABLE;

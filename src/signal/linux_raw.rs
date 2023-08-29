@@ -60,3 +60,8 @@ pub const SA_RESTART: Sigflags = linux_raw_sys::general::SA_RESTART as _;
 pub const SA_ONSTACK: Sigflags = linux_raw_sys::general::SA_ONSTACK as _;
 /// `SA_SIGINFO`
 pub const SA_SIGINFO: Sigflags = linux_raw_sys::general::SA_SIGINFO as _;
+
+/// `SIGSTKSZ`
+pub const SIGSTKSZ: usize = linux_raw_sys::general::SIGSTKSZ as usize;
+/// `SS_DISABLE`
+pub const SS_DISABLE: i32 = linux_raw_sys::general::SS_DISABLE as i32;

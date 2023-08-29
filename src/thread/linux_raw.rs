@@ -41,11 +41,7 @@ pub(super) unsafe extern "C" fn entry(fn_: *mut Box<dyn FnOnce() -> Option<Box<d
     let fn_ = Box::from_raw(fn_);
 
     #[cfg(feature = "log")]
-    log::trace!(
-        target: "origin::thread",
-        "Thread[{:?}] launched",
-        current_thread_id()
-    );
+    log::trace!("Thread[{:?}] launched", current_thread_id());
 
     // Do some basic precondition checks, to ensure that our assembly code did
     // what we expect it to do. These are debug-only for now, to keep the
@@ -328,7 +324,6 @@ pub(crate) fn call_thread_dtors(current: Thread) {
         #[cfg(feature = "log")]
         if log::log_enabled!(log::Level::Trace) {
             log::trace!(
-                target: "origin::thread",
                 "Thread[{:?}] calling `at_thread_exit`-registered function",
                 unsafe { current.0.as_ref().thread_id.load(SeqCst) },
             );
@@ -364,11 +359,7 @@ unsafe fn exit_thread() -> ! {
         let current_guard_size = current.0.as_ref().guard_size;
 
         #[cfg(feature = "log")]
-        log::trace!(
-            target: "origin::thread",
-            "Thread[{:?}] exiting as detached",
-            current_thread_id
-        );
+        log::trace!("Thread[{:?}] exiting as detached", current_thread_id);
         debug_assert_eq!(e, DETACHED);
 
         // Deallocate the `ThreadData`.
@@ -392,7 +383,6 @@ unsafe fn exit_thread() -> ! {
         #[cfg(feature = "log")]
         if log::log_enabled!(log::Level::Trace) {
             log::trace!(
-                target: "origin::thread",
                 "Thread[{:?}] exiting as joinable",
                 current.0.as_ref().thread_id.load(SeqCst)
             );
@@ -423,12 +413,12 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     let stack_base = stack_base.map_addr(|ptr| round_up(ptr, page_size())) as *mut c_void;
 
     // We're running before any user code, so the startup soft stack limit is
-    // the effective stack size. And Linux doesn't set up a guard page for the
-    // main thread.
+    // the effective stack size. Linux sets up inaccessible memory at the end
+    // of the stack.
     let stack_map_size = getrlimit(Resource::Stack).current.unwrap() as usize;
     let stack_least = stack_base.cast::<u8>().sub(stack_map_size);
     let stack_size = stack_least.offset_from(mem.cast::<u8>()) as usize;
-    let guard_size = 0;
+    let guard_size = page_size();
     let map_size = 0;
 
     // Compute relevant alignments.
@@ -700,7 +690,6 @@ pub fn create_thread(
         if clone_res >= 0 {
             #[cfg(feature = "log")]
             log::trace!(
-                target: "origin::thread",
                 "Thread[{:?}] launched thread Thread[{:?}] with stack_size={} and guard_size={}",
                 current_thread_id(),
                 clone_res,
@@ -736,7 +725,6 @@ pub unsafe fn detach_thread(thread: Thread) {
     #[cfg(feature = "log")]
     if log::log_enabled!(log::Level::Trace) {
         log::trace!(
-            target: "origin::thread",
             "Thread[{:?}] marked as detached by Thread[{:?}]",
             thread_id,
             current_thread_id()
@@ -766,7 +754,6 @@ pub unsafe fn join_thread(thread: Thread) {
     #[cfg(feature = "log")]
     if log::log_enabled!(log::Level::Trace) {
         log::trace!(
-            target: "origin::thread",
             "Thread[{:?}] is being joined by Thread[{:?}]",
             thread_id,
             current_thread_id()
@@ -814,11 +801,7 @@ unsafe fn wait_for_thread_exit(thread: Thread) {
 #[cfg(feature = "log")]
 unsafe fn log_thread_to_be_freed(thread_id: i32) {
     if log::log_enabled!(log::Level::Trace) {
-        log::trace!(
-            target: "origin::thread",
-            "Thread[{:?}] memory being freed",
-            thread_id
-        );
+        log::trace!("Thread[{:?}] memory being freed", thread_id);
     }
 }
 

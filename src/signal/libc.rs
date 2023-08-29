@@ -35,9 +35,7 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
     if libc::sigaction(sig as libc::c_int, action, old.as_mut_ptr()) == 0 {
         Ok(old.assume_init())
     } else {
-        // FIXME: this needs https://github.com/lambda-fairy/rust-errno/pull/77
-        //Err(rustix::io::Errno::from_raw_os_error(errno::errno().0))
-        Err(rustix::io::Errno::from_raw_os_error(libc::EINVAL))
+        Err(rustix::io::Errno::from_raw_os_error(errno::errno().0))
     }
 }
 

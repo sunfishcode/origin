@@ -1,5 +1,5 @@
-//! Run the programs in the `test-crates` directory and compare their outputs
-//! with expected outputs.
+//! Run the programs in the `example-crates` directory and compare their
+//! outputs with expected outputs.
 
 #![feature(cfg_target_abi)]
 
@@ -20,23 +20,6 @@ macro_rules! assert_eq_str {
 fn test_crate(name: &str, features: &str, stdout: &str, stderr: &str) {
     use std::process::Command;
 
-    #[cfg(target_arch = "x86_64")]
-    let arch = "x86_64";
-    #[cfg(target_arch = "aarch64")]
-    let arch = "aarch64";
-    #[cfg(target_arch = "riscv64")]
-    let arch = "riscv64gc";
-    #[cfg(target_arch = "x86")]
-    let arch = "i686";
-    #[cfg(target_arch = "arm")]
-    let arch = "armv5te";
-    #[cfg(target_env = "gnueabi")]
-    let env = "gnueabi";
-    #[cfg(all(target_env = "gnu", target_abi = "eabi"))]
-    let env = "gnueabi";
-    #[cfg(all(target_env = "gnu", not(target_abi = "eabi")))]
-    let env = "gnu";
-
     let mut command = Command::new("cargo");
     command.arg("run").arg("--quiet");
     if !features.is_empty() {
@@ -45,11 +28,7 @@ fn test_crate(name: &str, features: &str, stdout: &str, stderr: &str) {
             .arg("--features")
             .arg(features);
     }
-    // Always pass a --target option even when we're not cross-compiling;
-    // see `origin-start`'s README.md for more info.
-    command
-        .arg(&format!("--target={}-unknown-linux-{}", arch, env))
-        .current_dir(format!("test-crates/{}", name));
+    command.current_dir(format!("example-crates/{}", name));
     dbg!(&command);
     let output = command.output().unwrap();
 
@@ -78,7 +57,7 @@ fn test_crate(name: &str, features: &str, stdout: &str, stderr: &str) {
 }
 
 #[test]
-fn test_crate_basic() {
+fn example_crate_basic() {
     test_crate(
         "basic",
         "",
@@ -93,7 +72,7 @@ fn test_crate_basic() {
 }
 
 #[test]
-fn test_crate_no_std() {
+fn example_crate_no_std() {
     test_crate(
         "no-std",
         "",
@@ -108,7 +87,7 @@ fn test_crate_no_std() {
 }
 
 #[test]
-fn test_crate_external_start() {
+fn example_crate_external_start() {
     test_crate(
         "external-start",
         "",
@@ -123,7 +102,7 @@ fn test_crate_external_start() {
 }
 
 #[test]
-fn test_crate_origin_start() {
+fn example_crate_origin_start() {
     test_crate(
         "origin-start",
         "",
@@ -138,6 +117,6 @@ fn test_crate_origin_start() {
 }
 
 #[test]
-fn test_crate_origin_start_no_alloc() {
+fn example_crate_origin_start_no_alloc() {
     test_crate("origin-start-no-alloc", "", "", "Hello!\n");
 }

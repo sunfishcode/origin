@@ -153,6 +153,8 @@ unsafe impl Sync for UnsafeSendSyncVoidStar {}
 #[used]
 static INIT_ARRAY: unsafe extern "C" fn() = {
     unsafe extern "C" fn function() {
+        #[cfg(feature = "atomic-dbg")]
+        atomic_dbg::log::init();
         #[cfg(feature = "env_logger")]
         env_logger::init();
 
@@ -162,7 +164,11 @@ static INIT_ARRAY: unsafe extern "C" fn() = {
         // we couldn't initialize the logger until after the main thread is
         // intialized :-).
         #[cfg(feature = "origin-thread")]
-        log::trace!(target: "origin::thread", "Main Thread[{:?}] initialized", current_thread_id());
+        log::trace!(
+            target: "origin::thread",
+            "Main Thread[{:?}] initialized",
+            thread::current_thread_id()
+        );
     }
     function
 };

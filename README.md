@@ -43,20 +43,18 @@ Origin can also be used on its own, in several different configurations:
    shutdown once it takes control.
 
  - The [origin-start example] uses `no_std` and `no_main`, and lets origin
-   start the program using its own program entrypoint. This version must be
-   compiled with an explicit `--target=` flag, even if it's the same as the
-   host, because it uses special RUSTFLAGS, and an explicit `--target` flag
-   prevents those flags from being passed to build scripts. origin handles
-   program and thread startup and shutdown and no part of libc is used.
+   start the program using its own program entrypoint. origin handles program
+   and thread startup and shutdown and no part of libc is used. This is the
+   approach that [origin-studio] uses.
 
  - The [origin-start-no-alloc example] is like origin-start, but disables the
    "alloc" and "thread" features, so that it doesn't need to pull in a global
    allocator.
 
-[basic example]: https://github.com/sunfishcode/origin/blob/main/test-crates/basic/README.md
-[no-std example]: https://github.com/sunfishcode/origin/blob/main/test-crates/no-std/README.md
-[external-start example]: https://github.com/sunfishcode/origin/blob/main/test-crates/external-start/README.md
+[basic example]: https://github.com/sunfishcode/origin/blob/main/example-crates/basic/README.md
+[no-std example]: https://github.com/sunfishcode/origin/blob/main/example-crates/no-std/README.md
+[external-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/external-start/README.md
 [Mustang]: https://github.com/sunfishcode/mustang/
 [origin-studio]: https://github.com/sunfishcode/origin-studio
-[origin-start example]: https://github.com/sunfishcode/origin/blob/main/test-crates/origin-start/README.md
+[origin-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start/README.md
 [c-scape]: https://crates.io/crates/c-scape/

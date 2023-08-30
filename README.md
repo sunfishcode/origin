@@ -51,11 +51,13 @@ Origin can also be used on its own, in several different configurations:
    "alloc" and "thread" features, so that it doesn't need to pull in a global
    allocator.
 
+ - The [origin-start-lto example] is like origin-start, but builds with LTO.
+
 ## Fully static linking
 
-The resulting executables in the origin-start and origin-start-no-alloc
-examples don't depend on any dynamic libraries, however by default they do
-still depend on a dynamic linker.
+The resulting executables in the origin-start, origin-start-no-alloc, and
+origin-start-lto examples don't depend on any dynamic libraries, however by
+default they do still depend on a dynamic linker.
 
 For fully static linking, there are two options:
 
@@ -73,6 +75,7 @@ For fully static linking, there are two options:
 [external-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/external-start/README.md
 [origin-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start/README.md
 [origin-start-no-alloc example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-no-alloc/README.md
+[origin-start-lto example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-lto/README.md
 [Mustang]: https://github.com/sunfishcode/mustang/
 [origin-studio]: https://github.com/sunfishcode/origin-studio
 [c-scape]: https://crates.io/crates/c-scape/

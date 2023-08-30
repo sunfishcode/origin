@@ -233,3 +233,63 @@ fn example_crate_origin_start_no_alloc_crt_static_relocation_static_relocate() {
         NO_ALLOC_STDERR,
     );
 }
+
+#[test]
+fn example_crate_origin_start_lto() {
+    // Use a dynamic linker.
+    test_crate("origin-start-lto", &["--release"], &[], "", COMMON_STDERR);
+}
+
+/// Use a dynamic linker, redundantly run `relocate`.
+#[test]
+fn example_crate_origin_start_lto_relocate() {
+    test_crate(
+        "origin-start-lto",
+        &["--release", "--features=origin/experimental-relocate"],
+        &[],
+        "",
+        COMMON_STDERR,
+    );
+}
+
+/// Don't use a dynamic linker, run `relocate`.
+#[test]
+fn example_crate_origin_start_lto_crt_static() {
+    test_crate(
+        "origin-start-lto",
+        &["--release", "--features=origin/experimental-relocate"],
+        &[("RUSTFLAGS", "-C target-feature=+crt-static")],
+        "",
+        COMMON_STDERR,
+    );
+}
+
+/// Don't use a dynamic linker, use static relocs, don't run `relocate`.
+#[test]
+fn example_crate_origin_start_lto_crt_static_relocation_static() {
+    test_crate(
+        "origin-start-lto",
+        &["--release"],
+        &[(
+            "RUSTFLAGS",
+            "-C target-feature=+crt-static -C relocation-model=static",
+        )],
+        "",
+        COMMON_STDERR,
+    );
+}
+
+/// Don't use a dynamic linker, use static relocs, redundantly run `relocate`.
+#[test]
+fn example_crate_origin_start_lto_crt_static_relocation_static_relocate() {
+    test_crate(
+        "origin-start-lto",
+        &["--release", "--features=origin/experimental-relocate"],
+        &[(
+            "RUSTFLAGS",
+            "-C target-feature=+crt-static -C relocation-model=static",
+        )],
+        "",
+        COMMON_STDERR,
+    );
+}

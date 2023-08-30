@@ -1,5 +1,4 @@
-This crate demonstrates the use of origin as a plain library API using
-`no_std` and `no_main`.
+This crate is similar to the [`origin-start` example], except that it doesn't
+enable the "alloc" feature, so it doesn't get a global allocator.
 
-This version uses `-nostartfiles` and origin is in control from the very
-beginning. This uses origin in an "origin-start" configuration.
+[origin-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start/README.md

@@ -41,7 +41,7 @@ default-features = false
 features = [ "unwinder" ]
 
 [dev-dependencies]
-similar-asserts = "1.1.0"
+assert_cmd = "2.0.12"
 
 [features]
 default = ["std", "log", "libc", "thread"]

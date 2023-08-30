@@ -3,53 +3,21 @@
 
 #![feature(cfg_target_abi)]
 
-use similar_asserts::assert_eq;
-
-macro_rules! assert_eq_str {
-    ($a:expr, $b:expr) => {{
-        assert_eq!(String::from_utf8_lossy($a).lines().collect::<Vec<_>>(), String::from_utf8_lossy($b).lines().collect::<Vec<_>>());
-        assert_eq!($a, $b);
-    }};
-
-    ($a:expr, $b:expr, $($arg:tt)+) => {{
-        assert_eq!(String::from_utf8_lossy($a).lines().collect::<Vec<_>>(), String::from_utf8_lossy($b).lines().collect::<Vec<_>>(), $($arg)+);
-        assert_eq!($a, $b, $($arg)+);
-    }};
-}
-
-fn test_crate(name: &str, args: &[&str], envs: &[(&str, &str)], stdout: &str, stderr: &str) {
-    use std::process::Command;
+fn test_crate(
+    name: &str,
+    args: &[&str],
+    envs: &[(&str, &str)],
+    stdout: &'static str,
+    stderr: &'static str,
+) {
+    use assert_cmd::Command;
 
     let mut command = Command::new("cargo");
     command.arg("run").arg("--quiet");
     command.args(args);
     command.envs(envs.iter().cloned());
     command.current_dir(format!("example-crates/{}", name));
-    dbg!(&command);
-    let output = command.output().unwrap();
-
-    assert_eq_str!(
-        stderr.as_bytes(),
-        &output.stderr,
-        "example {} had unexpected stderr, with {:?}",
-        name,
-        output
-    );
-
-    assert_eq_str!(
-        stdout.as_bytes(),
-        &output.stdout,
-        "example {} had unexpected stdout, with {:?}",
-        name,
-        output
-    );
-
-    assert!(
-        output.status.success(),
-        "example {} failed with {:?}",
-        name,
-        output
-    );
+    command.assert().stdout(stdout).stderr(stderr).success();
 }
 
 /// Stderr output for most of the example crates.

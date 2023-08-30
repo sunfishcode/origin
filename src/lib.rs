@@ -4,6 +4,7 @@
 #![feature(asm_const)]
 #![feature(naked_functions)]
 #![feature(link_llvm_intrinsics)]
+#![cfg_attr(feature = "experimental-relocate", feature(cfg_relocation_model))]
 #![feature(strict_provenance)]
 #![deny(fuzzy_provenance_casts)]
 #![deny(lossy_provenance_casts)]

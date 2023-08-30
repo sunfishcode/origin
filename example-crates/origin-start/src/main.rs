@@ -11,8 +11,8 @@ extern crate compiler_builtins;
 
 use alloc::boxed::Box;
 use atomic_dbg::{dbg, eprintln};
-use origin::thread::*;
 use origin::program::*;
+use origin::thread::*;
 
 #[panic_handler]
 fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {

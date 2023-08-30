@@ -84,6 +84,12 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // order.
     rustix::param::init(envp);
 
+    // After initializing the AUX data in rustix, but before doing anything
+    // else, perform dynamic relocations.
+    #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+    #[cfg(relocation_model = "pic")]
+    relocate();
+
     // Initialize the main thread.
     #[cfg(feature = "origin-thread")]
     initialize_main_thread(mem.cast());
@@ -265,4 +271,241 @@ pub fn exit_immediately(status: c_int) -> ! {
         // Call `libc` to exit the program.
         libc::_exit(status)
     }
+}
+
+/// Locate the dynamic (startup-time) relocations and perform them.
+///
+/// This is unsafer than unsafe. It's meant to be called at a time when Rust
+/// code is running but before relocations have been performed. There are no
+/// guarantees that this code won't segfault at any moment.
+///
+/// We use volatile accesses and `asm` optimization barriers to try to
+/// discourage optimizers from thinking they understand what's happening, to
+/// increase the probability of this code working.
+///
+/// And if this code panics, the panic code will probably segfault, because
+/// `core::fmt` is known to use an address that needs relocation.
+///
+/// So yes, there's a reason this code is behind a feature flag.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+#[cold]
+unsafe fn relocate() {
+    use core::mem::size_of;
+    use core::ptr::{
+        from_exposed_addr, from_exposed_addr_mut, read_volatile, write_volatile, NonNull,
+    };
+    use core::slice::from_raw_parts;
+    use rustix::mm::{mprotect, MprotectFlags};
+
+    // Please do not take any of the following code as an example for how to
+    // write Rust code in general.
+
+    // Compute the static address of `_start`. This relies on the sneaky fact
+    // that we initialize a static variable with the address of `_start`, and
+    // if we haven't performed relocations yet, we'll be able to see the static
+    // address. Also, the program *just* started so there are no other threads
+    // yet, so loading from static memory without synchronization is fine. But
+    // we still use volatile and `asm` to do everything we can to protect this
+    // code because the optimizer won't have any idea what we're up to.
+    struct StaticStart(*const u8);
+    unsafe impl Sync for StaticStart {}
+    static STATIC_START: StaticStart = StaticStart(crate::_start as *const u8);
+    let mut static_start_addr: *const *const u8 = &STATIC_START.0;
+    asm!("# {}", inout(reg) static_start_addr);
+    let mut static_start = read_volatile(static_start_addr).addr();
+    asm!("# {}", inout(reg) static_start);
+
+    // Obtain the dynamic address of `_start` from the AUX records.
+    let dynamic_start = rustix::runtime::entry();
+
+    // Our offset is the difference between these two.
+    let offset = dynamic_start.wrapping_sub(static_start);
+
+    // If we're loaded at our static address, then there's nothing to do.
+    if offset == 0 {
+        return;
+    }
+
+    // Now, obtain the static Phdrs, which have been mapped into the address
+    // space at an address provided to us in the AUX array.
+    let (phdr, phnum) = rustix::runtime::exe_phdrs();
+    let phdrs: &[Elf_Phdr] = from_raw_parts(phdr.cast(), phnum);
+
+    // Next, look through the Phdrs to find the Dynamic section and the Relro
+    // description if present. In the `Dynamic` section, find the relocations
+    // and perform them.
+    let mut relro = 0;
+    let mut relro_len = 0;
+    for phdr in phdrs {
+        match phdr.p_type {
+            PT_DYNAMIC => {
+                // We found the dynamic section.
+                let dynamic = from_exposed_addr(phdr.p_vaddr.wrapping_add(offset));
+                let num_dyn = phdr.p_memsz / size_of::<Elf_Dyn>();
+                let dyns: &[Elf_Dyn] = from_raw_parts(dynamic, num_dyn);
+
+                // Look through the `Elf_Dyn` entries to find the location of
+                // the relocation table.
+                let mut rela = NonNull::dangling().as_ptr() as *const Elf_Rela;
+                let mut num_rela = 0;
+                for dyn_ in dyns {
+                    match dyn_.d_tag as u32 {
+                        DT_RELA => rela = from_exposed_addr(dyn_.d_un.d_ptr.wrapping_add(offset)),
+                        DT_RELASZ => num_rela = dyn_.d_un.d_val as usize / size_of::<Elf_Rela>(),
+                        DT_RELAENT => {
+                            debug_assert_eq!(dyn_.d_un.d_val as usize, size_of::<Elf_Rela>())
+                        }
+                        _ => (),
+                    }
+                }
+
+                // Now, perform the relocations. As above, the optimizer won't
+                // have any idea what we're up to, so use volatile and `asm`.
+                let relas: &[Elf_Rela] = from_raw_parts(rela, num_rela);
+                for rela in relas {
+                    let addr: *mut c_void =
+                        from_exposed_addr_mut(rela.r_offset.wrapping_add(offset));
+
+                    match rela.type_() {
+                        R_RELATIVE => {
+                            let mut reloc_addr = addr.cast();
+                            let mut reloc_value = rela.r_addend.wrapping_add(offset);
+                            asm!("# {} {}", inout(reg) reloc_addr, inout(reg) reloc_value);
+                            write_volatile(reloc_addr, reloc_value);
+                            asm!("");
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+            }
+            PT_GNU_RELRO => {
+                // A Relro description is present. Make a note of it so that we
+                // can mark memory readonly after relocations are done.
+                relro = phdr.p_vaddr;
+                relro_len = phdr.p_memsz;
+            }
+            _ => (),
+        }
+    }
+
+    // Check that relocation did its job.
+    #[cfg(debug_assertions)]
+    {
+        let mut static_start_addr: *const *const u8 = &STATIC_START.0;
+        asm!("# {}", inout(reg) static_start_addr);
+        let mut static_start = read_volatile(static_start_addr).addr();
+        asm!("# {}", inout(reg) static_start);
+        assert_eq!(static_start, dynamic_start);
+    }
+
+    // If we saw a Relro description, mark the memory readonly.
+    if relro_len != 0 {
+        let mprotect_addr = from_exposed_addr_mut(
+            relro.wrapping_add(offset) & rustix::param::page_size().wrapping_neg(),
+        );
+        mprotect(mprotect_addr, relro_len, MprotectFlags::READ).unwrap();
+    }
+
+    // ELF ABI.
+
+    #[cfg(target_pointer_width = "32")]
+    #[repr(C)]
+    struct Elf_Phdr {
+        p_type: u32,
+        p_offset: usize,
+        p_vaddr: usize,
+        p_paddr: usize,
+        p_filesz: usize,
+        p_memsz: usize,
+        p_flags: u32,
+        p_align: usize,
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[repr(C)]
+    struct Elf_Phdr {
+        p_type: u32,
+        p_flags: u32,
+        p_offset: usize,
+        p_vaddr: usize,
+        p_paddr: usize,
+        p_filesz: usize,
+        p_memsz: usize,
+        p_align: usize,
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[repr(C)]
+    struct Elf_Dyn {
+        d_tag: i32,
+        d_un: Elf_Dyn_Union,
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[repr(C)]
+    union Elf_Dyn_Union {
+        d_val: u32,
+        d_ptr: usize,
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[repr(C)]
+    struct Elf_Dyn {
+        d_tag: i64,
+        d_un: Elf_Dyn_Union,
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[repr(C)]
+    union Elf_Dyn_Union {
+        d_val: u64,
+        d_ptr: usize,
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[repr(C)]
+    struct Elf_Rela {
+        r_offset: usize,
+        r_info: u32,
+        r_addend: usize,
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[repr(C)]
+    struct Elf_Rela {
+        r_offset: usize,
+        r_info: u64,
+        r_addend: usize,
+    }
+
+    impl Elf_Rela {
+        #[inline]
+        fn type_(&self) -> u32 {
+            #[cfg(target_pointer_width = "32")]
+            {
+                self.r_info & 0xff
+            }
+            #[cfg(target_pointer_width = "64")]
+            {
+                (self.r_info & 0xffff_ffff) as u32
+            }
+        }
+    }
+
+    const PT_DYNAMIC: u32 = 2;
+    const PT_GNU_RELRO: u32 = 0x6474e552;
+    const DT_RELA: u32 = 7;
+    const DT_RELASZ: u32 = 8;
+    const DT_RELAENT: u32 = 9;
+    #[cfg(target_arch = "x86_64")]
+    const R_RELATIVE: u32 = 8; // `R_X86_64_RELATIVE`
+    #[cfg(target_arch = "x86")]
+    const R_RELATIVE: u32 = 8; // `R_386_RELATIVE`
+    #[cfg(target_arch = "aarch64")]
+    const R_RELATIVE: u32 = 1027; // `R_AARCH64_RELATIVE`
+    #[cfg(target_arch = "riscv64")]
+    const R_RELATIVE: u32 = 3; // `R_RISCV_RELATIVE`
+    #[cfg(target_arch = "arm")]
+    const R_RELATIVE: u32 = 23; // `R_ARM_RELATIVE`
 }

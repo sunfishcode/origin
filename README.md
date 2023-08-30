@@ -51,6 +51,23 @@ Origin can also be used on its own, in several different configurations:
    "alloc" and "thread" features, so that it doesn't need to pull in a global
    allocator.
 
+## Fully static linking
+
+The resulting executables in the origin-start and origin-start-no-alloc
+examples don't depend on any dynamic libraries, however by default they do
+still depend on a dynamic linker.
+
+For fully static linking, there are two options:
+
+ - Build with `RUSTFLAGS=-C target-feature=+crt-static -C relocation-model=static`.
+   This disables PIE mode, which is safer in terms of origin's code, but loses
+   the security benefits of Address-Space Layout Randomization (ASLR).
+
+ - Build with `RUSTFLAGS=-C target-feature=+crt-static` and enable
+   origin's `experimental-relocate` feature. This allows PIE mode to work,
+   however it does so by enabling some highly experimental code in origin for
+   performing relocations.
+
 [basic example]: https://github.com/sunfishcode/origin/blob/main/example-crates/basic/README.md
 [no-std example]: https://github.com/sunfishcode/origin/blob/main/example-crates/no-std/README.md
 [external-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/external-start/README.md

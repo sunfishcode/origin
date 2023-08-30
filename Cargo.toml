@@ -85,6 +85,14 @@ thread = ["alloc", "rustix/thread", "rustix/mm", "rustix/param", "rustix/process
 # Enable support for signal handlers.
 signal = ["rustix/runtime"]
 
+# Enable highly experimental support for performing startup-time relocations,
+# needed to support statically-linked PIE executables.
+experimental-relocate = ["rustix/mm", "rustix/runtime"]
+
 [package.metadata.docs.rs]
 features = ["origin-program", "origin-thread", "origin-signal", "origin-start"]
 rustdoc-args = ["--cfg", "doc_cfg"]
+
+[patch.crates-io]
+# Temporary override for the `runtime::entry` function.
+rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "6697a9f123130c4cd0290f4cec578a83ae405a2c" }

@@ -17,7 +17,8 @@ extern "C" {
     ) -> libc::c_int;
     fn __tls_get_addr(p: &[usize; 2]) -> *mut c_void;
 
-    // TODO: These two should probably be upstreamed.
+    // TODO: PR for these has been submitted to upstream:
+    // <https://github.com/rust-lang/libc/pull/3330>
     fn pthread_attr_getstacksize(
         attr: *const libc::pthread_attr_t,
         stacksize: &mut libc::size_t,

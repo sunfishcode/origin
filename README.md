@@ -28,6 +28,8 @@ This is used by the [Mustang] project in its libc implementation, and in the
 [origin-studio] project in its std implementation, which are two different
 ways to support building Rust programs written entirely in Rust.
 
+## Example crates
+
 Origin can also be used on its own, in several different configurations:
 
  - The [basic example] shows a simple example of using origin as a simple

@@ -334,18 +334,18 @@ unsafe fn relocate() {
 
     // Now, obtain the static Phdrs, which have been mapped into the address
     // space at an address provided to us in the AUX array.
-    let (phdrs_ptr, phent, phnum) = rustix::runtime::exe_phdrs();
-    let mut phdrs_ptr = phdrs_ptr.cast::<Elf_Phdr>();
+    let (first_phdr, phent, phnum) = rustix::runtime::exe_phdrs();
+    let mut current_phdr = first_phdr.cast::<Elf_Phdr>();
 
     // Next, look through the Phdrs to find the Dynamic section and the Relro
     // description if present. In the `Dynamic` section, find the relocations
     // and perform them.
     let mut relro = 0;
     let mut relro_len = 0;
-    let phdrs_end = phdrs_ptr.cast::<u8>().add(phnum * phent).cast();
-    while phdrs_ptr != phdrs_end {
-        let phdr = &*phdrs_ptr;
-        phdrs_ptr = phdrs_ptr.cast::<u8>().add(phent).cast();
+    let phdrs_end = current_phdr.cast::<u8>().add(phnum * phent).cast();
+    while current_phdr != phdrs_end {
+        let phdr = &*current_phdr;
+        current_phdr = current_phdr.cast::<u8>().add(phent).cast();
 
         match phdr.p_type {
             PT_DYNAMIC => {

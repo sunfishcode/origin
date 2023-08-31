@@ -19,4 +19,4 @@ compiler_builtins = { version = "0.1.101", features = ["mem"] }
 
 [patch.crates-io]
 # Temporary override.
-rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "2c56e44190eb97b5fefabe6cba4f86c50a01db1e" }
+rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "f49d028e916db8189d002eba282d7211d20b1cc4" }

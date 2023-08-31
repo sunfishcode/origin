@@ -80,6 +80,9 @@ max_level_off = ["log/max_level_off"]
 alloc = ["rustix/alloc"]
 
 # Enable support for threads.
+#
+# Origin's threads support currently depends on dynamic allocation, so it
+# pulls in the "alloc" feature.
 thread = ["alloc", "rustix/thread", "rustix/mm", "rustix/param", "rustix/process", "rustix/runtime"]
 
 # Enable support for signal handlers.

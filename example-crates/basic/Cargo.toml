@@ -10,3 +10,7 @@ origin = { path = "../.." }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]
+
+[patch.crates-io]
+# Temporary override.
+rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "2c56e44190eb97b5fefabe6cba4f86c50a01db1e" }

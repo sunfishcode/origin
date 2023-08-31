@@ -1,0 +1,30 @@
+[package]
+name = "origin-start-lto"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# Origin can be depended on just like any other crate. For no_std, disable
+# the default features, and the desired features.
+origin = { path = "../..", default-features = false, features = ["origin-program", "origin-thread", "origin-start"] }
+
+# Crates to help writing no_std code.
+atomic-dbg = { version = "0.1.8", default-features = false }
+rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
+compiler_builtins = { version = "0.1.101", features = ["mem"] }
+
+# This is just an example crate, and not part of the origin workspace.
+[workspace]
+
+# Enable LTO in the normal way.
+[profile.release]
+lto = true
+
+# Enable LTO for debug builds too, because hey, this is an LTO demo.
+[profile.dev]
+lto = true
+
+[patch.crates-io]
+# Temporary override for the `runtime::entry` function.
+rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "6697a9f123130c4cd0290f4cec578a83ae405a2c" }

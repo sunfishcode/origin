@@ -297,6 +297,7 @@ unsafe fn relocate() {
     };
     use core::slice::from_raw_parts;
     use rustix::mm::{mprotect, MprotectFlags};
+    use rustix::param::page_size;
 
     // Please do not take any of the following code as an example for how to
     // write Rust code in general.
@@ -321,6 +322,10 @@ unsafe fn relocate() {
 
     // Our offset is the difference between these two.
     let offset = dynamic_start.wrapping_sub(static_start);
+
+    // This code doesn't rely on the offset being page aligned, but it is
+    // useful to check to make sure we computed it correctly.
+    debug_assert_eq!(offset & (page_size() - 1), 0);
 
     // If we're loaded at our static address, then there's nothing to do.
     if offset == 0 {
@@ -402,7 +407,7 @@ unsafe fn relocate() {
     // If we saw a Relro description, mark the memory readonly.
     if relro_len != 0 {
         let mprotect_addr = from_exposed_addr_mut(
-            relro.wrapping_add(offset) & rustix::param::page_size().wrapping_neg(),
+            relro.wrapping_add(offset) & page_size().wrapping_neg(),
         );
         mprotect(mprotect_addr, relro_len, MprotectFlags::READ).unwrap();
     }

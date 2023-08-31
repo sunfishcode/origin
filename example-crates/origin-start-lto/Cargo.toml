@@ -24,7 +24,3 @@ lto = true
 # Enable LTO for debug builds too, because hey, this is an LTO demo.
 [profile.dev]
 lto = true
-
-[patch.crates-io]
-# Temporary override.
-rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "f49d028e916db8189d002eba282d7211d20b1cc4" }

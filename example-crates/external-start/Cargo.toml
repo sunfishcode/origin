@@ -19,7 +19,3 @@ compiler_builtins = { version = "0.1.101", features = ["mem"] }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]
-
-[patch.crates-io]
-# Temporary override.
-rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "f49d028e916db8189d002eba282d7211d20b1cc4" }

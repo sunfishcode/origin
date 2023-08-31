@@ -48,8 +48,10 @@ Origin can also be used on its own, in several different configurations:
    approach that [origin-studio] uses.
 
  - The [origin-start-no-alloc example] is like origin-start, but disables the
-   "alloc" and "thread" features, so that it doesn't need to pull in a global
-   allocator.
+   "alloc" and "thread" features, since origin's "thread" feature currently
+   depends on "alloc". Without "alloc", functions that return owned strings
+   or `Vec`s are not available. In this mode, origin avoids using a
+   global allocator entirely.
 
  - The [origin-start-lto example] is like origin-start, but builds with LTO.
 

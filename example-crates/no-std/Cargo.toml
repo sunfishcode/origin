@@ -17,5 +17,5 @@ rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
 [workspace]
 
 [patch.crates-io]
-# Temporary override for the `runtime::entry` function.
-rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "6697a9f123130c4cd0290f4cec578a83ae405a2c" }
+# Temporary override.
+rustix = { git = "https://github.com/bytecodealliance/rustix", rev = "2c56e44190eb97b5fefabe6cba4f86c50a01db1e" }

@@ -334,15 +334,19 @@ unsafe fn relocate() {
 
     // Now, obtain the static Phdrs, which have been mapped into the address
     // space at an address provided to us in the AUX array.
-    let (phdr, phnum) = rustix::runtime::exe_phdrs();
-    let phdrs: &[Elf_Phdr] = from_raw_parts(phdr.cast(), phnum);
+    let (phdrs_ptr, phent, phnum) = rustix::runtime::exe_phdrs();
+    let mut phdrs_ptr = phdrs_ptr.cast::<Elf_Phdr>();
 
     // Next, look through the Phdrs to find the Dynamic section and the Relro
     // description if present. In the `Dynamic` section, find the relocations
     // and perform them.
     let mut relro = 0;
     let mut relro_len = 0;
-    for phdr in phdrs {
+    let phdrs_end = phdrs_ptr.cast::<u8>().add(phnum * phent).cast();
+    while phdrs_ptr != phdrs_end {
+        let phdr = &*phdrs_ptr;
+        phdrs_ptr = phdrs_ptr.cast::<u8>().add(phent).cast();
+
         match phdr.p_type {
             PT_DYNAMIC => {
                 // We found the dynamic section.
@@ -352,23 +356,27 @@ unsafe fn relocate() {
 
                 // Look through the `Elf_Dyn` entries to find the location of
                 // the relocation table.
-                let mut rela = NonNull::dangling().as_ptr() as *const Elf_Rela;
+                let mut rela_ptr = NonNull::dangling().as_ptr() as *const Elf_Rela;
                 let mut num_rela = 0;
+                let mut rela_ent_size = 0;
                 for dyn_ in dyns {
                     match dyn_.d_tag as u32 {
-                        DT_RELA => rela = from_exposed_addr(dyn_.d_un.d_ptr.wrapping_add(offset)),
-                        DT_RELASZ => num_rela = dyn_.d_un.d_val as usize / size_of::<Elf_Rela>(),
-                        DT_RELAENT => {
-                            debug_assert_eq!(dyn_.d_un.d_val as usize, size_of::<Elf_Rela>())
+                        DT_RELA => {
+                            rela_ptr = from_exposed_addr(dyn_.d_un.d_ptr.wrapping_add(offset))
                         }
+                        DT_RELASZ => num_rela = dyn_.d_un.d_val as usize / size_of::<Elf_Rela>(),
+                        DT_RELAENT => rela_ent_size = dyn_.d_un.d_val as usize,
                         _ => (),
                     }
                 }
 
                 // Now, perform the relocations. As above, the optimizer won't
                 // have any idea what we're up to, so use volatile and `asm`.
-                let relas: &[Elf_Rela] = from_raw_parts(rela, num_rela);
-                for rela in relas {
+                let rela_end = rela_ptr.cast::<u8>().add(num_rela * rela_ent_size).cast();
+                while rela_ptr != rela_end {
+                    let rela = &*rela_ptr;
+                    rela_ptr = rela_ptr.cast::<u8>().add(rela_ent_size).cast();
+
                     let addr: *mut c_void =
                         from_exposed_addr_mut(rela.r_offset.wrapping_add(offset));
 
@@ -406,9 +414,8 @@ unsafe fn relocate() {
 
     // If we saw a Relro description, mark the memory readonly.
     if relro_len != 0 {
-        let mprotect_addr = from_exposed_addr_mut(
-            relro.wrapping_add(offset) & page_size().wrapping_neg(),
-        );
+        let mprotect_addr =
+            from_exposed_addr_mut(relro.wrapping_add(offset) & page_size().wrapping_neg());
         mprotect(mprotect_addr, relro_len, MprotectFlags::READ).unwrap();
     }
 

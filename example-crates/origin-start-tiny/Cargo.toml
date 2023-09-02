@@ -1,0 +1,27 @@
+[package]
+name = "origin-start-tiny"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# Origin can be depended on just like any other crate. For no_std, disable
+# the default features, and the desired features.
+origin = { path = "../..", default-features = false, features = ["origin-program", "origin-start"] }
+
+# Crates to help writing no_std code.
+compiler_builtins = { version = "0.1.101", features = ["mem"] }
+
+# This is just an example crate, and not part of the origin workspace.
+[workspace]
+
+# Let's optimize for small size!
+[profile.release]
+# Give the optimizer more lattitude to optimize and delete unneeded code.
+lto = true
+# "abort" is smaller than "unwind".
+panic = "abort"
+# Tell the optimizer to optimize for size.
+opt-level = "z"
+# Delete the symbol table from the executable.
+strip = true

@@ -83,6 +83,7 @@ For fully static linking, there are two options:
 [origin-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start/README.md
 [origin-start-no-alloc example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-no-alloc/README.md
 [origin-start-lto example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-lto/README.md
+[origin-start-tiny example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-tiny/README.md
 [Mustang]: https://github.com/sunfishcode/mustang/
 [origin-studio]: https://github.com/sunfishcode/origin-studio
 [c-scape]: https://crates.io/crates/c-scape/

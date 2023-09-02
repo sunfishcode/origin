@@ -65,12 +65,12 @@ origin-thread = ["memoffset", "rustix/runtime", "origin-program", "thread"]
 origin-signal = ["rustix/runtime", "signal"]
 
 # Use origin's `_start` definition.
-origin-start = ["rustix/use-explicitly-provided-auxv", "rustix/param", "rustix/runtime"]
+origin-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
 
 # Don't use origin's `_start` definition, but export a `start` function which
 # is meant to be run very early in program startup and passed a pointer to
 # the initial stack. Don't enable this when enabling "origin-start".
-external-start = ["rustix/use-explicitly-provided-auxv", "rustix/param", "rustix/runtime"]
+external-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
 
 # Disable logging.
 max_level_off = ["log/max_level_off"]
@@ -83,14 +83,17 @@ alloc = ["rustix/alloc"]
 #
 # Origin's threads support currently depends on dynamic allocation, so it
 # pulls in the "alloc" feature.
-thread = ["alloc", "rustix/thread", "rustix/mm", "rustix/param", "rustix/process", "rustix/runtime"]
+thread = ["alloc", "rustix/thread", "rustix/mm", "param", "rustix/process", "rustix/runtime"]
 
 # Enable support for signal handlers.
 signal = ["rustix/runtime"]
 
+# Enable support for `rustix::param`.
+param = ["rustix/param"]
+
 # Enable highly experimental support for performing startup-time relocations,
 # needed to support statically-linked PIE executables.
-experimental-relocate = ["rustix/mm", "rustix/runtime"]
+experimental-relocate = ["rustix/mm", "rustix/runtime", "param"]
 
 [package.metadata.docs.rs]
 features = ["origin-program", "origin-thread", "origin-signal", "origin-start"]

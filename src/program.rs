@@ -82,6 +82,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 
     // Explicitly initialize `rustix` so that we can control the initialization
     // order.
+    #[cfg(feature = "param")]
     rustix::param::init(envp);
 
     // After initializing the AUX data in rustix, but before doing anything

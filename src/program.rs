@@ -9,9 +9,11 @@ use alloc::boxed::Box;
     any(feature = "origin-start", feature = "external-start")
 ))]
 use alloc::vec::Vec;
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[cfg(all(
+    feature = "init-fini-arrays",
+    any(feature = "origin-start", feature = "external-start")
+))]
 use core::arch::asm;
-use core::ffi::c_void;
 #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
@@ -96,6 +98,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     initialize_main_thread(mem.cast());
 
     // Call the functions registered via `.init_array`.
+    #[cfg(feature = "init-fini-arrays")]
     call_ctors(argc, argv, envp);
 
     #[cfg(feature = "log")]
@@ -114,7 +117,10 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 
 /// Call the constructors in the `.init_array` section.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[cfg(feature = "init-fini-arrays")]
 unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
+    use core::ffi::c_void;
+
     extern "C" {
         static __init_array_start: c_void;
         static __init_array_end: c_void;
@@ -167,6 +173,8 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 
     #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
     {
+        use core::ffi::c_void;
+
         extern "C" {
             // <https://refspecs.linuxbase.org/LSB_3.1.0/LSB-generic/LSB-generic/baselib---cxa-atexit.html>
             fn __cxa_atexit(
@@ -218,7 +226,10 @@ pub fn exit(status: c_int) -> ! {
 
     // Call the `.fini_array` functions, in reverse order.
     #[cfg(any(feature = "origin-start", feature = "external-start"))]
+    #[cfg(feature = "init-fini-arrays")]
     unsafe {
+        use core::ffi::c_void;
+
         extern "C" {
             static __fini_array_start: c_void;
             static __fini_array_end: c_void;
@@ -292,6 +303,8 @@ pub fn exit_immediately(status: c_int) -> ! {
 #[cfg(relocation_model = "pic")]
 #[cold]
 unsafe fn relocate() {
+    use core::arch::asm;
+    use core::ffi::c_void;
     use core::mem::size_of;
     use core::ptr::{
         from_exposed_addr, from_exposed_addr_mut, read_volatile, write_volatile, NonNull,

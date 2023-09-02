@@ -44,7 +44,7 @@ features = [ "unwinder" ]
 assert_cmd = "2.0.12"
 
 [features]
-default = ["std", "log", "libc", "thread"]
+default = ["std", "log", "libc", "thread", "init-fini-arrays"]
 std = ["rustix/std"]
 set_thread_id = []
 rustc-dep-of-std = [
@@ -90,6 +90,9 @@ signal = ["rustix/runtime"]
 
 # Enable support for `rustix::param`.
 param = ["rustix/param"]
+
+# Enable support for ELF `.init_array` and `.fini_array`.
+init-fini-arrays = []
 
 # Enable highly experimental support for performing startup-time relocations,
 # needed to support statically-linked PIE executables.

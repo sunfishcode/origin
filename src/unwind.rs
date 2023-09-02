@@ -1,7 +1,7 @@
-//! Stub libunwind implementation on platforms where we don't have real
-//! unwind support.
+//! Stub libunwind implementation on platforms where we don't have real unwind
+//! support.
 //!
-//! Entirely `unimplemented!`. Don't panic.
+//! Entirely `unimplemented!`.
 
 #[no_mangle]
 unsafe extern "C" fn _Unwind_Backtrace() {

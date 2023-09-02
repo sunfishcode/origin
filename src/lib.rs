@@ -13,8 +13,12 @@
 #[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
 extern crate alloc;
 
+// Pull in the `unwinding` crate to satisfy `_Unwind_* symbol references.
+// Except that 32-bit arm isn't supported yet, so we use stubs instead.
 #[cfg(not(target_arch = "arm"))]
 extern crate unwinding;
+#[cfg(target_arch = "arm")]
+mod unwind;
 
 pub mod program;
 #[cfg(feature = "signal")]
@@ -27,10 +31,6 @@ pub mod signal;
 #[cfg_attr(feature = "origin-thread", path = "thread/linux_raw.rs")]
 #[cfg_attr(not(feature = "origin-thread"), path = "thread/libc.rs")]
 pub mod thread;
-
-// Unwinding isn't supported on 32-bit arm yet.
-#[cfg(target_arch = "arm")]
-mod unwind;
 
 #[cfg(any(feature = "origin-thread", feature = "origin-signal"))]
 #[cfg_attr(target_arch = "aarch64", path = "arch/aarch64.rs")]

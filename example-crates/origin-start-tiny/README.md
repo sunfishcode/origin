@@ -1,4 +1,4 @@
-This crate is similar to the [`origin-start` example], except that doesn't
+This crate is similar to the [origin-start example], except that doesn't
 print any output, and enables optimizations for small code size. To produce a
 small binary, compile with `--release`.
 

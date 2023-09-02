@@ -9,6 +9,7 @@ fn test_crate(
     envs: &[(&str, &str)],
     stdout: &'static str,
     stderr: &'static str,
+    code: Option<i32>,
 ) {
     use assert_cmd::Command;
 
@@ -17,7 +18,13 @@ fn test_crate(
     command.args(args);
     command.envs(envs.iter().cloned());
     command.current_dir(format!("example-crates/{}", name));
-    command.assert().stdout(stdout).stderr(stderr).success();
+    let assert = command.assert();
+    let assert = assert.stdout(stdout).stderr(stderr);
+    if let Some(code) = code {
+        assert.code(code);
+    } else {
+        assert.success();
+    }
 }
 
 /// Stderr output for most of the example crates.
@@ -33,7 +40,7 @@ const NO_ALLOC_STDERR: &'static str = "Hello!\n";
 
 #[test]
 fn example_crate_basic() {
-    test_crate("basic", &[], &[], "", COMMON_STDERR);
+    test_crate("basic", &[], &[], "", COMMON_STDERR, None);
 }
 
 /// Like `example_crate_basic` but redundantly call `relocate`.
@@ -45,12 +52,13 @@ fn example_crate_basic_relocate() {
         &[],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
 #[test]
 fn example_crate_no_std() {
-    test_crate("no-std", &[], &[], "", COMMON_STDERR);
+    test_crate("no-std", &[], &[], "", COMMON_STDERR, None);
 }
 
 /// Like `example_crate_no_std` but redundantly call `relocate`.
@@ -62,12 +70,13 @@ fn example_crate_no_std_relocate() {
         &[],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
 #[test]
 fn example_crate_external_start() {
-    test_crate("external-start", &[], &[], "", COMMON_STDERR);
+    test_crate("external-start", &[], &[], "", COMMON_STDERR, None);
 }
 
 /// Like `example_crate_external_start` but redundantly call `relocate`.
@@ -79,13 +88,14 @@ fn example_crate_external_start_relocate() {
         &[],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
 #[test]
 fn example_crate_origin_start() {
     // Use a dynamic linker.
-    test_crate("origin-start", &[], &[], "", COMMON_STDERR);
+    test_crate("origin-start", &[], &[], "", COMMON_STDERR, None);
 }
 
 /// Use a dynamic linker, redundantly run `relocate`.
@@ -97,6 +107,7 @@ fn example_crate_origin_start_relocate() {
         &[],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
@@ -109,6 +120,7 @@ fn example_crate_origin_start_crt_static() {
         &[("RUSTFLAGS", "-C target-feature=+crt-static")],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
@@ -124,6 +136,7 @@ fn example_crate_origin_start_crt_static_relocation_static() {
         )],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
@@ -139,13 +152,14 @@ fn example_crate_origin_start_crt_static_relocation_static_relocate() {
         )],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
 /// Use a dynamic linker.
 #[test]
 fn example_crate_origin_start_no_alloc() {
-    test_crate("origin-start-no-alloc", &[], &[], "", NO_ALLOC_STDERR);
+    test_crate("origin-start-no-alloc", &[], &[], "", NO_ALLOC_STDERR, None);
 }
 
 /// Use a dynamic linker, redundantly run `relocate`.
@@ -157,6 +171,7 @@ fn example_crate_origin_start_no_alloc_relocate() {
         &[],
         "",
         NO_ALLOC_STDERR,
+        None,
     );
 }
 
@@ -169,6 +184,7 @@ fn example_crate_origin_start_no_alloc_crt_static() {
         &[("RUSTFLAGS", "-C target-feature=+crt-static")],
         "",
         NO_ALLOC_STDERR,
+        None,
     );
 }
 
@@ -184,6 +200,7 @@ fn example_crate_origin_start_no_alloc_crt_static_relocation_static() {
         )],
         "",
         NO_ALLOC_STDERR,
+        None,
     );
 }
 
@@ -199,13 +216,21 @@ fn example_crate_origin_start_no_alloc_crt_static_relocation_static_relocate() {
         )],
         "",
         NO_ALLOC_STDERR,
+        None,
     );
 }
 
 #[test]
 fn example_crate_origin_start_lto() {
     // Use a dynamic linker.
-    test_crate("origin-start-lto", &["--release"], &[], "", COMMON_STDERR);
+    test_crate(
+        "origin-start-lto",
+        &["--release"],
+        &[],
+        "",
+        COMMON_STDERR,
+        None,
+    );
 }
 
 /// Use a dynamic linker, redundantly run `relocate`.
@@ -217,6 +242,7 @@ fn example_crate_origin_start_lto_relocate() {
         &[],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
@@ -229,6 +255,7 @@ fn example_crate_origin_start_lto_crt_static() {
         &[("RUSTFLAGS", "-C target-feature=+crt-static")],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
@@ -244,6 +271,7 @@ fn example_crate_origin_start_lto_crt_static_relocation_static() {
         )],
         "",
         COMMON_STDERR,
+        None,
     );
 }
 
@@ -259,5 +287,11 @@ fn example_crate_origin_start_lto_crt_static_relocation_static_relocate() {
         )],
         "",
         COMMON_STDERR,
+        None,
     );
+}
+
+#[test]
+fn example_crate_origin_start_tiny() {
+    test_crate("origin-start-tiny", &["--release"], &[], "", "", Some(42));
 }

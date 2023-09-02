@@ -57,6 +57,9 @@ Origin can also be used on its own, in several different configurations:
 
  - The [origin-start-lto example] is like origin-start, but builds with LTO.
 
+ - The [origin-start-tiny example] is like origin-start, but builds with
+   optimization flags and disables features to build a very small binary.
+
 ## Fully static linking
 
 The resulting executables in the origin-start, origin-start-no-alloc, and

@@ -1,0 +1,3 @@
+[build]
+# Disable traps on unreachable code.
+rustflags = ["-Z", "trap-unreachable=no"]

@@ -30,6 +30,8 @@ use rustix_futex_sync::Mutex;
 /// `mem` should point to the stack as provided by the operating system.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
+    use linux_raw_sys::ctypes::c_uint;
+
     extern "C" {
         fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
     }
@@ -75,7 +77,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // Compute `argc`, `argv`, and `envp`.
     let argc = *mem as c_int;
     let argv = mem.add(1).cast::<*mut u8>();
-    let envp = argv.add(argc as usize + 1);
+    let envp = argv.add(argc as c_uint as usize + 1);
 
     // Do a few more precondition checks on `argc` and `argv`.
     debug_assert!(argc >= 0);

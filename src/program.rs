@@ -338,7 +338,7 @@ unsafe fn relocate() {
     let (first_phdr, phent, phnum) = rustix::runtime::exe_phdrs();
     let mut current_phdr = first_phdr.cast::<Elf_Phdr>();
 
-    // Next, look through the Phdrs to find the Dynamic section and the Relro
+    // Next, look through the Phdrs to find the Dynamic section and the relro
     // description if present. In the `Dynamic` section, find the relocations
     // and perform them.
     let mut relro = 0;
@@ -394,7 +394,7 @@ unsafe fn relocate() {
                 }
             }
             PT_GNU_RELRO => {
-                // A Relro description is present. Make a note of it so that we
+                // A relro description is present. Make a note of it so that we
                 // can mark memory readonly after relocations are done.
                 relro = phdr.p_vaddr;
                 relro_len = phdr.p_memsz;
@@ -413,7 +413,7 @@ unsafe fn relocate() {
         assert_eq!(static_start, dynamic_start);
     }
 
-    // If we saw a Relro description, mark the memory readonly.
+    // If we saw a relro description, mark the memory readonly.
     if relro_len != 0 {
         let mprotect_addr =
             from_exposed_addr_mut(relro.wrapping_add(offset) & page_size().wrapping_neg());

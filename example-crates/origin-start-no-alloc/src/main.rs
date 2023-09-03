@@ -21,7 +21,7 @@ fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
 extern "C" fn eh_personality() {}
 
 #[no_mangle]
-extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
+fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     eprintln!("Hello!");
 
     // Unlike origin-start, this example can't create threads because origin's

@@ -116,7 +116,7 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[allow(unused_variables)]
 unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
-    extern "C" {
+    extern "Rust" {
         fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
     }
 

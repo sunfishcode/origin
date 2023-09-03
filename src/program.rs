@@ -32,7 +32,7 @@ use rustix_futex_sync::Mutex;
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     use linux_raw_sys::ctypes::c_uint;
 
-    extern "C" {
+    extern "Rust" {
         fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
     }
 

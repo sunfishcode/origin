@@ -11,8 +11,8 @@ extern crate compiler_builtins;
 
 use alloc::boxed::Box;
 use atomic_dbg::{dbg, eprintln};
-use origin::thread::*;
 use origin::program::*;
+use origin::thread::*;
 
 #[panic_handler]
 fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
@@ -27,7 +27,7 @@ extern "C" fn eh_personality() {}
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;
 
 #[no_mangle]
-extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
+fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     eprintln!("Hello from main thread");
 
     at_exit(Box::new(|| eprintln!("Hello from an at_exit handler")));

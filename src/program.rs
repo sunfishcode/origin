@@ -28,7 +28,7 @@ use rustix_futex_sync::Mutex;
 /// `mem` should point to the stack as provided by the operating system.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
-    extern "C" {
+    extern "Rust" {
         fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
     }
 

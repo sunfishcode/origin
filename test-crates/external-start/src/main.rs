@@ -56,7 +56,7 @@ static EARLY_INIT_ARRAY: unsafe extern "C" fn(i32, *mut *mut u8) = {
 };
 
 #[no_mangle]
-extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
+fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     eprintln!("Hello from main thread");
 
     at_exit(Box::new(|| eprintln!("Hello from an at_exit handler")));

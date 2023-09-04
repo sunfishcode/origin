@@ -30,8 +30,6 @@ use rustix_futex_sync::Mutex;
 /// `mem` should point to the stack as provided by the operating system.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
-    use linux_raw_sys::ctypes::c_uint;
-
     extern "C" {
         fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
     }
@@ -75,6 +73,27 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     }
 
     // Compute `argc`, `argv`, and `envp`.
+    let (argc, argv, envp) = compute_args(mem);
+    init_runtime(mem, argc, argv, envp);
+
+    #[cfg(feature = "log")]
+    log::trace!("Calling `main({:?}, {:?}, {:?})`", argc, argv, envp);
+
+    // Call `main`.
+    let status = main(argc, argv, envp);
+
+    #[cfg(feature = "log")]
+    log::trace!("`main` returned `{:?}`", status);
+
+    // Run functions registered with `at_exit`, and exit with main's return
+    // value.
+    exit(status)
+}
+
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
+unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
+    use linux_raw_sys::ctypes::c_uint;
+
     let argc = *mem as c_int;
     let argv = mem.add(1).cast::<*mut u8>();
     let envp = argv.add(argc as c_uint as usize + 1);
@@ -84,6 +103,12 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     debug_assert_eq!(*mem, argc as _);
     debug_assert_eq!(*argv.add(argc as usize), core::ptr::null_mut());
 
+    (argc, argv, envp)
+}
+
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[allow(unused_variables)]
+unsafe fn init_runtime(mem: *mut usize, argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
     // Explicitly initialize `rustix` so that we can control the initialization
     // order.
     #[cfg(feature = "param")]
@@ -102,19 +127,6 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // Call the functions registered via `.init_array`.
     #[cfg(feature = "init-fini-arrays")]
     call_ctors(argc, argv, envp);
-
-    #[cfg(feature = "log")]
-    log::trace!("Calling `main({:?}, {:?}, {:?})`", argc, argv, envp);
-
-    // Call `main`.
-    let status = main(argc, argv, envp);
-
-    #[cfg(feature = "log")]
-    log::trace!("`main` returned `{:?}`", status);
-
-    // Run functions registered with `at_exit`, and exit with main's return
-    // value.
-    exit(status)
 }
 
 /// Call the constructors in the `.init_array` section.

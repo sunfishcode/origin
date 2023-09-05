@@ -79,8 +79,9 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     exit(status)
 }
 
+/// TODO: docs
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
-unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
+pub unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     use linux_raw_sys::ctypes::c_uint;
 
     let argc = *mem as c_int;
@@ -95,9 +96,10 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     (argc, argv, envp)
 }
 
+/// TODO: docs
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[allow(unused_variables)]
-unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
+pub unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     // Explicitly initialize `rustix` so that we can control the initialization
     // order.
     #[cfg(feature = "param")]
@@ -114,9 +116,10 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     initialize_main_thread(mem.cast());
 }
 
+/// TODO: docs
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[allow(unused_variables)]
-unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
+pub unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
     extern "C" {
         fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
     }
@@ -140,7 +143,7 @@ unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) ->
 /// Call the constructors in the `.init_array` section.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[cfg(feature = "init-fini-arrays")]
-unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
+pub unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
     use core::ffi::c_void;
 
     extern "C" {

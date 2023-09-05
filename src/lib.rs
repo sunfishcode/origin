@@ -10,6 +10,9 @@
 #![deny(lossy_provenance_casts)]
 #![no_std]
 
+#![allow(dead_code)] // FIXME: this is just so tests pass while I implement everything
+
+
 #[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
 extern crate alloc;
 

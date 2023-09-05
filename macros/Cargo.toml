@@ -2,6 +2,17 @@
 name = "origin-macros"
 version = "0.1.0"
 edition = "2021"
+authors = [
+    "Dan Gohman <dev@sunfishcode.online>",
+    "Federico Maria Morrone <contact@morrone.dev>",
+]
+description = "Macros for origin crate"
+documentation = "https://docs.rs/origin-macros"
+license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+repository = "https://github.com/sunfishcode/origin"
+keywords = ["linux"]
+categories = ["no-std"]
+include = ["src", "Cargo.toml", "../COPYRIGHT", "../LICENSE*", "README.md"]
 
 [lib]
 proc-macro = true

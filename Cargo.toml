@@ -24,6 +24,9 @@ memoffset = { version = "0.9.0", optional = true }
 log = { version = "0.4.14", default-features = false, optional = true }
 rustix-futex-sync = "0.1.0"
 
+# Provides "origin::main" macro
+origin-macros = { version = "0.1.0", path = "./macros", optional = true }
+
 # Optional logging backends. You can use any external logger, but using these
 # features allows origin to initialize the logger before main, so that you can
 # see the log messages emitted before main is called.
@@ -57,6 +60,8 @@ rustc-dep-of-std = [
     "bitflags/rustc-dep-of-std",
     "libc/rustc-dep-of-std",
 ]
+
+macros = ["dep:origin-macros"]
 
 # Use origin's implementation of program startup and shutdown.
 origin-program = []

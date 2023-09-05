@@ -40,6 +40,10 @@ pub mod thread;
 #[cfg_attr(target_arch = "arm", path = "arch/arm.rs")]
 mod arch;
 
+
+#[cfg(feature = "macros")]
+pub use origin_macros::main;
+
 /// The program entry point.
 ///
 /// # Safety

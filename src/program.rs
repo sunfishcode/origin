@@ -30,10 +30,6 @@ use rustix_futex_sync::Mutex;
 /// `mem` should point to the stack as provided by the operating system.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
-    extern "C" {
-        fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
-    }
-
     // Do some basic precondition checks, to ensure that our assembly code did
     // what we expect it to do. These are debug-only for now, to keep the
     // release-mode startup code simple to disassemble and inspect, while we're
@@ -74,16 +70,9 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 
     // Compute `argc`, `argv`, and `envp`.
     let (argc, argv, envp) = compute_args(mem);
-    init_runtime(mem, argc, argv, envp);
+    init_runtime(mem, envp);
 
-    #[cfg(feature = "log")]
-    log::trace!("Calling `main({:?}, {:?}, {:?})`", argc, argv, envp);
-
-    // Call `main`.
-    let status = main(argc, argv, envp);
-
-    #[cfg(feature = "log")]
-    log::trace!("`main` returned `{:?}`", status);
+    let status = call_user_code(argc, argv, envp);
 
     // Run functions registered with `at_exit`, and exit with main's return
     // value.
@@ -108,7 +97,7 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
 
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[allow(unused_variables)]
-unsafe fn init_runtime(mem: *mut usize, argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
+unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     // Explicitly initialize `rustix` so that we can control the initialization
     // order.
     #[cfg(feature = "param")]
@@ -123,10 +112,29 @@ unsafe fn init_runtime(mem: *mut usize, argc: c_int, argv: *mut *mut u8, envp: *
     // Initialize the main thread.
     #[cfg(feature = "origin-thread")]
     initialize_main_thread(mem.cast());
+}
+
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[allow(unused_variables)]
+unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
+    extern "C" {
+        fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
+    }
 
     // Call the functions registered via `.init_array`.
     #[cfg(feature = "init-fini-arrays")]
     call_ctors(argc, argv, envp);
+
+    #[cfg(feature = "log")]
+    log::trace!("Calling `main({:?}, {:?}, {:?})`", argc, argv, envp);
+
+    // Call `main`.
+    let status = main(argc, argv, envp);
+
+    #[cfg(feature = "log")]
+    log::trace!("`main` returned `{:?}`", status);
+
+    status
 }
 
 /// Call the constructors in the `.init_array` section.

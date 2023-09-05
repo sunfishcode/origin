@@ -18,7 +18,7 @@ extern crate alloc;
 #[cfg(not(target_arch = "arm"))]
 extern crate unwinding;
 #[cfg(target_arch = "arm")]
-mod unwind;
+mod unwind_unimplemented;
 
 pub mod program;
 #[cfg(feature = "signal")]

@@ -5,6 +5,7 @@
 #![allow(internal_features)]
 #![feature(lang_items)]
 #![feature(core_intrinsics)]
+#![feature(naked_functions)]
 
 extern crate alloc;
 extern crate compiler_builtins;
@@ -26,8 +27,8 @@ extern "C" fn eh_personality() {}
 #[global_allocator]
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;
 
-#[no_mangle]
-extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
+#[origin::main]
+fn main() -> i32 {
     eprintln!("Hello from main thread");
 
     at_exit(Box::new(|| eprintln!("Hello from an at_exit handler")));

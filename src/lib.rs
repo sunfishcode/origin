@@ -124,30 +124,6 @@ pub unsafe fn start(mem: *mut usize) -> ! {
     program::entry(mem)
 }
 
-/// An ABI-conforming `__dso_handle`.
-#[cfg(feature = "origin-program")]
-#[cfg(feature = "origin-start")]
-#[no_mangle]
-static __dso_handle: UnsafeSendSyncVoidStar =
-    UnsafeSendSyncVoidStar(&__dso_handle as *const _ as *const _);
-
-/// A type for `__dso_handle`.
-///
-/// `*const c_void` isn't `Send` or `Sync` because a raw pointer could point to
-/// arbitrary data which isn't thread-safe, however `__dso_handle` is used as
-/// an opaque cookie value, and it always points to itself.
-///
-/// Note that in C, `__dso_handle`'s type is usually `void *` which would
-/// correspond to `*mut c_void`, however we can assume the pointee is never
-/// actually mutated.
-#[cfg(feature = "origin-program")]
-#[repr(transparent)]
-struct UnsafeSendSyncVoidStar(*const core::ffi::c_void);
-#[cfg(feature = "origin-program")]
-unsafe impl Send for UnsafeSendSyncVoidStar {}
-#[cfg(feature = "origin-program")]
-unsafe impl Sync for UnsafeSendSyncVoidStar {}
-
 /// Initialize logging, if enabled.
 #[cfg(feature = "log")]
 #[link_section = ".init_array.00099"]

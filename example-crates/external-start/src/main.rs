@@ -13,8 +13,8 @@ extern crate libc;
 use alloc::boxed::Box;
 use atomic_dbg::{dbg, eprintln};
 use core::sync::atomic::{AtomicBool, Ordering};
-use origin::thread::*;
 use origin::program::*;
+use origin::thread::*;
 
 #[panic_handler]
 fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
@@ -56,7 +56,7 @@ static EARLY_INIT_ARRAY: unsafe extern "C" fn(i32, *mut *mut u8) = {
 };
 
 #[no_mangle]
-fn main(_argc: i32, _argv: *const *const u8) -> i32 {
+unsafe fn origin_main(_argc: i32, _argv: *const *const u8, _envp: *const *const u8) -> i32 {
     eprintln!("Hello from main thread");
 
     at_exit(Box::new(|| eprintln!("Hello from an at_exit handler")));
@@ -77,10 +77,15 @@ fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     )
     .unwrap();
 
-    unsafe {
-        join_thread(thread);
-    }
+    join_thread(thread);
 
     eprintln!("Goodbye from main");
     exit(0);
+}
+
+// Libc calls `main` so we need to provide a definition to satisfy the
+// linker, however origin gains control before libc can call this `main`.
+#[no_mangle]
+unsafe fn main(_argc: i32, _argv: *const *const u8, _envp: *const *const u8) -> i32 {
+    core::intrinsics::abort();
 }

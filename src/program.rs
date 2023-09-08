@@ -117,7 +117,7 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 #[allow(unused_variables)]
 unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
     extern "Rust" {
-        fn main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
+        fn origin_main(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> c_int;
     }
 
     // Call the functions registered via `.init_array`.
@@ -125,13 +125,13 @@ unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) ->
     call_ctors(argc, argv, envp);
 
     #[cfg(feature = "log")]
-    log::trace!("Calling `main({:?}, {:?}, {:?})`", argc, argv, envp);
+    log::trace!("Calling `origin_main({:?}, {:?}, {:?})`", argc, argv, envp);
 
-    // Call `main`.
-    let status = main(argc, argv, envp);
+    // Call `origin_main`.
+    let status = origin_main(argc, argv, envp);
 
     #[cfg(feature = "log")]
-    log::trace!("`main` returned `{:?}`", status);
+    log::trace!("`origin_main` returned `{:?}`", status);
 
     status
 }

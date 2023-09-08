@@ -27,7 +27,7 @@ extern "C" fn eh_personality() {}
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;
 
 #[no_mangle]
-fn main(_argc: i32, _argv: *const *const u8) -> i32 {
+unsafe fn origin_main(_argc: i32, _argv: *const *const u8, _envp: *const *const u8) -> i32 {
     eprintln!("Hello from main thread");
 
     at_exit(Box::new(|| eprintln!("Hello from an at_exit handler")));
@@ -48,9 +48,7 @@ fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     )
     .unwrap();
 
-    unsafe {
-        join_thread(thread);
-    }
+    join_thread(thread);
 
     eprintln!("Goodbye from main");
     exit(0);

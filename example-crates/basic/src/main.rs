@@ -1,5 +1,5 @@
-use origin::thread::*;
 use origin::program::*;
+use origin::thread::*;
 
 fn main() {
     eprintln!("Hello from main thread");

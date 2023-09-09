@@ -334,6 +334,7 @@ unsafe fn relocate(envp: *mut *mut u8) {
     use core::ffi::c_void;
     use core::mem::size_of;
     use core::ptr::{from_exposed_addr, from_exposed_addr_mut, null, null_mut};
+    use linux_raw_sys::elf::*;
     use linux_raw_sys::general::{AT_ENTRY, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM};
     use rustix::mm::{mprotect, MprotectFlags};
 
@@ -427,7 +428,7 @@ unsafe fn relocate(envp: *mut *mut u8) {
                 let dyns_end = dynamic.add(num_dyn);
                 while current_dyn != dyns_end {
                     let dyn_ = *current_dyn;
-                    match dyn_.d_tag as u32 {
+                    match dyn_.d_tag {
                         DT_RELA => {
                             rela_ptr = from_exposed_addr(dyn_.d_un.d_ptr.wrapping_add(offset))
                         }
@@ -491,122 +492,5 @@ unsafe fn relocate(envp: *mut *mut u8) {
         let mprotect_addr =
             from_exposed_addr_mut(relro.wrapping_add(offset) & auxv_page_size.wrapping_neg());
         mprotect(mprotect_addr, relro_len, MprotectFlags::READ).unwrap();
-    }
-
-    // ELF ABI.
-
-    #[cfg(target_pointer_width = "32")]
-    #[repr(C)]
-    struct Elf_Phdr {
-        p_type: u32,
-        p_offset: usize,
-        p_vaddr: usize,
-        p_paddr: usize,
-        p_filesz: usize,
-        p_memsz: usize,
-        p_flags: u32,
-        p_align: usize,
-    }
-
-    #[cfg(target_pointer_width = "64")]
-    #[repr(C)]
-    struct Elf_Phdr {
-        p_type: u32,
-        p_flags: u32,
-        p_offset: usize,
-        p_vaddr: usize,
-        p_paddr: usize,
-        p_filesz: usize,
-        p_memsz: usize,
-        p_align: usize,
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    #[repr(C)]
-    #[derive(Copy, Clone)]
-    struct Elf_Dyn {
-        d_tag: i32,
-        d_un: Elf_Dyn_Union,
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    #[repr(C)]
-    #[derive(Copy, Clone)]
-    union Elf_Dyn_Union {
-        d_val: u32,
-        d_ptr: usize,
-    }
-
-    #[cfg(target_pointer_width = "64")]
-    #[repr(C)]
-    #[derive(Copy, Clone)]
-    struct Elf_Dyn {
-        d_tag: i64,
-        d_un: Elf_Dyn_Union,
-    }
-
-    #[cfg(target_pointer_width = "64")]
-    #[repr(C)]
-    #[derive(Copy, Clone)]
-    union Elf_Dyn_Union {
-        d_val: u64,
-        d_ptr: usize,
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    #[repr(C)]
-    struct Elf_Rela {
-        r_offset: usize,
-        r_info: u32,
-        r_addend: usize,
-    }
-
-    #[cfg(target_pointer_width = "64")]
-    #[repr(C)]
-    struct Elf_Rela {
-        r_offset: usize,
-        r_info: u64,
-        r_addend: usize,
-    }
-
-    impl Elf_Rela {
-        #[inline]
-        fn type_(&self) -> u32 {
-            #[cfg(target_pointer_width = "32")]
-            {
-                self.r_info & 0xff
-            }
-            #[cfg(target_pointer_width = "64")]
-            {
-                (self.r_info & 0xffff_ffff) as u32
-            }
-        }
-    }
-
-    const PT_DYNAMIC: u32 = 2;
-    const PT_GNU_RELRO: u32 = 0x6474e552;
-    const DT_RELA: u32 = 7;
-    const DT_RELASZ: u32 = 8;
-    const DT_RELAENT: u32 = 9;
-    #[cfg(target_arch = "x86_64")]
-    const R_RELATIVE: u32 = 8; // `R_X86_64_RELATIVE`
-    #[cfg(target_arch = "x86")]
-    const R_RELATIVE: u32 = 8; // `R_386_RELATIVE`
-    #[cfg(target_arch = "aarch64")]
-    const R_RELATIVE: u32 = 1027; // `R_AARCH64_RELATIVE`
-    #[cfg(target_arch = "riscv64")]
-    const R_RELATIVE: u32 = 3; // `R_RISCV_RELATIVE`
-    #[cfg(target_arch = "arm")]
-    const R_RELATIVE: u32 = 23; // `R_ARM_RELATIVE`
-
-    #[repr(C)]
-    #[derive(Copy, Clone)]
-    struct Elf_auxv_t {
-        a_type: usize,
-
-        // Some of the values in the auxv array are pointers, so we make `a_val` a
-        // pointer, in order to preserve their provenance. For the values which are
-        // integers, we cast this to `usize`.
-        a_val: *mut c_void,
     }
 }

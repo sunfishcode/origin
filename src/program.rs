@@ -98,16 +98,15 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[allow(unused_variables)]
 unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
+    // Before doing anything else, perform dynamic relocations.
+    #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+    #[cfg(relocation_model = "pic")]
+    relocate(envp);
+
     // Explicitly initialize `rustix` so that we can control the initialization
     // order.
     #[cfg(feature = "param")]
     rustix::param::init(envp);
-
-    // After initializing the AUX data in rustix, but before doing anything
-    // else, perform dynamic relocations.
-    #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
-    #[cfg(relocation_model = "pic")]
-    relocate();
 
     // Initialize the main thread.
     #[cfg(feature = "origin-thread")]
@@ -156,7 +155,7 @@ unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
     let init_end = &__init_array_end as *const _ as *const InitFn;
     // Prevent the optimizer from optimizing the `!=` comparison to true;
     // `init` and `init_start` may have the same address.
-    asm!("# {}", inout(reg) init);
+    asm!("# {}", inout(reg) init, options(pure, nomem, nostack, preserves_flags));
 
     while init != init_end {
         #[cfg(feature = "log")]
@@ -262,7 +261,7 @@ pub fn exit(status: c_int) -> ! {
         let fini_start: *const InitFn = &__fini_array_start as *const _ as *const InitFn;
         // Prevent the optimizer from optimizing the `!=` comparison to true;
         // `fini` and `fini_start` may have the same address.
-        asm!("# {}", inout(reg) fini);
+        asm!("# {}", inout(reg) fini, options(pure, nomem, nostack, preserves_flags));
 
         while fini != fini_start {
             fini = fini.sub(1);
@@ -313,9 +312,15 @@ pub fn exit_immediately(status: c_int) -> ! {
 /// code is running but before relocations have been performed. There are no
 /// guarantees that this code won't segfault at any moment.
 ///
-/// We use volatile accesses and `asm` optimization barriers to try to
-/// discourage optimizers from thinking they understand what's happening, to
-/// increase the probability of this code working.
+/// In practice, things work if we don't make any calls to functions outside
+/// of this crate, not counting functions directly implemented by the compiler.
+/// So we can do eg. `x == null()` but we can't do `x.is_null()`, because
+/// `null` is directly implemented by the compiler, while `is_null` is not.
+///
+/// We use `asm` optimization barriers to try to discourage optimizers from
+/// thinking they understand what's happening, to increase the probability of
+/// this code working. We'd use volatile accesses too, except those aren't
+/// directly implemented by the compiler.
 ///
 /// And if this code panics, the panic code will probably segfault, because
 /// `core::fmt` is known to use an address that needs relocation.
@@ -324,44 +329,66 @@ pub fn exit_immediately(status: c_int) -> ! {
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 #[cold]
-unsafe fn relocate() {
+unsafe fn relocate(envp: *mut *mut u8) {
     use core::arch::asm;
     use core::ffi::c_void;
     use core::mem::size_of;
-    use core::ptr::{
-        from_exposed_addr, from_exposed_addr_mut, read_volatile, write_volatile, NonNull,
-    };
-    use core::slice::from_raw_parts;
+    use core::ptr::{from_exposed_addr, from_exposed_addr_mut, null, null_mut};
+    use linux_raw_sys::general::{AT_ENTRY, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM};
     use rustix::mm::{mprotect, MprotectFlags};
-    use rustix::param::page_size;
 
     // Please do not take any of the following code as an example for how to
     // write Rust code in general.
+
+    // Locate the AUXV records we need. We don't use rustix to do this because
+    // that would involve calling a function in another crate.
+    let mut auxp = envp;
+    // Don't use `is_null` because that's a call.
+    while (*auxp) != null_mut() {
+        auxp = auxp.add(1);
+    }
+    let mut auxp = auxp.add(1).cast::<Elf_auxv_t>();
+    let mut auxv_page_size = 0;
+    let mut auxv_phdr = null();
+    let mut auxv_phent = 0;
+    let mut auxv_phnum = 0;
+    let mut auxv_entry = 0;
+    loop {
+        let Elf_auxv_t { a_type, a_val } = *auxp;
+
+        match a_type as _ {
+            AT_PAGESZ => auxv_page_size = a_val.addr(),
+            AT_PHDR => auxv_phdr = a_val.cast::<Elf_Phdr>(),
+            AT_PHNUM => auxv_phnum = a_val.addr(),
+            AT_PHENT => auxv_phent = a_val.addr(),
+            AT_ENTRY => auxv_entry = a_val.addr(),
+
+            AT_NULL => break,
+            _ => (),
+        }
+        auxp = auxp.add(1);
+    }
 
     // Compute the static address of `_start`. This relies on the sneaky fact
     // that we initialize a static variable with the address of `_start`, and
     // if we haven't performed relocations yet, we'll be able to see the static
     // address. Also, the program *just* started so there are no other threads
     // yet, so loading from static memory without synchronization is fine. But
-    // we still use volatile and `asm` to do everything we can to protect this
-    // code because the optimizer won't have any idea what we're up to.
+    // we still use `asm` to do everything we can to protect this code because
+    // the optimizer won't have any idea what we're up to.
     struct StaticStart(*const u8);
     unsafe impl Sync for StaticStart {}
     static STATIC_START: StaticStart = StaticStart(crate::_start as *const u8);
     let mut static_start_addr: *const *const u8 = &STATIC_START.0;
     asm!("# {}", inout(reg) static_start_addr);
-    let mut static_start = read_volatile(static_start_addr).addr();
+    let mut static_start = (*static_start_addr).addr();
     asm!("# {}", inout(reg) static_start);
 
     // Obtain the dynamic address of `_start` from the AUX records.
-    let dynamic_start = rustix::runtime::entry();
+    let dynamic_start = auxv_entry;
 
     // Our offset is the difference between these two.
     let offset = dynamic_start.wrapping_sub(static_start);
-
-    // This code doesn't rely on the offset being page aligned, but it is
-    // useful to check to make sure we computed it correctly.
-    debug_assert_eq!(offset & (page_size() - 1), 0);
 
     // If we're loaded at our static address, then there's nothing to do.
     if offset == 0 {
@@ -370,32 +397,36 @@ unsafe fn relocate() {
 
     // Now, obtain the static Phdrs, which have been mapped into the address
     // space at an address provided to us in the AUX array.
-    let (first_phdr, phent, phnum) = rustix::runtime::exe_phdrs();
-    let mut current_phdr = first_phdr.cast::<Elf_Phdr>();
+    let mut current_phdr = auxv_phdr.cast::<Elf_Phdr>();
 
     // Next, look through the Phdrs to find the Dynamic section and the relro
     // description if present. In the `Dynamic` section, find the relocations
     // and perform them.
     let mut relro = 0;
     let mut relro_len = 0;
-    let phdrs_end = current_phdr.cast::<u8>().add(phnum * phent).cast();
+    let phdrs_end = current_phdr
+        .cast::<u8>()
+        .add(auxv_phnum * auxv_phent)
+        .cast();
     while current_phdr != phdrs_end {
         let phdr = &*current_phdr;
-        current_phdr = current_phdr.cast::<u8>().add(phent).cast();
+        current_phdr = current_phdr.cast::<u8>().add(auxv_phent).cast();
 
         match phdr.p_type {
             PT_DYNAMIC => {
                 // We found the dynamic section.
-                let dynamic = from_exposed_addr(phdr.p_vaddr.wrapping_add(offset));
+                let dynamic: *const Elf_Dyn = from_exposed_addr(phdr.p_vaddr.wrapping_add(offset));
                 let num_dyn = phdr.p_memsz / size_of::<Elf_Dyn>();
-                let dyns: &[Elf_Dyn] = from_raw_parts(dynamic, num_dyn);
 
                 // Look through the `Elf_Dyn` entries to find the location of
                 // the relocation table.
-                let mut rela_ptr = NonNull::dangling().as_ptr() as *const Elf_Rela;
+                let mut rela_ptr: *const Elf_Rela = null();
                 let mut num_rela = 0;
                 let mut rela_ent_size = 0;
-                for dyn_ in dyns {
+                let mut current_dyn = dynamic;
+                let dyns_end = dynamic.add(num_dyn);
+                while current_dyn != dyns_end {
+                    let dyn_ = *current_dyn;
                     match dyn_.d_tag as u32 {
                         DT_RELA => {
                             rela_ptr = from_exposed_addr(dyn_.d_un.d_ptr.wrapping_add(offset))
@@ -404,6 +435,7 @@ unsafe fn relocate() {
                         DT_RELAENT => rela_ent_size = dyn_.d_un.d_val as usize,
                         _ => (),
                     }
+                    current_dyn = current_dyn.add(1);
                 }
 
                 // Now, perform the relocations. As above, the optimizer won't
@@ -421,7 +453,7 @@ unsafe fn relocate() {
                             let mut reloc_addr = addr.cast();
                             let mut reloc_value = rela.r_addend.wrapping_add(offset);
                             asm!("# {} {}", inout(reg) reloc_addr, inout(reg) reloc_value);
-                            write_volatile(reloc_addr, reloc_value);
+                            *reloc_addr = reloc_value;
                             asm!("");
                         }
                         _ => unimplemented!(),
@@ -438,9 +470,15 @@ unsafe fn relocate() {
         }
     }
 
+    // This code doesn't rely on the offset being page aligned, but it is
+    // useful to check to make sure we computed it correctly.
+    debug_assert_eq!(offset & (auxv_page_size - 1), 0);
+
     // Check that relocation did its job.
     #[cfg(debug_assertions)]
     {
+        use core::ptr::read_volatile;
+
         let mut static_start_addr: *const *const u8 = &STATIC_START.0;
         asm!("# {}", inout(reg) static_start_addr);
         let mut static_start = read_volatile(static_start_addr).addr();
@@ -451,7 +489,7 @@ unsafe fn relocate() {
     // If we saw a relro description, mark the memory readonly.
     if relro_len != 0 {
         let mprotect_addr =
-            from_exposed_addr_mut(relro.wrapping_add(offset) & page_size().wrapping_neg());
+            from_exposed_addr_mut(relro.wrapping_add(offset) & auxv_page_size.wrapping_neg());
         mprotect(mprotect_addr, relro_len, MprotectFlags::READ).unwrap();
     }
 
@@ -485,6 +523,7 @@ unsafe fn relocate() {
 
     #[cfg(target_pointer_width = "32")]
     #[repr(C)]
+    #[derive(Copy, Clone)]
     struct Elf_Dyn {
         d_tag: i32,
         d_un: Elf_Dyn_Union,
@@ -492,6 +531,7 @@ unsafe fn relocate() {
 
     #[cfg(target_pointer_width = "32")]
     #[repr(C)]
+    #[derive(Copy, Clone)]
     union Elf_Dyn_Union {
         d_val: u32,
         d_ptr: usize,
@@ -499,6 +539,7 @@ unsafe fn relocate() {
 
     #[cfg(target_pointer_width = "64")]
     #[repr(C)]
+    #[derive(Copy, Clone)]
     struct Elf_Dyn {
         d_tag: i64,
         d_un: Elf_Dyn_Union,
@@ -506,6 +547,7 @@ unsafe fn relocate() {
 
     #[cfg(target_pointer_width = "64")]
     #[repr(C)]
+    #[derive(Copy, Clone)]
     union Elf_Dyn_Union {
         d_val: u64,
         d_ptr: usize,
@@ -556,4 +598,15 @@ unsafe fn relocate() {
     const R_RELATIVE: u32 = 3; // `R_RISCV_RELATIVE`
     #[cfg(target_arch = "arm")]
     const R_RELATIVE: u32 = 23; // `R_ARM_RELATIVE`
+
+    #[repr(C)]
+    #[derive(Copy, Clone)]
+    struct Elf_auxv_t {
+        a_type: usize,
+
+        // Some of the values in the auxv array are pointers, so we make `a_val` a
+        // pointer, in order to preserve their provenance. For the values which are
+        // integers, we cast this to `usize`.
+        a_val: *mut c_void,
+    }
 }

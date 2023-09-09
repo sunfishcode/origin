@@ -209,15 +209,26 @@ of needing an explicit argument. But having it be an explicit argument makes it
 behave more like normal Rust code, which shouldn't be peeking at its caller's
 stack memory.
 
-And lastly, we could enable the `push %rbp` and `jmp`, which are just zeroing
-out the return address so that nothing ever unwinds back into the `_start`
-code, and jumping to the immediately following code, to make a "call" from the
+We could omit the `push %rbp` and `jmp`, which are just zeroing out the return
+address so that nothing ever unwinds back into the `_start` code, and instead
+fall through to the immediately following code, to make a "call" from the
 `[naked]` function `_start` written in asm to the Rust `origin::program::entry`
 function. This is the transition from assembly code to the first Rust code in
 the program. There are sneaky ways to arrange for this code to be able to
 fall-through from `_start` into the `origin::program::entry`, but as above, I'm
 aiming to have this code behave like normal Rust code, which shouldn't be using
 control flow paths that the compiler doesn't know about.
+
+We could also use the `exit` syscall instead of `exit_group`, which in rustix
+means using `exit_thread` instead of `exit_group`. This would exit only the
+current thread, but that's fine because our tiny program only ever uses one
+thread. And it would be slightly smaller on some architectures because the
+syscall number for `exit` is lower than the number for `exit_group`. For
+example, on x86_64, `exit` is 60 while `exit_group` is 231. That would enable
+the compiler to use the same `push`/`pop` trick it does does the 42 constant,
+saving 2 bytes. In theory origin could have a feature to enable this, however
+it's a very minor optimization, and it would introducue undefined behavior if
+somehow some thread got created outside of origin, so I chose not to add it.
 
 ## Sources
 

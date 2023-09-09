@@ -57,8 +57,8 @@ Origin can also be used on its own, in several different configurations:
 
  - The [origin-start-lto example] is like origin-start, but builds with LTO.
 
- - The [origin-start-tiny example] is like origin-start, but builds with
-   optimization flags and disables features to build a very small binary.
+ - The [tiny example] is like origin-start, but builds with optimization flags
+   and disables features to build a very small binary.
 
 ## Fully static linking
 
@@ -83,7 +83,7 @@ For fully static linking, there are two options:
 [origin-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start/README.md
 [origin-start-no-alloc example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-no-alloc/README.md
 [origin-start-lto example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-lto/README.md
-[origin-start-tiny example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-tiny/README.md
+[tiny example]: https://github.com/sunfishcode/origin/blob/main/example-crates/tiny/README.md
 [Mustang]: https://github.com/sunfishcode/mustang/
 [origin-studio]: https://github.com/sunfishcode/origin-studio
 [c-scape]: https://crates.io/crates/c-scape/

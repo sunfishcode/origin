@@ -293,5 +293,5 @@ fn example_crate_origin_start_lto_crt_static_relocation_static_relocate() {
 
 #[test]
 fn example_crate_origin_start_tiny() {
-    test_crate("origin-start-tiny", &["--release"], &[], "", "", Some(42));
+    test_crate("tiny", &["--release"], &[], "", "", Some(42));
 }

@@ -6,7 +6,7 @@ To produce an even smaller binary, use `objcopy` to remove the `.eh_frame`
 and `.comment` sections:
 
 ```
-objcopy -R .eh_frame -R .comment target/release/origin-start-tiny even-smaller
+objcopy -R .eh_frame -R .comment target/release/tiny even-smaller
 ```
 
 For details on the specific optimizations performed, see the options under
@@ -184,11 +184,10 @@ With all these optimizations, the generated code looks like this:
   4000b0:	48 89 e7             	mov    %rsp,%rdi
   4000b3:	55                   	push   %rbp
   4000b4:	e9 00 00 00 00       	jmp    0x4000b9
-  4000b9:	50                   	push   %rax
-  4000ba:	6a 2a                	push   $0x2a
-  4000bc:	5f                   	pop    %rdi
-  4000bd:	b8 e7 00 00 00       	mov    $0xe7,%eax
-  4000c2:	0f 05                	syscall 
+  4000b9:	6a 2a                	push   $0x2a
+  4000bb:	5f                   	pop    %rdi
+  4000bc:	b8 e7 00 00 00       	mov    $0xe7,%eax
+  4000c1:	0f 05                	syscall
 ```
 
 Those first 3 instructions are origin's `_start` function. The next 5
@@ -210,16 +209,15 @@ of needing an explicit argument. But having it be an explicit argument makes it
 behave more like normal Rust code, which shouldn't be peeking at its caller's
 stack memory.
 
-And lastly, we could enable the `push %rbp`, `jmp`, and `push %rax`, which are
-just zeroing out the return address so that nothing ever unwinds back into the
-`_start` code, jumping to the immediately following code, and aligning the
-stack pointer, all to make a "call" from the `[naked]` function `_start` written
-in asm to the Rust `origin::program::entry` function. This is the transition
-from assembly code to the first Rust code in the program. There are sneaky ways
-to arrange for this code to be able to fall-through from `_start` into the
-`origin::program::entry`, but as above, I'm aiming to have this code behave
-like normal Rust code, which shouldn't be using control flow paths that the
-compiler doesn't know about.
+And lastly, we could enable the `push %rbp` and `jmp`, which are just zeroing
+out the return address so that nothing ever unwinds back into the `_start`
+code, and jumping to the immediately following code, to make a "call" from the
+`[naked]` function `_start` written in asm to the Rust `origin::program::entry`
+function. This is the transition from assembly code to the first Rust code in
+the program. There are sneaky ways to arrange for this code to be able to
+fall-through from `_start` into the `origin::program::entry`, but as above, I'm
+aiming to have this code behave like normal Rust code, which shouldn't be using
+control flow paths that the compiler doesn't know about.
 
 ## Sources
 

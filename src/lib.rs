@@ -100,9 +100,9 @@ unsafe extern "C" fn _start() -> ! {
     #[cfg(target_arch = "x86")]
     asm!(
         "mov eax, esp", // Save the incoming `esp` value.
-        "push ebp",     // Pad for alignment.
-        "push ebp",     // Pad for alignment.
-        "push ebp",     // Pad for alignment.
+        "push ebp",     // Pad for stack pointer alignment.
+        "push ebp",     // Pad for stack pointer alignment.
+        "push ebp",     // Pad for stack pointer alignment.
         "push eax",     // Pass saved the incoming `esp` as the arg to `entry`.
         "push ebp",     // Set the return address to zero.
         "jmp {entry}",  // Jump to `entry`.

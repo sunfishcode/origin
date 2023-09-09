@@ -51,7 +51,10 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(
+    feature = "origin-thread",
+    any(feature = "origin-start", feature = "external-start")
+))]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     rustix::runtime::arm_set_tls(ptr).expect("arm_set_tls");
@@ -59,12 +62,15 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 }
 
 /// Read the value of the platform thread-pointer register.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(
+    feature = "origin-thread",
+    any(feature = "origin-start", feature = "external-start")
+))]
 #[inline]
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;
     unsafe {
-        asm!("mrc p15,0,{0},c13,c0,3", out(reg) ptr);
+        asm!("mrc p15,0,{},c13,c0,3", out(reg) ptr);
     }
     ptr
 }

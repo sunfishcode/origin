@@ -56,7 +56,7 @@ static EARLY_INIT_ARRAY: unsafe extern "C" fn(i32, *mut *mut u8) = {
 };
 
 #[no_mangle]
-unsafe fn origin_main(_argc: i32, _argv: *const *const u8, _envp: *const *const u8) -> i32 {
+unsafe fn origin_main(_argc: i32, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
     eprintln!("Hello from main thread");
 
     at_exit(Box::new(|| eprintln!("Hello from an at_exit handler")));
@@ -86,6 +86,6 @@ unsafe fn origin_main(_argc: i32, _argv: *const *const u8, _envp: *const *const 
 // Libc calls `main` so we need to provide a definition to satisfy the
 // linker, however origin gains control before libc can call this `main`.
 #[no_mangle]
-unsafe fn main(_argc: i32, _argv: *const *const u8, _envp: *const *const u8) -> i32 {
+unsafe fn main(_argc: i32, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
     core::intrinsics::abort();
 }

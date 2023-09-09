@@ -1,4 +1,27 @@
 //! Program startup and shutdown.
+//!
+//! To use origin's program startup, define a function named `origin_main` like
+//! this:
+//!
+//! ```no_run
+//! #[no_mangle]
+//! fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
+//!    todo!("Run the program and return the program exit status.")
+//! }
+//! ```
+//!
+//! Origin will call this function after starting up the program and running
+//! the constructors. `argc` is the number of command-line arguments with a
+//! value of at most `c_int::MAX`, and `argv` is a pointer to a NULL-terminated
+//! array of pointers to NUL-terminated C strings. `argc` and `argv` describe
+//! the command-line arguments. `envp` is a pointer to a NULL-terminated array
+//! of pointers to NUL-terminated C strings containing a key followed by `b'='`
+//! followed by a value. It describes the environment variables. The function
+//! should return a value for the program exit status.
+//!
+//! This is a low-level and somewhat C-flavored interface, which is in tension
+//! with origin's goal of providing Rust-idiomatic interfaces, however it does
+//! mean that origin can avoid doing any work that users might not need.
 
 #[cfg(feature = "origin-thread")]
 use crate::thread::initialize_main_thread;

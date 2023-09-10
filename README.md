@@ -57,8 +57,9 @@ Origin can also be used on its own, in several different configurations:
 
  - The [origin-start-lto example] is like origin-start, but builds with LTO.
 
- - The [tiny example] is like origin-start, but builds with optimization flags
-   and disables features to build a very small binary.
+ - The [tiny example] is like origin-start, but builds with optimization flags,
+   disables features, and adds an objcopy trick to produce a very small
+   binary—408 bytes on x86-64!
 
 ## Fully static linking
 

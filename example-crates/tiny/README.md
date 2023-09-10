@@ -9,23 +9,27 @@ and `.comment` sections:
 objcopy -R .eh_frame -R .comment target/release/tiny even-smaller
 ```
 
-For details on the specific optimizations performed, see the options under
-`[profile.release]` and the use of `default-features = false`, in Cargo.toml,
-and the additional link flags passed in build.rs.
+On x86_64, this produces a executable with size 408 bytes.
+
+How is this achieved?
 
 ## The optimizations
 
-First, `origin` makes much of its functionality optional, so we add
-`default-features = false` to disable things like `.init_array`/`.fini_array`
-support, thread support, and other things. We only enable the features needed
-for our minimal test program:
+First, to make this example really simple, we change it from printing a message
+to just returning the number 42.
+
+Next, `origin` makes much of its functionality optional, so we add
+`default-features = false` when declaring the `origin` dependency, to disable
+things like `.init_array`/`.fini_array` support, thread support, and other
+things that our simple example doesn't need. We only enable the features
+needed for our minimal test program:
 
 ```toml
 origin = { path = "../..", default-features = false, features = ["origin-program", "origin-start"] }
 ```
 
-Then, we enable several optimizations in the `#[profile.release]` section of
-Cargo.toml:
+Then, we add a `#[profile.release]` section to our Cargo.toml, to enable
+several optimizations:
 
 ```toml
 # Give the optimizer more lattitude to optimize and delete unneeded code.
@@ -193,6 +197,8 @@ With all these optimizations, the generated code looks like this:
 Those first 3 instructions are origin's `_start` function. The next 5
 instructions are `origin::program::entry` and everything, including the user
 `main` function and the `exit_group` syscall inlined into it.
+
+## Optimizations not done
 
 In theory this code code be made even smaller.
 

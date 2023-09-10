@@ -50,20 +50,26 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(
+    feature = "origin-thread",
+    any(feature = "origin-start", feature = "external-start")
+))]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
-    asm!("msr tpidr_el0,{0}", in(reg) ptr);
+    asm!("msr tpidr_el0,{}", in(reg) ptr);
     debug_assert_eq!(get_thread_pointer(), ptr);
 }
 
 /// Read the value of the platform thread-pointer register.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(
+    feature = "origin-thread",
+    any(feature = "origin-start", feature = "external-start")
+))]
 #[inline]
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;
     unsafe {
-        asm!("mrs {0},tpidr_el0", out(reg) ptr, options(nostack, preserves_flags, readonly));
+        asm!("mrs {},tpidr_el0", out(reg) ptr, options(nostack, preserves_flags, readonly));
     }
     ptr
 }

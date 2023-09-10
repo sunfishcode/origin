@@ -89,7 +89,10 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(
+    feature = "origin-thread",
+    any(feature = "origin-start", feature = "external-start")
+))]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     let mut user_desc = rustix::runtime::UserDesc {
@@ -113,12 +116,15 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 }
 
 /// Read the value of the platform thread-pointer register.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(
+    feature = "origin-thread",
+    any(feature = "origin-start", feature = "external-start")
+))]
 #[inline]
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;
     unsafe {
-        asm!("mov {0},DWORD PTR gs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
+        asm!("mov {},DWORD PTR gs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
     }
     ptr
 }

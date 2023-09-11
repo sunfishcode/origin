@@ -835,6 +835,12 @@ pub fn default_guard_size() -> usize {
     page_size() * 4
 }
 
+/// Yield the current thread, encouraging other threads to run.
+#[inline]
+pub fn yield_current_thread() {
+    rustix::process::sched_yield()
+}
+
 /// Information obtained from the `DT_TLS` segment of the executable.
 static mut STARTUP_TLS_INFO: StartupTlsInfo = StartupTlsInfo {
     addr: null(),

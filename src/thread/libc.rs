@@ -249,6 +249,12 @@ pub fn default_guard_size() -> usize {
     }
 }
 
+/// Yield the current thread, encouraging other threads to run.
+#[inline]
+pub fn yield_current_thread() {
+    let _ = unsafe { libc::sched_yield() };
+}
+
 /// Return the address of `__dso_handle`, appropriately casted.
 unsafe fn dso_handle() -> *mut c_void {
     let dso_handle: *const *const c_void = &__dso_handle;

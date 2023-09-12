@@ -58,6 +58,6 @@ pub const SA_ONSTACK: Sigflags = libc::SA_ONSTACK;
 pub const SA_SIGINFO: Sigflags = libc::SA_SIGINFO;
 
 /// `SIGSTKSZ`
-pub const SIGSTKSZ: usize = libc::SIGSTKSZ as usize;
+pub const SIGSTKSZ: usize = libc::SIGSTKSZ;
 /// `SS_DISABLE`
 pub const SS_DISABLE: i32 = libc::SS_DISABLE;

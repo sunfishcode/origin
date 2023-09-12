@@ -1,6 +1,6 @@
 //! Thread startup and shutdown.
 
-#[cfg(all(any(feature = "origin-start", feature = "external-start")))]
+#[cfg(any(feature = "origin-start", feature = "external-start"))]
 use crate::arch::set_thread_pointer;
 use crate::arch::{clone, get_thread_pointer, munmap_and_exit_thread, TLS_OFFSET};
 use alloc::boxed::Box;
@@ -15,6 +15,7 @@ use core::sync::atomic::Ordering::SeqCst;
 use core::sync::atomic::{AtomicI32, AtomicU8};
 use memoffset::offset_of;
 use rustix::io;
+use rustix::mm::{mmap_anonymous, mprotect, MapFlags, MprotectFlags, ProtFlags};
 use rustix::param::page_size;
 use rustix::runtime::{set_tid_address, StartupTlsInfo};
 use rustix::thread::gettid;
@@ -192,6 +193,7 @@ impl ThreadData {
 }
 
 #[inline]
+#[must_use]
 fn current_metadata() -> *mut Metadata {
     get_thread_pointer()
         .cast::<u8>()
@@ -201,6 +203,7 @@ fn current_metadata() -> *mut Metadata {
 
 /// Return a raw pointer to the data associated with the current thread.
 #[inline]
+#[must_use]
 pub fn current_thread() -> Thread {
     unsafe { Thread(NonNull::from(&mut (*current_metadata()).thread)) }
 }
@@ -210,6 +213,7 @@ pub fn current_thread() -> Thread {
 /// This is the same as [`rustix::thread::gettid`], but loads the value from a
 /// field in the runtime rather than making a system call.
 #[inline]
+#[must_use]
 pub fn current_thread_id() -> ThreadId {
     let tid = thread_id(current_thread());
     debug_assert_eq!(tid, gettid(), "`current_thread_id` disagrees with `gettid`");
@@ -248,6 +252,7 @@ pub unsafe fn set_current_thread_id_after_a_fork(tid: ThreadId) {
 
 /// Return the TLS entry for the current thread.
 #[inline]
+#[must_use]
 pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
     // Platforms where TLS data goes after the ABI-exposed fields.
     #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
@@ -294,6 +299,7 @@ pub fn thread_id(thread: Thread) -> ThreadId {
 ///
 /// `thread` must point to a valid and live thread record.
 #[inline]
+#[must_use]
 pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
     let data = thread.0.as_ref();
     (data.stack_addr, data.stack_size, data.guard_size)
@@ -397,8 +403,6 @@ unsafe fn exit_thread() -> ! {
 /// already running.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
-    use rustix::mm::{mmap_anonymous, MapFlags, ProtFlags};
-
     // Read the TLS information from the ELF header.
     STARTUP_TLS_INFO = rustix::runtime::startup_tls_info();
 
@@ -523,8 +527,6 @@ pub fn create_thread(
     stack_size: usize,
     guard_size: usize,
 ) -> io::Result<Thread> {
-    use rustix::mm::{mmap_anonymous, mprotect, MapFlags, MprotectFlags, ProtFlags};
-
     // Safety: `STARTUP_TLS_INFO` is initialized at program startup before
     // we come here creating new threads.
     let (startup_tls_align, startup_tls_mem_size) =
@@ -823,6 +825,7 @@ unsafe fn free_thread_memory(thread: Thread) {
 
 /// Return the default stack size for new threads.
 #[inline]
+#[must_use]
 pub fn default_stack_size() -> usize {
     // This is just something simple that works for now.
     unsafe { max(page_size() * 2, STARTUP_TLS_INFO.stack_size) }
@@ -830,6 +833,7 @@ pub fn default_stack_size() -> usize {
 
 /// Return the default guard size for new threads.
 #[inline]
+#[must_use]
 pub fn default_guard_size() -> usize {
     // This is just something simple that works for now.
     page_size() * 4

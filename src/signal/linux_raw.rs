@@ -45,7 +45,8 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
 
 /// Return a special "ignore" signal handler for ignoring signals.
 #[doc(alias = "SIG_IGN")]
-pub fn sig_ign() -> Sighandler {
+#[must_use]
+pub const fn sig_ign() -> Sighandler {
     linux_raw_sys::signal_macros::sig_ign()
 }
 

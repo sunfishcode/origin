@@ -137,8 +137,9 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 }
 
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
-#[allow(unused_variables)]
+#[allow(clippy::let_and_return)]
 unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
+    // Declare `origin_main` as documented in [`crate::program`].
     extern "Rust" {
         fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32;
     }

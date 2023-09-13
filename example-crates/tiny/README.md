@@ -58,7 +58,7 @@ into the code in `origin` that calls it. Since it's just returning the constant
 Rust's default panic mechanism is to perform a stack unwind, however that
 mechanism takes some code.
 
-This doesn't actally help our example here, since it's a minimal program that
+This doesn't actually help our example here, since it's a minimal program that
 doesn't contain any `panic` calls, but it's a useful optimization feature in
 general.
 
@@ -131,7 +131,7 @@ since we won't be doing any unwinding.
 
 > `-n`
 
-This turns of page alignment of sections, so that we don't waste any space on
+This turns off page alignment of sections, so that we don't waste any space on
 padding bytes.
 
 > `-N`
@@ -140,7 +140,7 @@ This sets code sections to be writable, so that they can be loaded into memory
 together with data. Ordinarily, having read-only code is a very good thing,
 but making them writable can save a few bytes.
 
-The `-n` and `-N` flags dont actally help our example here, but they can save
+The `-n` and `-N` flags dont actually help our example here, but they can save
 some code size in larger programs.
 
 > `--build-id=none`
@@ -205,7 +205,7 @@ In theory this code code be made even smaller.
 That first `mov $rsp,%rdi` is moving the incoming stack pointer we got from the
 OS into the first argument register to pass to `origin::program::entry` so that
 it can use it to pick up the command-line arguments, environment variables, and
-AUX records, however we don't use any of those, so we don't need that argument.
+AUX records. However we don't use any of those, so we don't need that argument.
 In theory origin could put that behind a cargo flag, but I didn't feel like
 adding separate versions of the `_start` sequence just for that optimization.
 

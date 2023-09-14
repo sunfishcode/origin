@@ -24,8 +24,8 @@ its own implementations of this functionality, written in Rust.
 
 For a C-ABI-compatible interface to this functionality, see [c-scape].
 
-This is used by the [Mustang] project in its libc implementation, and in the
-[origin-studio] project in its std implementation, which are two different
+This is used by [Mustang] and [Eyra] in thier libc implementation, and in
+the [origin-studio] project in its std implementation, which are three different
 ways to support building Rust programs written entirely in Rust.
 
 ## Example crates
@@ -86,5 +86,6 @@ For fully static linking, there are two options:
 [origin-start-lto example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-lto/README.md
 [tiny example]: https://github.com/sunfishcode/origin/blob/main/example-crates/tiny/README.md
 [Mustang]: https://github.com/sunfishcode/mustang/
+[Eyra]: https://github.com/sunfishcode/c-ward/tree/main/eyra
 [origin-studio]: https://github.com/sunfishcode/origin-studio
 [c-scape]: https://crates.io/crates/c-scape/

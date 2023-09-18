@@ -24,7 +24,7 @@ its own implementations of this functionality, written in Rust.
 
 For a C-ABI-compatible interface to this functionality, see [c-scape].
 
-This is used by [Mustang] and [Eyra] in thier libc implementation, and in
+This is used by [Mustang] and [Eyra] in their libc implementations, and in
 the [origin-studio] project in its std implementation, which are three different
 ways to support building Rust programs written entirely in Rust.
 

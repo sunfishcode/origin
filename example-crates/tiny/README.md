@@ -1,6 +1,7 @@
 This crate is similar to the [origin-start example], except that doesn't
 print any output, and enables optimizations for small code size. To produce a
-small binary, compile with `--release`.
+small binary, compile with `--release`. And experimentally, on this example
+program, the BFD linker produces smaller output than gold, lld, or mold.
 
 To produce an even smaller binary, use `objcopy` to remove the `.eh_frame`
 and `.comment` sections:
@@ -32,7 +33,7 @@ Then, we add a `#[profile.release]` section to our Cargo.toml, to enable
 several optimizations:
 
 ```toml
-# Give the optimizer more lattitude to optimize and delete unneeded code.
+# Give the optimizer more latitude to optimize and delete unneeded code.
 lto = true
 # "abort" is smaller than "unwind".
 panic = "abort"
@@ -109,8 +110,6 @@ Next, we enable several link arguments in build.rs:
 ```rust
     // Tell the linker to exclude the .eh_frame_hdr section.
     println!("cargo:rustc-link-arg=-Wl,--no-eh-frame-hdr");
-    // Tell the linker not to page-align sections.
-    println!("cargo:rustc-link-arg=-Wl,-n");
     // Tell the linker to make the text and data readable and writeable. This
     // allows them to occupy the same page.
     println!("cargo:rustc-link-arg=-Wl,-N");
@@ -129,18 +128,16 @@ In detail:
 This disables the creation of a `.eh_frame_hdr` section, which we don't need
 since we won't be doing any unwinding.
 
-> `-n`
-
-This turns off page alignment of sections, so that we don't waste any space on
-padding bytes.
-
 > `-N`
 
 This sets code sections to be writable, so that they can be loaded into memory
 together with data. Ordinarily, having read-only code is a very good thing,
 but making them writable can save a few bytes.
 
-The `-n` and `-N` flags dont actually help our example here, but they can save
+A related flag is `-n`, which may help code size in some cases, but we don't
+use it here because it's not available in the mold linker.
+
+The `-n` and `-N` flags don't actually help our example here, but they may save
 some code size in larger programs.
 
 > `--build-id=none`

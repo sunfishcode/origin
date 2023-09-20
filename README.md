@@ -1,5 +1,5 @@
 <div align="center">
-  <h1><code>origin</code></h1>
+  <h1>Origin</h1>
 
   <p>
     <strong>Program and thread startup and shutdown in Rust</strong>

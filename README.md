@@ -25,34 +25,34 @@ its own implementations of this functionality, written in Rust.
 For a C-ABI-compatible interface to this functionality, see [c-scape].
 
 This is used by [Mustang] and [Eyra] in their libc implementations, and in
-the [origin-studio] project in its std implementation, which are three different
+the [Origin Studio] project in its std implementation, which are three different
 ways to support building Rust programs written entirely in Rust.
 
 ## Example crates
 
 Origin can also be used on its own, in several different configurations:
 
- - The [basic example] shows a simple example of using origin as a simple
+ - The [basic example] shows a simple example of using Origin as a simple
    library. In this configuration, libc is doing most of the work.
 
  - The [no-std example] uses `no_std` and starts the program using Rust's
-   `#[start]` feature, and then hands control to origin. libc is still
+   `#[start]` feature, and then hands control to Origin. libc is still
    doing most of the work here.
 
  - The [external-start example] uses `no_std` and `no_main`, and starts the
    program by taking over control from libc as soon as possible, and then
-   hands control to origin. origin handles program and thread startup and
+   hands control to Origin. Origin handles program and thread startup and
    shutdown once it takes control.
 
- - The [origin-start example] uses `no_std` and `no_main`, and lets origin
-   start the program using its own program entrypoint. origin handles program
+ - The [origin-start example] uses `no_std` and `no_main`, and lets Origin
+   start the program using its own program entrypoint. Origin handles program
    and thread startup and shutdown and no part of libc is used. This is the
-   approach that [origin-studio] uses.
+   approach that [Origin Studio] uses.
 
  - The [origin-start-no-alloc example] is like origin-start, but disables the
-   "alloc" and "thread" features, since origin's "thread" feature currently
+   "alloc" and "thread" features, since Origin's "thread" feature currently
    depends on "alloc". Without "alloc", functions that return owned strings
-   or `Vec`s are not available. In this mode, origin avoids using a
+   or `Vec`s are not available. In this mode, Origin avoids using a
    global allocator entirely.
 
  - The [origin-start-lto example] is like origin-start, but builds with LTO.
@@ -70,11 +70,11 @@ default they do still depend on a dynamic linker.
 For fully static linking, there are two options:
 
  - Build with `RUSTFLAGS=-C target-feature=+crt-static -C relocation-model=static`.
-   This disables PIE mode, which is safer in terms of origin's code, but loses
+   This disables PIE mode, which is safer in terms of Origin's code, but loses
    the security benefits of Address-Space Layout Randomization (ASLR).
 
  - Build with `RUSTFLAGS=-C target-feature=+crt-static` and enable
-   origin's `experimental-relocate` feature. This allows PIE mode to work,
+   Origin's `experimental-relocate` feature. This allows PIE mode to work,
    however it does so by enabling some highly experimental code in origin for
    performing relocations.
 
@@ -85,7 +85,7 @@ For fully static linking, there are two options:
 [origin-start-no-alloc example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-no-alloc/README.md
 [origin-start-lto example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-lto/README.md
 [tiny example]: https://github.com/sunfishcode/origin/blob/main/example-crates/tiny/README.md
-[Mustang]: https://github.com/sunfishcode/mustang/
-[Eyra]: https://github.com/sunfishcode/c-ward/tree/main/eyra
-[origin-studio]: https://github.com/sunfishcode/origin-studio
-[c-scape]: https://crates.io/crates/c-scape/
+[Mustang]: https://github.com/sunfishcode/mustang#readme
+[Eyra]: https://github.com/sunfishcode/c-ward/tree/main/eyra#readme
+[Origin Studio]: https://github.com/sunfishcode/origin-studio#readme
+[c-scape]: https://github.com/sunfishcode/c-ward/tree/main/c-scape#readme

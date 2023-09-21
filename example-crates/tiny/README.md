@@ -6,7 +6,7 @@ program, the BFD linker produces smaller output than gold, lld, or mold.
 To produce an even smaller binary, use `objcopy` to remove the `.eh_frame`
 and `.comment` sections:
 
-```
+```console
 objcopy -R .eh_frame -R .comment target/release/tiny even-smaller
 ```
 
@@ -96,7 +96,7 @@ But it is 3 bytes instead of 5, so `opt_level = "z"` goes with it.
 
 Amusingly, it doesn't do this same trick for the immediately following
 instruction, which looks similar:
-```
+```asm
   4000bd:	b8 e7 00 00 00       	mov    $0xe7,%eax
 ```
 

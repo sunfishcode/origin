@@ -45,7 +45,7 @@ use rustix_futex_sync::Mutex;
 ///
 /// # Safety
 ///
-/// `mem` should point to the stack as provided by the operating system.
+/// `mem` must point to the stack as provided by the operating system.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // Do some basic precondition checks, to ensure that our assembly code did
@@ -97,6 +97,11 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     exit(status)
 }
 
+/// Compute `argc`, `argv`, and `envp`.
+///
+/// # Safety
+///
+/// `mem` must point to the stack as provided by the operating system.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     use linux_raw_sys::ctypes::c_uint;
@@ -113,6 +118,13 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     (argc, argv, envp)
 }
 
+/// Perform dynamic relocation (if enabled), and initialize `origin and
+/// `rustix` runtime state.
+///
+/// # Safety
+///
+/// `mem` must point to the stack as provided by the operating system. `envp`
+/// must point to the incoming environment variables.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[allow(unused_variables)]
 unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
@@ -135,6 +147,16 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     initialize_main_thread(mem.cast());
 }
 
+/// Call user-defined constructors and the `origin_main` function.
+///
+/// Return the status value returned by `origin_main`.
+///
+/// # Safety
+///
+/// `argv` and `envp` must point to the incoming arguments and environment
+/// variables.
+///
+/// All `origin` and `rustix` runtime state must be initialized.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[allow(clippy::let_and_return)]
 unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
@@ -159,7 +181,14 @@ unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) ->
     status
 }
 
-/// Call the constructors in the `.init_array` section.
+/// Call user-defined constructors.
+///
+/// # Safety
+///
+/// `argv` and `envp` must point to the incoming arguments and environment
+/// variables.
+///
+/// All `origin` and `rustix` runtime state must be initialized.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[cfg(feature = "init-fini-arrays")]
 unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {

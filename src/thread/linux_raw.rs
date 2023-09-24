@@ -183,6 +183,9 @@ pub(super) fn initialize_startup_thread_info() {
 
     // The dynamic address of the dynamic section, which we can compare with
     // the `PT_DYNAMIC` header's static address, if present.
+    //
+    // SAFETY: We're just taking the address of `_DYNAMIC` for arithmetic
+    // purposes, not dereferencing it.
     let dynamic_addr: *const c_void = unsafe { &_DYNAMIC };
 
     // SAFETY: We assume that the phdr array pointer and length the kernel
@@ -237,7 +240,7 @@ extern "C" {
     /// Declare the `_DYNAMIC` symbol so that we can compare its address with
     /// the static address in the `PT_DYNAMIC` header to learn our offset. Use
     /// a weak symbol because `_DYNAMIC` is not always present.
-    static mut _DYNAMIC: c_void;
+    static _DYNAMIC: c_void;
 }
 // Rust has `extern_weak` but it isn't stable, so use a `global_asm`.
 core::arch::global_asm!(".weak _DYNAMIC");
@@ -701,7 +704,7 @@ pub(crate) fn call_thread_dtors(current: Thread) {
 ///
 /// # Safety
 ///
-/// `thread` must point to a valid and live thread record that has not yet been
+/// `thread` must point to a valid thread record that has not yet been
 /// detached and will not be joined.
 #[inline]
 pub unsafe fn detach_thread(thread: Thread) {
@@ -731,8 +734,8 @@ pub unsafe fn detach_thread(thread: Thread) {
 ///
 /// # Safety
 ///
-/// `thread` must point to a valid and live thread record that has not already
-/// been detached or joined.
+/// `thread` must point to a valid thread record that has not already been
+/// detached or joined.
 pub unsafe fn join_thread(thread: Thread) {
     #[cfg(feature = "log")]
     let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
@@ -755,6 +758,10 @@ pub unsafe fn join_thread(thread: Thread) {
     free_thread_memory(thread);
 }
 
+/// Wait until `thread` has exited.
+///
+/// `thread` must point to a valid thread record that has not already been
+/// detached or joined.
 unsafe fn wait_for_thread_exit(thread: Thread) {
     use rustix::thread::{futex, FutexFlags, FutexOperation};
 
@@ -791,6 +798,12 @@ fn log_thread_to_be_freed(thread_id: i32) {
     }
 }
 
+/// Free any dynamically-allocated memory for `thread`.
+///
+/// # Safety
+///
+/// `thread` must point to a valid thread record for a thread that has
+/// already exited.
 unsafe fn free_thread_memory(thread: Thread) {
     use rustix::mm::munmap;
 
@@ -844,7 +857,10 @@ pub fn current_thread() -> Thread {
 #[inline]
 #[must_use]
 pub fn current_thread_id() -> ThreadId {
-    let tid = thread_id(current_thread());
+    // SAFETY: All threads have been initialized, including the main thread
+    // with `initialize_main_thread`, so `current_thread()` returns a valid
+    // pointer.
+    let tid = unsafe { thread_id(current_thread()) };
     debug_assert_eq!(tid, gettid(), "`current_thread_id` disagrees with `gettid`");
     tid
 }
@@ -879,14 +895,14 @@ pub unsafe fn set_current_thread_id_after_a_fork(tid: ThreadId) {
         .store(tid.as_raw_nonzero().get(), SeqCst);
 }
 
-/// Return the TLS entry for the current thread.
+/// Return the TLS address for the given `offset` for the current thread.
 #[inline]
 #[must_use]
 pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
     // Platforms where TLS data goes after the ABI-exposed fields.
     #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
     {
-        crate::arch::get_thread_pointer()
+        get_thread_pointer()
             .cast::<u8>()
             .wrapping_add(TLS_OFFSET)
             .wrapping_add(size_of::<Abi>())
@@ -895,6 +911,9 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
     }
 
     // Platforms where TLS data goes before the ABI-exposed fields.
+    //
+    // SAFETY: `STARTUP_TLS_INFO` has already been initialized by
+    // [`initialize_startup_thread_info`].
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     unsafe {
         get_thread_pointer()
@@ -913,12 +932,12 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
 ///
 /// # Safety
 ///
-/// `thread` must point to a valid and live thread record.
+/// `thread` must point to a valid thread record.
 #[inline]
-pub fn thread_id(thread: Thread) -> ThreadId {
-    let raw = unsafe { thread.0.as_ref().thread_id.load(SeqCst) };
+pub unsafe fn thread_id(thread: Thread) -> ThreadId {
+    let raw = thread.0.as_ref().thread_id.load(SeqCst);
     debug_assert!(raw > 0);
-    unsafe { ThreadId::from_raw_unchecked(raw) }
+    ThreadId::from_raw_unchecked(raw)
 }
 
 /// Return the current thread's stack address (lowest address), size, and guard
@@ -926,7 +945,7 @@ pub fn thread_id(thread: Thread) -> ThreadId {
 ///
 /// # Safety
 ///
-/// `thread` must point to a valid and live thread record.
+/// `thread` must point to a valid thread record.
 #[inline]
 #[must_use]
 pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
@@ -939,6 +958,9 @@ pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
 #[must_use]
 pub fn default_stack_size() -> usize {
     // This is just something simple that works for now.
+    //
+    // SAFETY: `STARTUP_STACK_SIZE` has already been initialized by
+    // [`initialize_startup_thread_info`].
     unsafe { max(page_size() * 2, STARTUP_STACK_SIZE) }
 }
 
@@ -959,7 +981,7 @@ pub fn yield_current_thread() {
 /// The ARM ABI expects this to be defined.
 #[cfg(target_arch = "arm")]
 #[no_mangle]
-unsafe extern "C" fn __aeabi_read_tp() -> *mut c_void {
+extern "C" fn __aeabi_read_tp() -> *mut c_void {
     get_thread_pointer()
 }
 

@@ -13,11 +13,12 @@ use core::ptr::{self, drop_in_place, null, null_mut, NonNull};
 use core::slice;
 use core::sync::atomic::Ordering::SeqCst;
 use core::sync::atomic::{AtomicI32, AtomicU8};
+use linux_raw_sys::elf::*;
 use memoffset::offset_of;
 use rustix::io;
 use rustix::mm::{mmap_anonymous, mprotect, MapFlags, MprotectFlags, ProtFlags};
 use rustix::param::page_size;
-use rustix::runtime::{set_tid_address, StartupTlsInfo};
+use rustix::runtime::{exe_phdrs, set_tid_address};
 use rustix::thread::gettid;
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 use {
@@ -82,6 +83,107 @@ pub(super) unsafe extern "C" fn entry(fn_: *mut Box<dyn FnOnce() -> Option<Box<d
 
     exit_thread()
 }
+
+/// Information obtained from the `DT_TLS` segment of the executable.
+///
+/// This variable must be initialized with [`initialize_startup_thread_info`]
+/// before use.
+static mut STARTUP_TLS_INFO: StartupTlsInfo = StartupTlsInfo {
+    addr: null(),
+    mem_size: 0,
+    file_size: 0,
+    align: 0,
+};
+
+/// The requested minimum size for stacks.
+static mut STARTUP_STACK_SIZE: usize = 0;
+
+/// The type of [`STARTUP_TLS_INFO`].
+struct StartupTlsInfo {
+    /// The base address of the TLS segment. Once initialize, this is
+    /// always non-null, even when the TLS data is absent, so that the
+    /// `addr` and `file_size` fields are suitable for passing to
+    /// `slice::from_raw_parts`.
+    addr: *const c_void,
+    /// The size of the memory region pointed to by `addr`.
+    mem_size: usize,
+    /// From this offset up to `mem_size` is zero-initialized.
+    file_size: usize,
+    /// The required alignment for the TLS segment.
+    align: usize,
+}
+
+/// Initialize `STARTUP_TLS_INFO` and `STARTUP_STACK_SIZE`.
+///
+/// Read values from the main executable segment headers ("phdrs") relevant to
+/// initializing TLS provided to the program at startup, and store them in
+/// `STARTUP_TLS_INFO`.
+pub(super) fn initialize_startup_thread_info() {
+    let mut tls_phdr = null();
+    let mut stack_size = 0;
+    let mut offset = 0;
+
+    let (first_phdr, phent, phnum) = exe_phdrs();
+    let mut current_phdr = first_phdr.cast::<Elf_Phdr>();
+
+    // The dynamic address of the dynamic section, which we can compare with
+    // the `PT_DYNAMIC` header's static address, if present.
+    let dynamic_addr: *const c_void = unsafe { &_DYNAMIC };
+
+    // SAFETY: We assume the phdr array pointer and length the kernel provided
+    // to the process describe a valid phdr array.
+    unsafe {
+        let phdrs_end = current_phdr.cast::<u8>().add(phnum * phent).cast();
+        while current_phdr != phdrs_end {
+            let phdr = &*current_phdr;
+            current_phdr = current_phdr.cast::<u8>().add(phent).cast();
+
+            match phdr.p_type {
+                // Compute the offset from the static virtual addresses
+                // in the `p_vaddr` fields to the dynamic addresses. We don't
+                // always get a `PT_PHDR` or `PT_DYNAMIC` header, so use
+                // whichever one we get.
+                PT_PHDR => offset = first_phdr.addr().wrapping_sub(phdr.p_vaddr),
+                PT_DYNAMIC => offset = dynamic_addr.addr().wrapping_sub(phdr.p_vaddr),
+
+                PT_TLS => tls_phdr = phdr,
+                PT_GNU_STACK => stack_size = phdr.p_memsz,
+
+                _ => {}
+            }
+        }
+
+        STARTUP_TLS_INFO = if tls_phdr.is_null() {
+            // No `PT_TLS` section. Assume an empty TLS.
+            StartupTlsInfo {
+                addr: NonNull::dangling().as_ptr(),
+                mem_size: 0,
+                file_size: 0,
+                align: 1,
+            }
+        } else {
+            // We saw a `PT_TLS` section. Initialize the fields.
+            let tls_phdr = &*tls_phdr;
+            StartupTlsInfo {
+                addr: ptr::from_exposed_addr(offset.wrapping_add(tls_phdr.p_vaddr)),
+                mem_size: tls_phdr.p_memsz,
+                file_size: tls_phdr.p_filesz,
+                align: tls_phdr.p_align,
+            }
+        };
+
+        STARTUP_STACK_SIZE = stack_size;
+    }
+}
+
+extern "C" {
+    /// Declare the `_DYNAMIC` symbol so that we can compare its address with
+    /// the static address in the `PT_DYNAMIC` header to learn our offset. Use
+    /// a weak symbol because `_DYNAMIC` is not always present.
+    static mut _DYNAMIC: c_void;
+}
+// Rust has `extern_weak` but it isn't stable, so use a `global_asm`.
+core::arch::global_asm!(".weak _DYNAMIC");
 
 /// Metadata describing a thread.
 #[repr(C)]
@@ -401,11 +503,14 @@ unsafe fn exit_thread() -> ! {
 /// This function is similar to `create_thread` except that the OS thread is
 /// already created, and already has a stack (which we need to locate), and is
 /// already running.
+///
+/// # Safety
+///
+/// `initialize_startup_thread_info` must be called before this. And `mem` must
+/// be the initial value of the stack pointer in a new process, pointing to the
+/// initial contents of the stack.
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
-    // Read the TLS information from the ELF header.
-    STARTUP_TLS_INFO = rustix::runtime::startup_tls_info();
-
     // Determine the top of the stack. Linux puts the `AT_EXECFN` string at
     // the top, so find the end of that, and then round up to the page size.
     // See <https://lwn.net/Articles/631631/> for details.
@@ -828,7 +933,7 @@ unsafe fn free_thread_memory(thread: Thread) {
 #[must_use]
 pub fn default_stack_size() -> usize {
     // This is just something simple that works for now.
-    unsafe { max(page_size() * 2, STARTUP_TLS_INFO.stack_size) }
+    unsafe { max(page_size() * 2, STARTUP_STACK_SIZE) }
 }
 
 /// Return the default guard size for new threads.
@@ -844,15 +949,6 @@ pub fn default_guard_size() -> usize {
 pub fn yield_current_thread() {
     rustix::process::sched_yield()
 }
-
-/// Information obtained from the `DT_TLS` segment of the executable.
-static mut STARTUP_TLS_INFO: StartupTlsInfo = StartupTlsInfo {
-    addr: null(),
-    mem_size: 0,
-    file_size: 0,
-    align: 0,
-    stack_size: 0,
-};
 
 /// The ARM ABI expects this to be defined.
 #[cfg(target_arch = "arm")]

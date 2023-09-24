@@ -24,7 +24,7 @@
 //! mean that origin can avoid doing any work that users might not need.
 
 #[cfg(feature = "origin-thread")]
-use crate::thread::initialize_main_thread;
+use crate::thread::{initialize_main_thread, initialize_startup_thread_info};
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(all(
@@ -32,11 +32,6 @@ use alloc::boxed::Box;
     any(feature = "origin-start", feature = "external-start")
 ))]
 use alloc::vec::Vec;
-#[cfg(all(
-    feature = "init-fini-arrays",
-    any(feature = "origin-start", feature = "external-start")
-))]
-use core::arch::asm;
 #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
@@ -126,10 +121,14 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     #[cfg(relocation_model = "pic")]
     relocate(envp);
 
-    // Explicitly initialize `rustix` so that we can control the initialization
-    // order.
+    // Explicitly initialize `rustix`. This is needed for things like
+    // `page_size()` to work.
     #[cfg(feature = "param")]
     rustix::param::init(envp);
+
+    // Read the program headers and extract the TLS info.
+    #[cfg(feature = "origin-thread")]
+    initialize_startup_thread_info();
 
     // Initialize the main thread.
     #[cfg(feature = "origin-thread")]
@@ -164,6 +163,7 @@ unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) ->
 #[cfg(any(feature = "origin-start", feature = "external-start"))]
 #[cfg(feature = "init-fini-arrays")]
 unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
+    use core::arch::asm;
     use core::ffi::c_void;
 
     extern "C" {
@@ -273,6 +273,7 @@ pub fn exit(status: c_int) -> ! {
     #[cfg(any(feature = "origin-start", feature = "external-start"))]
     #[cfg(feature = "init-fini-arrays")]
     unsafe {
+        use core::arch::asm;
         use core::ffi::c_void;
 
         extern "C" {

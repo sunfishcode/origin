@@ -96,7 +96,7 @@ init-fini-arrays = []
 
 # Enable highly experimental support for performing startup-time relocations,
 # needed to support statically-linked PIE executables.
-experimental-relocate = ["rustix/mm", "rustix/runtime", "param"]
+experimental-relocate = ["rustix/mm", "rustix/runtime"]
 
 [package.metadata.docs.rs]
 features = ["origin-program", "origin-thread", "origin-signal", "origin-start"]

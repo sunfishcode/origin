@@ -86,6 +86,6 @@ For fully static linking, there are two options:
 [origin-start-lto example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start-lto/README.md
 [tiny example]: https://github.com/sunfishcode/origin/blob/main/example-crates/tiny/README.md
 [Mustang]: https://github.com/sunfishcode/mustang#readme
-[Eyra]: https://github.com/sunfishcode/c-ward/tree/main/eyra#readme
+[Eyra]: https://github.com/sunfishcode/eyra#readme
 [Origin Studio]: https://github.com/sunfishcode/origin-studio#readme
 [c-scape]: https://github.com/sunfishcode/c-ward/tree/main/c-scape#readme

@@ -144,7 +144,7 @@ static INIT_ARRAY: unsafe extern "C" fn() = {
         log::trace!(
             target: "origin::thread",
             "Main Thread[{:?}] initialized",
-            thread::current_thread_id()
+            thread::current_thread_id().as_raw_nonzero()
         );
     }
     function

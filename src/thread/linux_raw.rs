@@ -545,7 +545,7 @@ pub fn create_thread(
             #[cfg(feature = "log")]
             log::trace!(
                 "Thread[{:?}] launched thread Thread[{:?}] with stack_size={} and guard_size={}",
-                current_thread_id(),
+                current_thread_id().as_raw_nonzero(),
                 clone_res,
                 stack_size,
                 guard_size
@@ -571,7 +571,10 @@ pub(super) unsafe extern "C" fn entry(fn_: *mut Box<dyn FnOnce() -> Option<Box<d
     let fn_ = Box::from_raw(fn_);
 
     #[cfg(feature = "log")]
-    log::trace!("Thread[{:?}] launched", current_thread_id());
+    log::trace!(
+        "Thread[{:?}] launched",
+        current_thread_id().as_raw_nonzero()
+    );
 
     // Do some basic precondition checks, to ensure that our assembly code did
     // what we expect it to do. These are debug-only for now, to keep the
@@ -716,7 +719,7 @@ pub unsafe fn detach_thread(thread: Thread) {
         log::trace!(
             "Thread[{:?}] marked as detached by Thread[{:?}]",
             thread_id,
-            current_thread_id()
+            current_thread_id().as_raw_nonzero()
         );
     }
 
@@ -745,7 +748,7 @@ pub unsafe fn join_thread(thread: Thread) {
         log::trace!(
             "Thread[{:?}] is being joined by Thread[{:?}]",
             thread_id,
-            current_thread_id()
+            current_thread_id().as_raw_nonzero()
         );
     }
 

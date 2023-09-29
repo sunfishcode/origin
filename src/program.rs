@@ -131,7 +131,7 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     (argc, argv, envp)
 }
 
-/// Perform dynamic relocation (if enabled), and initialize `origin and
+/// Perform dynamic relocation (if enabled), and initialize `origin` and
 /// `rustix` runtime state.
 ///
 /// # Safety

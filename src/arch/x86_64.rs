@@ -1,4 +1,3 @@
-#[cfg(any(feature = "origin-thread", feature = "origin-signal"))]
 use core::arch::asm;
 #[cfg(feature = "thread")]
 use core::ffi::c_void;
@@ -12,7 +11,35 @@ use {
     rustix::thread::RawPid,
 };
 
+/// The program entry point.
+///
+/// # Safety
+///
+/// This function must never be called explicitly. It is the first thing
+/// executed in the program, and it assumes that memory is laid out according
+/// to the operating system convention for starting a new program.
+#[cfg(all(feature = "origin-program", feature = "origin-start"))]
+#[naked]
+#[no_mangle]
+pub(super) unsafe extern "C" fn _start() -> ! {
+    // Jump to `entry`, passing it the initial stack pointer value as an
+    // argument, a null return address, a null frame pointer, and an aligned
+    // stack pointer. On many architectures, the incoming frame pointer is
+    // already null.
+    asm!(
+        "mov rdi, rsp", // Pass the incoming `rsp` as the arg to `entry`.
+        "push rbp",     // Set the return address to zero.
+        "jmp {entry}",  // Jump to `entry`.
+        entry = sym super::program::entry,
+        options(noreturn),
+    )
+}
+
 /// A wrapper around the Linux `clone` system call.
+///
+/// This can't be implemented in `rustix` because the child starts executing at
+/// the same point as the parent and we need to use inline asm to have the
+/// child jump to our new-thread entrypoint.
 #[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) unsafe fn clone(
@@ -25,14 +52,14 @@ pub(super) unsafe fn clone(
 ) -> isize {
     let r0;
     asm!(
-        "syscall",         // do the `clone` system call
-        "test eax,eax",    // branch if we're in the parent thread
+        "syscall",            // do the `clone` system call
+        "test eax,eax",       // branch if we're in the parent thread
         "jnz 0f",
 
         // Child thread.
-        "xor ebp,ebp",     // zero the frame address
-        "mov rdi,r9",      // pass `fn_` as the first argument
-        "push rax",        // zero the return address
+        "xor ebp,ebp",        // zero the frame address
+        "mov rdi,r9",         // pass `fn_` as the first argument
+        "push rax",           // zero the return address
         "jmp {entry}",
 
         // Parent thread.

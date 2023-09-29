@@ -50,7 +50,7 @@ static EARLY_INIT_ARRAY: unsafe extern "C" fn(i32, *mut *mut u8) = {
         // Compute the initial stack address provided by the kernel.
         let mem = argv.sub(1);
 
-        origin::start(mem as _);
+        origin::program::start(mem as _);
     }
     function
 };

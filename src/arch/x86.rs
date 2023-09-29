@@ -1,4 +1,3 @@
-#[cfg(any(feature = "origin-thread", feature = "origin-signal"))]
 use core::arch::asm;
 #[cfg(feature = "origin-signal")]
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
@@ -11,6 +10,34 @@ use {
     linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
     rustix::thread::RawPid,
 };
+
+/// The program entry point.
+///
+/// # Safety
+///
+/// This function must never be called explicitly. It is the first thing
+/// executed in the program, and it assumes that memory is laid out according
+/// to the operating system convention for starting a new program.
+#[cfg(all(feature = "origin-program", feature = "origin-start"))]
+#[naked]
+#[no_mangle]
+pub(super) unsafe extern "C" fn _start() -> ! {
+    // Jump to `entry`, passing it the initial stack pointer value as an
+    // argument, a null return address, a null frame pointer, and an aligned
+    // stack pointer. On many architectures, the incoming frame pointer is
+    // already null.
+    asm!(
+        "mov eax, esp", // Save the incoming `esp` value.
+        "push ebp",     // Pad for stack pointer alignment.
+        "push ebp",     // Pad for stack pointer alignment.
+        "push ebp",     // Pad for stack pointer alignment.
+        "push eax",     // Pass saved the incoming `esp` as the arg to `entry`.
+        "push ebp",     // Set the return address to zero.
+        "jmp {entry}",  // Jump to `entry`.
+        entry = sym super::program::entry,
+        options(noreturn),
+    )
+}
 
 /// A wrapper around the Linux `clone` system call.
 #[cfg(feature = "origin-thread")]
@@ -48,8 +75,8 @@ pub(super) unsafe fn clone(
     // extra hoops here.
     let r0;
     asm!(
-        "push esi",          // save incoming register value
-        "push ebp",          // save incoming register value
+        "push esi",           // save incoming register value
+        "push ebp",           // save incoming register value
 
         // Pass `fn_` to the child in ebp.
         "mov ebp,DWORD PTR [eax+8]",

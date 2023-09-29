@@ -97,6 +97,19 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     exit(status)
 }
 
+/// A program entry point similar to `_start`, but which is meant to be called
+/// by something else in the program rather than the OS.
+///
+/// # Safety
+///
+/// `mem` must point to a stack with the contents that the OS would provide
+/// on the initial stack.
+#[cfg(feature = "origin-program")]
+#[cfg(feature = "external-start")]
+pub unsafe fn start(mem: *mut usize) -> ! {
+    entry(mem)
+}
+
 /// Compute `argc`, `argv`, and `envp`.
 ///
 /// # Safety
@@ -433,7 +446,7 @@ unsafe fn relocate(envp: *mut *mut u8) {
     // the optimizer won't have any idea what we're up to.
     struct StaticStart(*const u8);
     unsafe impl Sync for StaticStart {}
-    static STATIC_START: StaticStart = StaticStart(crate::_start as *const u8);
+    static STATIC_START: StaticStart = StaticStart(crate::arch::_start as *const u8);
     let mut static_start_addr: *const *const u8 = &STATIC_START.0;
     asm!("# {}", inout(reg) static_start_addr);
     let mut static_start = (*static_start_addr).addr();

@@ -1,3 +1,5 @@
+//! Architecture-specific assembly code.
+
 #[cfg(any(feature = "origin-thread", feature = "origin-start"))]
 use core::arch::asm;
 #[cfg(feature = "origin-thread")]

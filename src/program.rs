@@ -4,8 +4,12 @@
 //! this:
 //!
 //! ```no_run
+//! /// This function is called by Origin.
+//! ///
+//! /// SAFETY: `argc`, `argv`, and `envp` describe incoming program
+//! /// command-line arguments and environment variables.
 //! #[no_mangle]
-//! fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
+//! unsafe fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
 //!    todo!("Run the program and return the program exit status.")
 //! }
 //! ```
@@ -43,9 +47,8 @@ use rustix_futex_sync::Mutex;
 #[cfg(feature = "origin-program")]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // Do some basic precondition checks, to ensure that our assembly code did
-    // what we expect it to do. These are debug-only for now, to keep the
-    // release-mode startup code simple to disassemble and inspect, while we're
-    // getting started.
+    // what we expect it to do. These are debug-only, to keep the release-mode
+    // startup code small and simple to disassemble and inspect.
     #[cfg(debug_assertions)]
     #[cfg(feature = "origin-start")]
     {
@@ -213,6 +216,7 @@ static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 /// This arranges for `func` to be called, and passed `obj`, when the program
 /// exits.
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     #[cfg(feature = "origin-program")]
     {
@@ -315,7 +319,7 @@ pub fn exit_immediately(status: c_int) -> ! {
     #[cfg(feature = "origin-program")]
     {
         #[cfg(feature = "log")]
-        log::trace!("Program exiting with status {:?}", status);
+        log::trace!("Program exiting with status `{:?}`", status);
 
         // Call `rustix` to exit the program.
         rustix::runtime::exit_group(status)

@@ -1,3 +1,5 @@
+//! Architecture-specific assembly code.
+
 use core::arch::asm;
 #[cfg(feature = "thread")]
 use core::ffi::c_void;

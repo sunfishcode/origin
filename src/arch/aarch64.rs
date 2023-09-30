@@ -1,3 +1,5 @@
+//! Architecture-specific assembly code.
+
 use core::arch::asm;
 #[cfg(feature = "origin-signal")]
 use linux_raw_sys::general::__NR_rt_sigreturn;

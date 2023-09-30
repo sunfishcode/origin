@@ -1,7 +1,4 @@
-#[cfg(any(
-    feature = "origin-thread",
-    all(feature = "origin-program", feature = "origin-start")
-))]
+#[cfg(any(feature = "origin-thread", feature = "origin-start"))]
 use core::arch::asm;
 #[cfg(feature = "origin-thread")]
 use {
@@ -19,7 +16,7 @@ use {
 /// This function must never be called explicitly. It is the first thing
 /// executed in the program, and it assumes that memory is laid out according
 /// to the operating system convention for starting a new program.
-#[cfg(all(feature = "origin-program", feature = "origin-start"))]
+#[cfg(feature = "origin-start")]
 #[naked]
 #[no_mangle]
 pub(super) unsafe extern "C" fn _start() -> ! {
@@ -80,10 +77,7 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(all(
-    feature = "origin-thread",
-    any(feature = "origin-start", feature = "external-start")
-))]
+#[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     asm!("mv tp,{}", in(reg) ptr);
@@ -91,10 +85,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 }
 
 /// Read the value of the platform thread-pointer register.
-#[cfg(all(
-    feature = "origin-thread",
-    any(feature = "origin-start", feature = "external-start")
-))]
+#[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;

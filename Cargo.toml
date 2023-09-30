@@ -77,6 +77,10 @@ origin-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime", "origin
 # the initial stack. Don't enable this when enabling "origin-start".
 external-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime", "origin-program"]
 
+# The loggers depend on a `.init_array` entry to initialize themselves.
+atomic-dbg = ["dep:atomic-dbg", "init-fini-arrays"]
+env_logger = ["dep:env_logger", "init-fini-arrays"]
+
 # Disable logging.
 max_level_off = ["log/max_level_off"]
 

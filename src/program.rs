@@ -200,10 +200,6 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     // Initialize the main thread.
     #[cfg(feature = "origin-thread")]
     initialize_main_thread(mem.cast());
-
-    // Initialize logging.
-    #[cfg(feature = "log")]
-    crate::log::init();
 }
 
 /// Functions registered with [`at_exit`].

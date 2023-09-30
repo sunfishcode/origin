@@ -40,15 +40,22 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
 }
 
 /// Return a special "ignore" signal handler for ignoring signals.
+///
+/// If you're looking for `sig_dfl`; use [`SigDfl`].
 #[doc(alias = "SIG_IGN")]
-pub fn sig_ign() -> Sighandler {
+#[must_use]
+pub const fn sig_ign() -> Sighandler {
     libc::SIG_IGN
 }
 
-/// `SIG_DFL`
+/// A special "default" signal handler representing the default behavior for
+/// handling a signal.
+///
+/// If you're looking for `SigIgn`; use [`sig_ign`].
+#[doc(alias = "SIG_DFL")]
 pub use libc::SIG_DFL as SigDfl;
 
-// TODO: Convert these to a `bitflags`?
+// TODO: Convert these to a `bitflags`.
 
 /// `SA_RESTART`
 pub const SA_RESTART: Sigflags = libc::SA_RESTART;

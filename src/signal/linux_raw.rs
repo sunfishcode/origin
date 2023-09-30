@@ -44,13 +44,19 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
 }
 
 /// Return a special "ignore" signal handler for ignoring signals.
+///
+/// If you're looking for `sig_dlf`; use [`SigDfl`].
 #[doc(alias = "SIG_IGN")]
 #[must_use]
 pub const fn sig_ign() -> Sighandler {
     linux_raw_sys::signal_macros::sig_ign()
 }
 
-/// `SIG_DFL`
+/// A special "default" signal handler representing the default behavior for
+/// handling a signal.
+///
+/// If you're looking for `SigIgn`; use [`sig_ign`].
+#[doc(alias = "SIG_DFL")]
 pub use linux_raw_sys::signal_macros::SIG_DFL as SigDfl;
 
 // TODO: Convert these to a `bitflags`.

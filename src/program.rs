@@ -27,18 +27,12 @@
 use crate::thread::{initialize_main_thread, initialize_startup_thread_info};
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(all(
-    feature = "alloc",
-    any(feature = "origin-start", feature = "external-start")
-))]
+#[cfg(all(feature = "alloc", feature = "origin-program"))]
 use alloc::vec::Vec;
-#[cfg(not(any(feature = "origin-start", feature = "external-start")))]
+#[cfg(not(feature = "origin-program"))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
-#[cfg(all(
-    feature = "alloc",
-    any(feature = "origin-start", feature = "external-start")
-))]
+#[cfg(all(feature = "alloc", feature = "origin-program"))]
 use rustix_futex_sync::Mutex;
 
 /// The entrypoint where Rust code is first executed when the program starts.
@@ -46,7 +40,7 @@ use rustix_futex_sync::Mutex;
 /// # Safety
 ///
 /// `mem` must point to the stack as provided by the operating system.
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[cfg(feature = "origin-program")]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // Do some basic precondition checks, to ensure that our assembly code did
     // what we expect it to do. These are debug-only for now, to keep the
@@ -90,11 +84,60 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     let (argc, argv, envp) = compute_args(mem);
     init_runtime(mem, envp);
 
-    let status = call_user_code(argc, argv, envp);
+    // Call the functions registered via `.init_array`.
+    #[cfg(feature = "init-fini-arrays")]
+    {
+        use core::arch::asm;
+        use core::ffi::c_void;
 
-    // Run functions registered with `at_exit`, and exit with main's return
-    // value.
-    exit(status)
+        extern "C" {
+            static __init_array_start: c_void;
+            static __init_array_end: c_void;
+        }
+
+        // Call the `.init_array` functions. As GLIBC does, pass argc, argv,
+        // and envp as extra arguments. In addition to GLIBC ABI compatibility,
+        // c-scape relies on this.
+        type InitFn = fn(c_int, *mut *mut u8, *mut *mut u8);
+        let mut init = &__init_array_start as *const _ as *const InitFn;
+        let init_end = &__init_array_end as *const _ as *const InitFn;
+        // Prevent the optimizer from optimizing the `!=` comparison to true;
+        // `init` and `init_start` may have the same address.
+        asm!("# {}", inout(reg) init, options(pure, nomem, nostack, preserves_flags));
+
+        while init != init_end {
+            #[cfg(feature = "log")]
+            log::trace!(
+                "Calling `.init_array`-registered function `{:?}({:?}, {:?}, {:?})`",
+                *init,
+                argc,
+                argv,
+                envp
+            );
+            (*init)(argc, argv, envp);
+            init = init.add(1);
+        }
+    }
+
+    {
+        // Declare `origin_main` as documented in [`crate::program`].
+        extern "Rust" {
+            fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32;
+        }
+
+        #[cfg(feature = "log")]
+        log::trace!("Calling `origin_main({:?}, {:?}, {:?})`", argc, argv, envp);
+
+        // Call `origin_main`.
+        let status = origin_main(argc as usize, argv, envp);
+
+        #[cfg(feature = "log")]
+        log::trace!("`origin_main` returned `{:?}`", status);
+
+        // Run functions registered with `at_exit`, and exit with
+        // `origin_main`'s return value.
+        exit(status)
+    }
 }
 
 /// A program entry point similar to `_start`, but which is meant to be called
@@ -104,7 +147,6 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 ///
 /// `mem` must point to a stack with the contents that the OS would provide
 /// on the initial stack.
-#[cfg(feature = "origin-program")]
 #[cfg(feature = "external-start")]
 pub unsafe fn start(mem: *mut usize) -> ! {
     entry(mem)
@@ -115,7 +157,7 @@ pub unsafe fn start(mem: *mut usize) -> ! {
 /// # Safety
 ///
 /// `mem` must point to the stack as provided by the operating system.
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[cfg(feature = "origin-program")]
 unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     use linux_raw_sys::ctypes::c_uint;
 
@@ -138,7 +180,7 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
 ///
 /// `mem` must point to the stack as provided by the operating system. `envp`
 /// must point to the incoming environment variables.
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
+#[cfg(feature = "origin-program")]
 #[allow(unused_variables)]
 unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     // Before doing anything else, perform dynamic relocations.
@@ -160,88 +202,8 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     initialize_main_thread(mem.cast());
 }
 
-/// Call user-defined constructors and the `origin_main` function.
-///
-/// Return the status value returned by `origin_main`.
-///
-/// # Safety
-///
-/// `argv` and `envp` must point to the incoming arguments and environment
-/// variables.
-///
-/// All `origin` and `rustix` runtime state must be initialized.
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
-#[allow(clippy::let_and_return)]
-unsafe fn call_user_code(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
-    // Declare `origin_main` as documented in [`crate::program`].
-    extern "Rust" {
-        fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32;
-    }
-
-    // Call the functions registered via `.init_array`.
-    #[cfg(feature = "init-fini-arrays")]
-    call_ctors(argc, argv, envp);
-
-    #[cfg(feature = "log")]
-    log::trace!("Calling `origin_main({:?}, {:?}, {:?})`", argc, argv, envp);
-
-    // Call `origin_main`.
-    let status = origin_main(argc as usize, argv, envp);
-
-    #[cfg(feature = "log")]
-    log::trace!("`origin_main` returned `{:?}`", status);
-
-    status
-}
-
-/// Call user-defined constructors.
-///
-/// # Safety
-///
-/// `argv` and `envp` must point to the incoming arguments and environment
-/// variables.
-///
-/// All `origin` and `rustix` runtime state must be initialized.
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
-#[cfg(feature = "init-fini-arrays")]
-unsafe fn call_ctors(argc: c_int, argv: *mut *mut u8, envp: *mut *mut u8) {
-    use core::arch::asm;
-    use core::ffi::c_void;
-
-    extern "C" {
-        static __init_array_start: c_void;
-        static __init_array_end: c_void;
-    }
-
-    // Call the `.init_array` functions. As GLIBC, does, pass argc, argv,
-    // and envp as extra arguments. In addition to GLIBC ABI compatibility,
-    // c-scape relies on this.
-    type InitFn = fn(c_int, *mut *mut u8, *mut *mut u8);
-    let mut init = &__init_array_start as *const _ as *const InitFn;
-    let init_end = &__init_array_end as *const _ as *const InitFn;
-    // Prevent the optimizer from optimizing the `!=` comparison to true;
-    // `init` and `init_start` may have the same address.
-    asm!("# {}", inout(reg) init, options(pure, nomem, nostack, preserves_flags));
-
-    while init != init_end {
-        #[cfg(feature = "log")]
-        log::trace!(
-            "Calling `.init_array`-registered function `{:?}({:?}, {:?}, {:?})`",
-            *init,
-            argc,
-            argv,
-            envp
-        );
-        (*init)(argc, argv, envp);
-        init = init.add(1);
-    }
-}
-
 /// Functions registered with [`at_exit`].
-#[cfg(all(
-    feature = "alloc",
-    any(feature = "origin-start", feature = "external-start")
-))]
+#[cfg(all(feature = "alloc", feature = "origin-program"))]
 static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 
 /// Register a function to be called when [`exit`] is called.
@@ -252,13 +214,13 @@ static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
 /// exits.
 #[cfg(feature = "alloc")]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
-    #[cfg(any(feature = "origin-start", feature = "external-start"))]
+    #[cfg(feature = "origin-program")]
     {
         let mut funcs = DTORS.lock();
         funcs.push(func);
     }
 
-    #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
+    #[cfg(not(feature = "origin-program"))]
     {
         use core::ffi::c_void;
 
@@ -286,19 +248,13 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 /// `.fini_array` section, and exit the program.
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
-    #[cfg(all(
-        feature = "thread",
-        any(feature = "origin-start", feature = "external-start")
-    ))]
+    #[cfg(all(feature = "thread", feature = "origin-program"))]
     crate::thread::call_thread_dtors(crate::thread::current_thread());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`
     // unlocked while making the call so that functions can add more functions
     // to the end of the list.
-    #[cfg(all(
-        feature = "alloc",
-        any(feature = "origin-start", feature = "external-start")
-    ))]
+    #[cfg(all(feature = "alloc", feature = "origin-program"))]
     loop {
         let mut dtors = DTORS.lock();
         if let Some(dtor) = dtors.pop() {
@@ -312,8 +268,7 @@ pub fn exit(status: c_int) -> ! {
     }
 
     // Call the `.fini_array` functions, in reverse order.
-    #[cfg(any(feature = "origin-start", feature = "external-start"))]
-    #[cfg(feature = "init-fini-arrays")]
+    #[cfg(all(feature = "init-fini-arrays", feature = "origin-program"))]
     unsafe {
         use core::arch::asm;
         use core::ffi::c_void;
@@ -340,13 +295,13 @@ pub fn exit(status: c_int) -> ! {
         }
     }
 
-    #[cfg(any(feature = "origin-start", feature = "external-start"))]
+    #[cfg(feature = "origin-program")]
     {
         // Call `exit_immediately` to exit the program.
         exit_immediately(status)
     }
 
-    #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
+    #[cfg(not(feature = "origin-program"))]
     unsafe {
         // Call `libc` to run *its* dtors, and exit the program.
         libc::exit(status)
@@ -357,16 +312,16 @@ pub fn exit(status: c_int) -> ! {
 /// with the `.fini_array` section.
 #[inline]
 pub fn exit_immediately(status: c_int) -> ! {
-    #[cfg(feature = "log")]
-    log::trace!("Program exiting");
-
-    #[cfg(any(feature = "origin-start", feature = "external-start"))]
+    #[cfg(feature = "origin-program")]
     {
+        #[cfg(feature = "log")]
+        log::trace!("Program exiting with status {:?}", status);
+
         // Call `rustix` to exit the program.
         rustix::runtime::exit_group(status)
     }
 
-    #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
+    #[cfg(not(feature = "origin-program"))]
     unsafe {
         // Call `libc` to exit the program.
         libc::_exit(status)

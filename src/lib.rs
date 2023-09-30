@@ -23,7 +23,7 @@ mod unwind_unimplemented;
 #[cfg(any(
     feature = "origin-thread",
     feature = "origin-signal",
-    all(feature = "origin-program", feature = "origin-start")
+    feature = "origin-start"
 ))]
 #[cfg_attr(target_arch = "aarch64", path = "arch/aarch64.rs")]
 #[cfg_attr(target_arch = "x86_64", path = "arch/x86_64.rs")]
@@ -31,7 +31,7 @@ mod unwind_unimplemented;
 #[cfg_attr(target_arch = "riscv64", path = "arch/riscv64.rs")]
 #[cfg_attr(target_arch = "arm", path = "arch/arm.rs")]
 mod arch;
-#[cfg(feature = "log")]
+#[cfg(all(feature = "origin-program", feature = "log"))]
 mod log;
 
 pub mod program;

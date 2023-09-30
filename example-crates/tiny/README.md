@@ -26,7 +26,7 @@ things that our simple example doesn't need. We only enable the features
 needed for our minimal test program:
 
 ```toml
-origin = { path = "../..", default-features = false, features = ["origin-program", "origin-start"] }
+origin = { path = "../..", default-features = false, features = ["origin-start"] }
 ```
 
 Then, we add a `#[profile.release]` section to our Cargo.toml, to enable
@@ -50,9 +50,9 @@ In detail:
 LTO is Link-Time Optimization, which gives the optimizer the ability to see the
 whole program at once, and be more aggressive about deleting unneeded code.
 
-For example, in our test program, it enables inlining of the `main` function
-into the code in `origin` that calls it. Since it's just returning the constant
-`42`, inlining reduces code size.
+For example, in our test program, it enables inlining of the `origin_main`
+function into the code in `origin` that calls it. Since it's just returning the
+constant `42`, inlining reduces code size.
 
 > `panic = "abort"`
 
@@ -193,7 +193,7 @@ With all these optimizations, the generated code looks like this:
 
 Those first 3 instructions are origin's `_start` function. The next 5
 instructions are `origin::program::entry` and everything, including the user
-`main` function and the `exit_group` syscall inlined into it.
+`origin_main` function and the `exit_group` syscall inlined into it.
 
 ## Optimizations not done
 

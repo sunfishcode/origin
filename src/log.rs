@@ -14,7 +14,7 @@ static INIT_ARRAY: unsafe extern "C" fn() = {
 
 fn init() {
     // Initialize the chosen logger.
-    #[cfg(feature = "atomic-dbg")]
+    #[cfg(feature = "atomic-dbg-logger")]
     atomic_dbg::log::init();
     #[cfg(feature = "env_logger")]
     env_logger::init();

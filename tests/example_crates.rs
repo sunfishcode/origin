@@ -32,10 +32,10 @@ fn test_crate(
 
     let mut command = Command::new("cargo");
     command.arg("run").arg("--quiet");
-    command.arg(&format!("--target={}-unknown-linux-{}", arch, env));
+    command.arg(&format!("--target={arch}-unknown-linux-{env}"));
     command.args(args);
-    command.envs(envs.iter().cloned());
-    command.current_dir(format!("example-crates/{}", name));
+    command.envs(envs.iter().copied());
+    command.current_dir(format!("example-crates/{name}"));
     let assert = command.assert();
     let assert = assert.stdout(stdout).stderr(stderr);
     if let Some(code) = code {
@@ -46,7 +46,7 @@ fn test_crate(
 }
 
 /// Stderr output for most of the example crates.
-const COMMON_STDERR: &'static str = "Hello from main thread\n\
+const COMMON_STDERR: &str = "Hello from main thread\n\
     Hello from child thread\n\
     Hello from child thread's at_thread_exit handler\n\
     Goodbye from main\n\
@@ -54,7 +54,7 @@ const COMMON_STDERR: &'static str = "Hello from main thread\n\
     Hello from an at_exit handler\n";
 
 /// Stderr output for the origin-start-no-alloc crate.
-const NO_ALLOC_STDERR: &'static str = "Hello!\n";
+const NO_ALLOC_STDERR: &str = "Hello!\n";
 
 #[test]
 fn example_crate_basic() {

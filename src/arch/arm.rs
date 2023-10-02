@@ -69,7 +69,7 @@ pub(super) unsafe fn clone(
         entry = sym super::thread::entry,
         fn_ = in(reg) fn_,
         in("r7") __NR_clone,
-        inlateout("r0") flags as isize => r0,
+        inlateout("r0") flags as usize => r0,
         in("r1") child_stack,
         in("r2") parent_tid,
         in("r3") newtls,

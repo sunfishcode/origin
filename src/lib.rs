@@ -16,6 +16,7 @@ extern crate alloc;
 // Pull in the `unwinding` crate to satisfy `_Unwind_*` symbol references.
 // Except that 32-bit arm isn't supported yet, so we use stubs instead.
 #[cfg(not(target_arch = "arm"))]
+#[allow(unused_extern_crates)]
 extern crate unwinding;
 #[cfg(target_arch = "arm")]
 mod unwind_unimplemented;

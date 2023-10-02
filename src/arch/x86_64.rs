@@ -68,7 +68,7 @@ pub(super) unsafe fn clone(
         "0:",
 
         entry = sym super::thread::entry,
-        inlateout("rax") __NR_clone as isize => r0,
+        inlateout("rax") __NR_clone as usize => r0,
         in("rdi") flags,
         in("rsi") child_stack,
         in("rdx") parent_tid,

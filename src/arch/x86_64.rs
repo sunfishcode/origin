@@ -127,6 +127,11 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
 
 /// Invoke the `__NR_rt_sigreturn` system call to return control from a signal
 /// handler.
+///
+/// # Safety
+///
+/// This function must never be called other than by the `sa_restorer`
+/// mechanism.
 #[cfg(feature = "origin-signal")]
 #[naked]
 pub(super) unsafe extern "C" fn return_from_signal_handler() {

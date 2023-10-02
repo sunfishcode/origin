@@ -19,8 +19,8 @@ linux-raw-sys = { version = "0.9.2", default-features = false, optional = true, 
 rustix = { version = "1.0.0", default-features = false }
 bitflags = { version = "2.4.0", default-features = false }
 log = { version = "0.4.14", default-features = false, optional = true }
-rustix-futex-sync = { version = "0.4.0", optional = true }
-smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
+rustix-futex-sync = { git = "https://github.com/sunfishcode/rustix-futex-sync", branch = "rustc-dep-of-std", default-features = false, optional = true }
+smallvec = { git = "https://github.com/sunfishcode/rust-smallvec", branch = "rustc-dep-of-std", optional = true, features = ["const_new"] }
 
 # Optional logging backends for use with "take-charge". You can use any
 # external logger, but using these features allows origin to initialize the
@@ -28,14 +28,14 @@ smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
 # before `origin_main` is called.
 
 # Enable `env_logger`; eg. recognizing `RUST_LOG=trace`. This requires `std`.
-env_logger = { version = "0.11.0", default-features = false, optional = true }
+#env_logger = { version = "0.11.0", default-features = false, optional = true }
 
 # Enable `atomic-dbg`'s simple logger. This doesn't require `std`.
-atomic-dbg = { version = "0.1.11", default-features = false, optional = true }
+#atomic-dbg = { version = "0.1.11", default-features = false, optional = true }
 
 # Enable this when disabling origin's implementations.
-libc = { version = "0.2.149", default-features = false, optional = true }
-errno = { version = "0.3.3", default-features = false, optional = true }
+#libc = { version = "0.2.149", default-features = false, optional = true }
+#errno = { version = "0.3.3", default-features = false, optional = true }
 
 # Special dependencies used in rustc-dep-of-std mode.
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
@@ -63,7 +63,7 @@ assert_cmd = "2.0.12"
 # By default, origin coexists with libc and assume std exists and enables most
 # features. To have origin avoid using libc, disable the default features and
 # enable either "origin-start" or "external-start".
-default = ["std", "log", "libc", "errno", "signal", "init-fini-arrays", "program-at-exit", "thread-at-exit"]
+default = ["std", "log", "signal", "init-fini-arrays", "program-at-exit", "thread-at-exit"]
 
 # If you're using nightly Rust, enable this feature to let origin use
 # nightly-only features, which include proper support for unwinding (if
@@ -114,13 +114,13 @@ thread-at-exit = ["alloc", "thread"]
 #
 # To have origin emit log messages for the things it does, additionally enable the
 # "log" feature.
-atomic-dbg-logger = ["atomic-dbg/log", "init-array"]
+#atomic-dbg-logger = ["atomic-dbg/log", "init-array"]
 
 # Have origin call `env_logger::init()` on startup.
 #
 # To have origin emit log messages for the things it does, additionally enable the
 # "log" feature.
-env_logger = ["dep:env_logger", "init-array"]
+#env_logger = ["dep:env_logger", "init-array"]
 
 # Disable logging.
 max_level_off = ["log/max_level_off"]
@@ -192,7 +192,8 @@ rustc-dep-of-std = [
     "bitflags/rustc-dep-of-std",
     "rustix/rustc-dep-of-std",
     "unwinding?/rustc-dep-of-std",
-    "libc?/rustc-dep-of-std",
+    "smallvec/rustc-dep-of-std",
+    #"libc?/rustc-dep-of-std",
     "rustix-futex-sync/rustc-dep-of-std",
 ]
 

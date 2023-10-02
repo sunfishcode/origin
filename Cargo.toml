@@ -30,7 +30,7 @@ rustix-futex-sync = "0.1.0"
 env_logger = { version = "0.10.0", optional = true, default-features = false }
 
 # Enable `atomic-dbg`'s simple logger. This doesn't require `std`.
-atomic-dbg = { version = "0.1", default-features = false, optional = true, features = ["log"] }
+atomic-dbg = { version = "0.1", default-features = false, optional = true }
 
 # Enable this when disabling origin's implementations.
 libc = { version = "0.2.138", default-features = false, optional = true }
@@ -82,8 +82,10 @@ origin-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime", "origin
 # the initial stack. Don't enable this when enabling "origin-start".
 external-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime", "origin-program"]
 
-# The loggers depend on a `.init_array` entry to initialize themselves.
-atomic-dbg = ["dep:atomic-dbg", "init-fini-arrays"]
+# The loggers depend on a `.init_array` entry to initialize themselves, and
+# `env_logger` needs it so that `c-scape` can initialize environment variables
+# and make `RUST_LOG` available.
+atomic-dbg-logger = ["dep:atomic-dbg", "atomic-dbg/log"]
 env_logger = ["dep:env_logger", "init-fini-arrays"]
 
 # Disable logging.

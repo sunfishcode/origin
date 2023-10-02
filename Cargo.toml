@@ -15,11 +15,11 @@ include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
 
 [dependencies]
 linux-raw-sys = { version = "0.4.9", default-features = false, features = ["general", "no_std", "elf"] }
-rustix = { version = "0.38.26", default-features = false }
+rustix = { git = "https://github.com/bytecodealliance/rustix", branch = 'rustc-dep-of-std', default-features = false }
 bitflags = { version = "2.4.0", default-features = false }
 memoffset = { version = "0.9.0", optional = true }
 log = { version = "0.4.14", default-features = false, optional = true }
-rustix-futex-sync = { version = "0.2.1", optional = true }
+rustix-futex-sync = { git = "https://github.com/sunfishcode/rustix-futex-sync", branch = "rustc-dep-of-std", default-features = false, optional = true }
 
 # Optional logging backends for use with "origin-program". You can use any
 # external logger, but using these features allows origin to initialize the
@@ -27,14 +27,14 @@ rustix-futex-sync = { version = "0.2.1", optional = true }
 # before `origin_main` is called.
 
 # Enable `env_logger`; eg. recognizing `RUST_LOG=trace`. This requires `std`.
-env_logger = { version = "0.10.0", optional = true, default-features = false }
+#env_logger = { version = "0.10.0", optional = true, default-features = false }
 
 # Enable `atomic-dbg`'s simple logger. This doesn't require `std`.
-atomic-dbg = { version = "0.1", default-features = false, optional = true }
+#atomic-dbg = { version = "0.1", default-features = false, optional = true }
 
 # Enable this when disabling origin's implementations.
-libc = { version = "0.2.149", default-features = false, optional = true }
-errno = { version = "0.3.3", default-features = false, optional = true }
+#libc = { version = "0.2.149", default-features = false, optional = true }
+#errno = { version = "0.3.3", default-features = false, optional = true }
 
 # Special dependencies used in rustc-dep-of-std mode.
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
@@ -51,7 +51,8 @@ features = ["unwinder"]
 assert_cmd = "2.0.12"
 
 [features]
-default = ["std", "log", "libc", "errno", "thread", "init-fini-arrays"]
+#default = ["std", "log", "libc", "errno", "thread", "init-fini-arrays"]
+default = ["std", "log", "thread", "init-fini-arrays"]
 std = ["rustix/std", "bitflags/std", "alloc"]
 rustc-dep-of-std = [
     "dep:core",
@@ -60,7 +61,7 @@ rustc-dep-of-std = [
     "bitflags/rustc-dep-of-std",
     "rustix/rustc-dep-of-std",
     "unwinding/rustc-dep-of-std",
-    "libc?/rustc-dep-of-std",
+    #"libc?/rustc-dep-of-std",
     "rustix-futex-sync/rustc-dep-of-std",
     "dep:compiler_builtins",
 ]
@@ -89,8 +90,8 @@ external-start = ["origin-program"]
 # The loggers depend on a `.init_array` entry to initialize themselves, and
 # `env_logger` needs it so that `c-scape` can initialize environment variables
 # and make `RUST_LOG` available.
-atomic-dbg-logger = ["atomic-dbg/log", "init-fini-arrays"]
-env_logger = ["dep:env_logger", "init-fini-arrays"]
+#atomic-dbg-logger = ["atomic-dbg/log", "init-fini-arrays"]
+#env_logger = ["dep:env_logger", "init-fini-arrays"]
 
 # Disable logging.
 max_level_off = ["log/max_level_off"]

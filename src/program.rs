@@ -10,7 +10,7 @@
 //! /// command-line arguments and environment variables.
 //! #[no_mangle]
 //! unsafe fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
-//!    todo!("Run the program and return the program exit status.")
+//!     todo!("Run the program and return the program exit status.")
 //! }
 //! ```
 //!
@@ -117,7 +117,9 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
                 argv,
                 envp
             );
+
             (*init)(argc, argv, envp);
+
             init = init.add(1);
         }
     }
@@ -164,13 +166,14 @@ pub unsafe fn start(mem: *mut usize) -> ! {
 unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     use linux_raw_sys::ctypes::c_uint;
 
-    let argc = *mem as c_int;
+    let kernel_argc = *mem;
+    let argc = kernel_argc as c_int;
     let argv = mem.add(1).cast::<*mut u8>();
     let envp = argv.add(argc as c_uint as usize + 1);
 
     // Do a few more precondition checks on `argc` and `argv`.
     debug_assert!(argc >= 0);
-    debug_assert_eq!(*mem, argc as _);
+    debug_assert_eq!(kernel_argc, argc as _);
     debug_assert_eq!(*argv.add(argc as usize), core::ptr::null_mut());
 
     (argc, argv, envp)

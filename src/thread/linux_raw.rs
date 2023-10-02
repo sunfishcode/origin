@@ -376,7 +376,6 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
 /// Creates a new thread.
 ///
 /// `fn_` is called on the new thread.
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn create_thread(
     fn_: Box<dyn FnOnce() -> Option<Box<dyn Any>>>,
     stack_size: usize,

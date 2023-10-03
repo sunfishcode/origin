@@ -772,8 +772,7 @@ unsafe fn wait_for_thread_exit(thread: Thread) {
     // for `NONE` here.
     let thread = thread.0.as_ref();
     let thread_id = &thread.thread_id;
-    let id_value = thread_id.load(SeqCst);
-    if let Some(id_value) = ThreadId::from_raw(id_value) {
+    while let Some(id_value) = ThreadId::from_raw(thread_id.load(SeqCst)) {
         // This doesn't use any shared memory, but we can't use
         // `FutexFlags::PRIVATE` because the wake comes from Linux
         // as arranged by the `CloneFlags::CHILD_CLEARTID` flag,
@@ -787,7 +786,8 @@ unsafe fn wait_for_thread_exit(thread: Thread) {
             null_mut(),
             0,
         ) {
-            Ok(_) => {}
+            Ok(_) => break,
+            Err(io::Errno::INTR) => continue,
             Err(e) => debug_assert_eq!(e, io::Errno::AGAIN),
         }
     }

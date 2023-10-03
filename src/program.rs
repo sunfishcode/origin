@@ -101,7 +101,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
         // Call the `.init_array` functions. As GLIBC does, pass argc, argv,
         // and envp as extra arguments. In addition to GLIBC ABI compatibility,
         // c-scape relies on this.
-        type InitFn = fn(c_int, *mut *mut u8, *mut *mut u8);
+        type InitFn = extern "C" fn(c_int, *mut *mut u8, *mut *mut u8);
         let mut init = &__init_array_start as *const _ as *const InitFn;
         let init_end = &__init_array_end as *const _ as *const InitFn;
         // Prevent the optimizer from optimizing the `!=` comparison to true;
@@ -285,9 +285,9 @@ pub fn exit(status: c_int) -> ! {
             static __fini_array_end: c_void;
         }
 
-        type InitFn = fn();
-        let mut fini: *const InitFn = &__fini_array_end as *const _ as *const InitFn;
-        let fini_start: *const InitFn = &__fini_array_start as *const _ as *const InitFn;
+        type FiniFn = extern "C" fn();
+        let mut fini: *const FiniFn = &__fini_array_end as *const _ as *const FiniFn;
+        let fini_start: *const FiniFn = &__fini_array_start as *const _ as *const FiniFn;
         // Prevent the optimizer from optimizing the `!=` comparison to true;
         // `fini` and `fini_start` may have the same address.
         asm!("# {}", inout(reg) fini, options(pure, nomem, nostack, preserves_flags));

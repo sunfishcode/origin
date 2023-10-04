@@ -54,15 +54,15 @@ pub(super) unsafe fn clone(
 ) -> isize {
     let r0;
     asm!(
-        "syscall",            // do the `clone` system call
-        "test eax,eax",       // branch if we're in the parent thread
+        "syscall",            // Do the `clone` system call.
+        "test eax,eax",       // Branch if we're in the parent thread.
         "jnz 0f",
 
         // Child thread.
-        "xor ebp,ebp",        // zero the frame address
-        "mov rdi,r9",         // pass `fn_` as the first argument
-        "push rax",           // zero the return address
-        "jmp {entry}",
+        "xor ebp,ebp",        // Zero the frame address.
+        "mov rdi,r9",         // Pass `fn_` as the first argument.
+        "push rax",           // Zero the return address.
+        "jmp {entry}",        // Call `entry`.
 
         // Parent thread.
         "0:",
@@ -147,5 +147,10 @@ pub(super) unsafe extern "C" fn return_from_signal_handler() {
 /// Invoke the appropriate system call to return control from a signal
 /// handler that does not use `SA_SIGINFO`. On x86_64, this uses the same
 /// sequence as the `SA_SIGINFO` case.
+///
+/// # Safety
+///
+/// This function must never be called other than by the `sa_restorer`
+/// mechanism.
 #[cfg(feature = "origin-signal")]
 pub(super) use return_from_signal_handler as return_from_signal_handler_noinfo;

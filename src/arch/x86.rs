@@ -42,6 +42,10 @@ pub(super) unsafe extern "C" fn _start() -> ! {
 }
 
 /// A wrapper around the Linux `clone` system call.
+///
+/// This can't be implemented in `rustix` because the child starts executing at
+/// the same point as the parent and we need to use inline asm to have the
+/// child jump to our new-thread entrypoint.
 #[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) unsafe fn clone(
@@ -77,35 +81,35 @@ pub(super) unsafe fn clone(
     // extra hoops here.
     let r0;
     asm!(
-        "push esi",           // save incoming register value
-        "push ebp",           // save incoming register value
+        "push esi",           // Save incoming register value.
+        "push ebp",           // Save incoming register value.
 
         // Pass `fn_` to the child in ebp.
         "mov ebp,DWORD PTR [eax+8]",
 
-        "mov esi, [eax + 0]", // `newtls`
-        "mov eax, [eax + 4]", // `__NR_clone`
+        "mov esi, [eax+0]",   // Pass `newtls` to the `int 0x80`.
+        "mov eax, [eax+4]",   // Pass `__NR_clone` to the `int 0x80`.
 
         // Use `int 0x80` instead of vsyscall, following `clone`'s
         // documentation; vsyscall would attempt to return to the parent stack
         // in the child.
-        "int 0x80",           // do the `clone` system call
-        "test eax,eax",       // branch if we're in the parent
+        "int 0x80",           // Do the `clone` system call.
+        "test eax,eax",       // Branch if we're in the parent.
         "jnz 0f",
 
         // Child thread.
-        "push eax",           // pad for alignment
-        "push eax",           // pad for alignment
-        "push eax",           // pad for alignment
-        "push ebp",           // pass `fn` as the first argument
-        "xor ebp,ebp",        // zero the frame address
-        "push eax",           // zero the return address
-        "jmp {entry}",
+        "push eax",           // Pad for alignment.
+        "push eax",           // Pad for alignment.
+        "push eax",           // Pad for alignment.
+        "push ebp",           // Pass `fn` as the first argument.
+        "xor ebp,ebp",        // Zero the frame address.
+        "push eax",           // Zero the return address.
+        "jmp {entry}",        // Call `entry`.
 
         // Parent thread.
         "0:",
-        "pop ebp",            // restore incoming register value
-        "pop esi",            // restore incoming register value
+        "pop ebp",            // Restore incoming register value.
+        "pop esi",            // Restore incoming register value.
 
         entry = sym super::thread::entry,
         inout("eax") &[newtls as *mut c_void, invalid(__NR_clone as usize), fn_ as *mut c_void] => r0,

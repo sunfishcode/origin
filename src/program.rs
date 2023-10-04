@@ -101,6 +101,8 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
         use core::arch::asm;
         use core::ffi::c_void;
 
+        // The linker-generated symbols that mark the start and end of the
+        // `.init_array` section.
         extern "C" {
             static __init_array_start: c_void;
             static __init_array_end: c_void;
@@ -282,12 +284,16 @@ pub fn exit(status: c_int) -> ! {
         }
     }
 
-    // Call the `.fini_array` functions, in reverse order.
+    // Call the `.fini_array` functions, in reverse order. We only do this
+    // in "origin-program" mode because if we're using libc, libc does this
+    // in `exit`.
     #[cfg(all(feature = "init-fini-arrays", feature = "origin-program"))]
     unsafe {
         use core::arch::asm;
         use core::ffi::c_void;
 
+        // The linker-generated symbols that mark the start and end of the
+        // `.fini_array` section.
         extern "C" {
             static __fini_array_start: c_void;
             static __fini_array_end: c_void;

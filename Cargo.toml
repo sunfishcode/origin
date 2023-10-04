@@ -85,7 +85,7 @@ external-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime", "orig
 # The loggers depend on a `.init_array` entry to initialize themselves, and
 # `env_logger` needs it so that `c-scape` can initialize environment variables
 # and make `RUST_LOG` available.
-atomic-dbg-logger = ["dep:atomic-dbg", "atomic-dbg/log"]
+atomic-dbg-logger = ["atomic-dbg/log"]
 env_logger = ["dep:env_logger", "init-fini-arrays"]
 
 # Disable logging.

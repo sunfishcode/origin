@@ -1,8 +1,8 @@
 //! Thread startup and shutdown.
 
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
-use crate::arch::set_thread_pointer;
-use crate::arch::{clone, get_thread_pointer, munmap_and_exit_thread, TLS_OFFSET};
+use crate::arch::{
+    clone, get_thread_pointer, munmap_and_exit_thread, set_thread_pointer, TLS_OFFSET,
+};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::any::Any;
@@ -17,14 +17,10 @@ use linux_raw_sys::elf::*;
 use memoffset::offset_of;
 use rustix::io;
 use rustix::mm::{mmap_anonymous, mprotect, MapFlags, MprotectFlags, ProtFlags};
-use rustix::param::page_size;
+use rustix::param::{linux_execfn, page_size};
+use rustix::process::{getrlimit, Resource};
 use rustix::runtime::{exe_phdrs, set_tid_address};
 use rustix::thread::gettid;
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
-use {
-    rustix::param::linux_execfn,
-    rustix::process::{getrlimit, Resource},
-};
 
 /// An opaque pointer to a thread.
 ///
@@ -259,7 +255,6 @@ pub use rustix::thread::Pid as ThreadId;
 /// `initialize_startup_thread_info` must be called before this. And `mem` must
 /// be the initial value of the stack pointer in a new process, pointing to the
 /// initial contents of the stack.
-#[cfg(any(feature = "origin-start", feature = "external-start"))]
 pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     // Determine the top of the stack. Linux puts the `AT_EXECFN` string at
     // the top, so find the end of that, and then round up to the page size.

@@ -39,6 +39,12 @@ use linux_raw_sys::ctypes::c_int;
 #[cfg(all(feature = "alloc", feature = "origin-program"))]
 use rustix_futex_sync::Mutex;
 
+#[cfg(all(
+    feature = "program-start",
+    not(any(feature = "origin-start", feature = "external-start"))
+))]
+compile_error!("\"origin-program\" depends on either \"origin-start\" or \"external-start\".");
+
 /// The entrypoint where Rust code is first executed when the program starts.
 ///
 /// # Safety
@@ -85,6 +91,8 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 
     // Compute `argc`, `argv`, and `envp`.
     let (argc, argv, envp) = compute_args(mem);
+
+    // Initialize program state before running any user code.
     init_runtime(mem, envp);
 
     // Call the functions registered via `.init_array`.

@@ -54,10 +54,10 @@ pub(super) unsafe fn clone(
     let r0;
     asm!(
         "ecall",              // Do the `clone` system call.
-        "bnez a0,0f",         // Branch if we're in the parent thread.
+        "bnez a0, 0f",        // Branch if we're in the parent thread.
 
         // Child thread.
-        "mv a0,{fn_}",        // Pass `fn_` as the first argument.
+        "mv a0, {fn_}",       // Pass `fn_` as the first argument.
         "mv fp, zero",        // Zero the frame address.
         "mv ra, zero",        // Zero the return address.
         "tail {entry}",       // Call `entry`.
@@ -82,7 +82,7 @@ pub(super) unsafe fn clone(
 #[cfg(feature = "origin-thread")]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
-    asm!("mv tp,{}", in(reg) ptr);
+    asm!("mv tp, {}", in(reg) ptr);
     debug_assert_eq!(get_thread_pointer(), ptr);
 }
 
@@ -92,7 +92,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;
     unsafe {
-        asm!("mv {},tp", out(reg) ptr, options(nostack, preserves_flags, readonly));
+        asm!("mv {}, tp", out(reg) ptr, options(nostack, preserves_flags, readonly));
     }
     ptr
 }
@@ -109,8 +109,8 @@ pub(super) const TLS_OFFSET: usize = 0x800;
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
     asm!(
         "ecall",
-        "mv a0,zero",
-        "li a7,{__NR_exit}",
+        "mv a0, zero",
+        "li a7, {__NR_exit}",
         "ecall",
         "unimp",
         __NR_exit = const __NR_exit,

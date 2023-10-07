@@ -55,12 +55,12 @@ pub(super) unsafe fn clone(
     let r0;
     asm!(
         "syscall",            // Do the `clone` system call.
-        "test eax,eax",       // Branch if we're in the parent thread.
+        "test eax, eax",      // Branch if we're in the parent thread.
         "jnz 0f",
 
         // Child thread.
-        "xor ebp,ebp",        // Zero the frame address.
-        "mov rdi,r9",         // Pass `fn_` as the first argument.
+        "xor ebp, ebp",       // Zero the frame address.
+        "mov rdi, r9",        // Pass `fn_` as the first argument.
         "push rax",           // Zero the return address.
         "jmp {entry}",        // Call `entry`.
 
@@ -97,7 +97,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;
     unsafe {
-        asm!("mov {},QWORD PTR fs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
+        asm!("mov {}, QWORD PTR fs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
     }
     ptr
 }
@@ -113,8 +113,8 @@ pub(super) const TLS_OFFSET: usize = 0;
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
     asm!(
         "syscall",
-        "xor edi,edi",
-        "mov eax,{__NR_exit}",
+        "xor edi, edi",
+        "mov eax, {__NR_exit}",
         "syscall",
         "ud2",
         __NR_exit = const __NR_exit,
@@ -136,7 +136,7 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
 #[naked]
 pub(super) unsafe extern "C" fn return_from_signal_handler() {
     asm!(
-        "mov rax,{__NR_rt_sigreturn}",
+        "mov rax, {__NR_rt_sigreturn}",
         "syscall",
         "ud2",
         __NR_rt_sigreturn = const __NR_rt_sigreturn,

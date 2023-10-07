@@ -57,7 +57,7 @@ pub(super) unsafe fn clone(
     fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>>>,
 ) -> isize {
     let mut gs: u32 = 0;
-    asm!("mov {0:x},gs", inout(reg) gs);
+    asm!("mov {0:x}, gs", inout(reg) gs);
     let entry_number = gs >> 3;
 
     let mut user_desc = rustix::runtime::UserDesc {
@@ -85,7 +85,7 @@ pub(super) unsafe fn clone(
         "push ebp",           // Save incoming register value.
 
         // Pass `fn_` to the child in ebp.
-        "mov ebp,DWORD PTR [eax+8]",
+        "mov ebp, DWORD PTR [eax+8]",
 
         "mov esi, [eax+0]",   // Pass `newtls` to the `int 0x80`.
         "mov eax, [eax+4]",   // Pass `__NR_clone` to the `int 0x80`.
@@ -94,7 +94,7 @@ pub(super) unsafe fn clone(
         // documentation; vsyscall would attempt to return to the parent stack
         // in the child.
         "int 0x80",           // Do the `clone` system call.
-        "test eax,eax",       // Branch if we're in the parent.
+        "test eax, eax",      // Branch if we're in the parent.
         "jnz 0f",
 
         // Child thread.
@@ -102,7 +102,7 @@ pub(super) unsafe fn clone(
         "push eax",           // Pad for alignment.
         "push eax",           // Pad for alignment.
         "push ebp",           // Pass `fn` as the first argument.
-        "xor ebp,ebp",        // Zero the frame address.
+        "xor ebp, ebp",       // Zero the frame address.
         "push eax",           // Zero the return address.
         "jmp {entry}",        // Call `entry`.
 
@@ -140,7 +140,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     user_desc.set_seg_not_present(0);
     user_desc.set_useable(1);
     rustix::runtime::set_thread_area(&mut user_desc).expect("set_thread_area");
-    asm!("mov gs,{0:x}", in(reg) ((user_desc.entry_number << 3) | 3) as u16);
+    asm!("mov gs, {0:x}", in(reg) ((user_desc.entry_number << 3) | 3) as u16);
     debug_assert_eq!(*ptr.cast::<*const c_void>(), ptr);
     debug_assert_eq!(get_thread_pointer(), ptr);
 }
@@ -151,7 +151,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 pub(super) fn get_thread_pointer() -> *mut c_void {
     let ptr;
     unsafe {
-        asm!("mov {},DWORD PTR gs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
+        asm!("mov {}, DWORD PTR gs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
     }
     ptr
 }
@@ -169,8 +169,8 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
         // Use `int 0x80` instead of vsyscall, since vsyscall would attempt to
         // touch the stack after we `munmap` it.
         "int 0x80",
-        "xor ebx,ebx",
-        "mov eax,{__NR_exit}",
+        "xor ebx, ebx",
+        "mov eax, {__NR_exit}",
         "int 0x80",
         "ud2",
         __NR_exit = const __NR_exit,
@@ -192,7 +192,7 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
 #[naked]
 pub(super) unsafe extern "C" fn return_from_signal_handler() {
     asm!(
-        "mov eax,{__NR_rt_sigreturn}",
+        "mov eax, {__NR_rt_sigreturn}",
         "int 0x80",
         "ud2",
         __NR_rt_sigreturn = const __NR_rt_sigreturn,

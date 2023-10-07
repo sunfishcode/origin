@@ -299,9 +299,10 @@ pub fn exit(status: c_int) -> ! {
             static __fini_array_end: c_void;
         }
 
+        // Call the `.fini_array` functions.
         type FiniFn = extern "C" fn();
-        let mut fini: *const FiniFn = &__fini_array_end as *const _ as *const FiniFn;
-        let fini_start: *const FiniFn = &__fini_array_start as *const _ as *const FiniFn;
+        let mut fini = &__fini_array_end as *const _ as *const FiniFn;
+        let fini_start = &__fini_array_start as *const _ as *const FiniFn;
         // Prevent the optimizer from optimizing the `!=` comparison to true;
         // `fini` and `fini_start` may have the same address.
         asm!("# {}", inout(reg) fini, options(pure, nomem, nostack, preserves_flags));

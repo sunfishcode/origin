@@ -361,10 +361,9 @@ pub fn exit_immediately(status: c_int) -> ! {
 /// So we can do eg. `x == null()` but we can't do `x.is_null()`, because
 /// `null` is directly implemented by the compiler, while `is_null` is not.
 ///
-/// We use `asm` optimization barriers to try to discourage optimizers from
-/// thinking they understand what's happening, to increase the probability of
-/// this code working. We'd use volatile accesses too, except those aren't
-/// directly implemented by the compiler.
+/// We do all the relocation memory accesses using `asm`, as they happen
+/// outside the Rust memory model. They read and write and `mprotect` memory
+/// that Rust wouldn't think could be accessed.
 ///
 /// And if this code panics, the panic code will probably segfault, because
 /// `core::fmt` is known to use an address that needs relocation.
@@ -374,13 +373,12 @@ pub fn exit_immediately(status: c_int) -> ! {
 #[cfg(relocation_model = "pic")]
 #[cold]
 unsafe fn relocate(envp: *mut *mut u8) {
-    use core::arch::asm;
+    use crate::arch::{relocation_load, relocation_mprotect_readonly, relocation_store};
     use core::ffi::c_void;
     use core::mem::size_of;
-    use core::ptr::{from_exposed_addr, from_exposed_addr_mut, null, null_mut};
+    use core::ptr::{from_exposed_addr, null, null_mut};
     use linux_raw_sys::elf::*;
     use linux_raw_sys::general::{AT_ENTRY, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM};
-    use rustix::mm::{mprotect, MprotectFlags};
 
     // Please do not take any of the following code as an example for how to
     // write Rust code in general.
@@ -421,13 +419,11 @@ unsafe fn relocate(envp: *mut *mut u8) {
     // yet, so loading from static memory without synchronization is fine. But
     // we still use `asm` to do everything we can to protect this code because
     // the optimizer won't have any idea what we're up to.
-    struct StaticStart(*const u8);
+    struct StaticStart(*const c_void);
     unsafe impl Sync for StaticStart {}
-    static STATIC_START: StaticStart = StaticStart(crate::arch::_start as *const u8);
-    let mut static_start_addr: *const *const u8 = &STATIC_START.0;
-    asm!("# {}", inout(reg) static_start_addr);
-    let mut static_start = (*static_start_addr).addr();
-    asm!("# {}", inout(reg) static_start);
+    static STATIC_START: StaticStart = StaticStart(crate::arch::_start as *const c_void);
+    let static_start_addr: *const *const c_void = &STATIC_START.0;
+    let static_start = relocation_load(static_start_addr.addr());
 
     // Obtain the dynamic address of `_start` from the AUX records.
     let dynamic_start = auxv_entry;
@@ -484,22 +480,18 @@ unsafe fn relocate(envp: *mut *mut u8) {
                 }
 
                 // Now, perform the relocations. As above, the optimizer won't
-                // have any idea what we're up to, so use volatile and `asm`.
+                // have any idea what we're up to, so use `asm`.
                 let rela_end = rela_ptr.cast::<u8>().add(num_rela * rela_ent_size).cast();
                 while rela_ptr != rela_end {
                     let rela = &*rela_ptr;
                     rela_ptr = rela_ptr.cast::<u8>().add(rela_ent_size).cast();
 
-                    let addr: *mut c_void =
-                        from_exposed_addr_mut(rela.r_offset.wrapping_add(offset));
+                    let reloc_addr = rela.r_offset.wrapping_add(offset);
 
                     match rela.type_() {
                         R_RELATIVE => {
-                            let mut reloc_addr = addr.cast();
-                            let mut reloc_value = rela.r_addend.wrapping_add(offset);
-                            asm!("# {} {}", inout(reg) reloc_addr, inout(reg) reloc_value);
-                            *reloc_addr = reloc_value;
-                            asm!("");
+                            let reloc_value = rela.r_addend.wrapping_add(offset);
+                            relocation_store(reloc_addr, reloc_value);
                         }
                         _ => unimplemented!(),
                     }
@@ -522,19 +514,14 @@ unsafe fn relocate(envp: *mut *mut u8) {
     // Check that relocation did its job.
     #[cfg(debug_assertions)]
     {
-        use core::ptr::read_volatile;
-
-        let mut static_start_addr: *const *const u8 = &STATIC_START.0;
-        asm!("# {}", inout(reg) static_start_addr);
-        let mut static_start = read_volatile(static_start_addr).addr();
-        asm!("# {}", inout(reg) static_start);
+        let static_start_addr: *const *const c_void = &STATIC_START.0;
+        let static_start = relocation_load(static_start_addr.addr());
         assert_eq!(static_start, dynamic_start);
     }
 
     // If we saw a relro description, mark the memory readonly.
     if relro_len != 0 {
-        let mprotect_addr =
-            from_exposed_addr_mut(relro.wrapping_add(offset) & auxv_page_size.wrapping_neg());
-        mprotect(mprotect_addr, relro_len, MprotectFlags::READ).unwrap();
+        let mprotect_addr = relro.wrapping_add(offset) & auxv_page_size.wrapping_neg();
+        relocation_mprotect_readonly(mprotect_addr, relro_len);
     }
 }

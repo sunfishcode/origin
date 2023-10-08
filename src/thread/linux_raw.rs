@@ -221,7 +221,7 @@ pub(super) fn initialize_startup_thread_info() {
             // We saw a `PT_TLS` section. Initialize the fields.
             let tls_phdr = &*tls_phdr;
             StartupTlsInfo {
-                addr: ptr::from_exposed_addr(offset.wrapping_add(tls_phdr.p_vaddr)),
+                addr: first_phdr.with_addr(offset.wrapping_add(tls_phdr.p_vaddr)),
                 mem_size: tls_phdr.p_memsz,
                 file_size: tls_phdr.p_filesz,
                 align: tls_phdr.p_align,
@@ -982,7 +982,7 @@ extern "C" fn __aeabi_read_tp() -> *mut c_void {
     get_thread_pointer()
 }
 
-fn round_up(addr: usize, boundary: usize) -> usize {
+const fn round_up(addr: usize, boundary: usize) -> usize {
     (addr + (boundary - 1)) & boundary.wrapping_neg()
 }
 

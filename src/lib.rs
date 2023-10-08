@@ -34,6 +34,9 @@ mod unwind_unimplemented;
 mod arch;
 #[cfg(all(feature = "origin-program", feature = "log"))]
 mod log;
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+mod relocate;
 
 pub mod program;
 #[cfg(feature = "signal")]

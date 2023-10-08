@@ -3,6 +3,9 @@
 use core::arch::asm;
 #[cfg(feature = "origin-signal")]
 use linux_raw_sys::general::__NR_rt_sigreturn;
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "origin-thread")]
 use {
     alloc::boxed::Box,
@@ -34,6 +37,98 @@ pub(super) unsafe extern "C" fn _start() -> ! {
         entry = sym super::program::entry,
         options(noreturn),
     )
+}
+
+/// Perform a single load operation, outside the Rust memory model.
+///
+/// This function conceptually casts `ptr` to a `*const *mut c_void` and loads
+/// a `*mut c_void` value from it. However, it does this using `asm`, and
+/// `usize` types which don't carry provenance, as it's used by `relocate` to
+/// perform relocations which cannot be expressed in the Rust memory model.
+///
+/// # Safety
+///
+/// This function must only be called during the relocation process, for
+/// relocation purposes. And, `ptr` must contain the address of a memory
+/// location that can be loaded from.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+#[inline]
+pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
+    let r0;
+
+    // This is read-only but we don't use `readonly` because this memory access
+    // happens outside the Rust memory model. As far as Rust knows, this is
+    // just an arbitrary side-effecting opaque operation.
+    asm!(
+        "ldr {}, [{}]",
+        out(reg) r0,
+        in(reg) ptr,
+        options(nostack, preserves_flags),
+    );
+
+    r0
+}
+
+/// Perform a single store operation, outside the Rust memory model.
+///
+/// This function conceptually casts `ptr` to a `*mut *mut c_void` and stores
+/// a `*mut c_void` value to it. However, it does this using `asm`, and `usize`
+/// types which don't carry provenance, as it's used by `relocate` to perform
+/// relocations which cannot be expressed in the Rust memory model.
+///
+/// # Safety
+///
+/// This function must only be called during the relocation process, for
+/// relocation purposes. And, `ptr` must contain the address of a memory
+/// location that can be stored to.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+#[inline]
+pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
+    asm!(
+        "str {}, [{}]",
+        in(reg) value,
+        in(reg) ptr,
+        options(nostack, preserves_flags),
+    );
+}
+
+/// Mark "relro" memory as readonly.
+///
+/// "relro" is a relocation feature in which memory can be readonly after
+/// relocations are applied.
+///
+/// This function conceptually casts `ptr` to a `*mut c_void` and does a
+/// `rustix::mm::mprotect(ptr, len, MprotectFlags::READ)`. However, it does
+/// this using `asm` and `usize` types which don't carry provenance, as it's
+/// used by `relocate` to implement the "relro" feature which cannot be
+/// expressed in the Rust memory model.
+///
+/// # Safety
+///
+/// This function must only be called during the relocation process, for
+/// relocation purposes. And, `ptr` must contain the address of a memory
+/// location that can be marked readonly.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+#[inline]
+pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
+    let r0: usize;
+
+    // This is read-only but we don't use `readonly` because the side effects
+    // happen outside the Rust memory model. As far as Rust knows, this is
+    // just an arbitrary side-effecting opaque operation.
+    asm!(
+        "svc 0",
+        in("x8") __NR_mprotect,
+        inlateout("x0") ptr as usize => r0,
+        in("x1") len,
+        in("x2") PROT_READ,
+        options(nostack, preserves_flags),
+    );
+
+    assert_eq!(r0, 0);
 }
 
 /// A wrapper around the Linux `clone` system call.

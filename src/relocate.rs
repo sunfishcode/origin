@@ -24,6 +24,8 @@
 //! need to rely on testing the code to make sure it doesn't segfault in any
 //! case. And, `#![no_builtins]` interferes with LTO, so we don't use it.
 
+#![allow(clippy::cmp_null)]
+
 use crate::arch::{relocation_load, relocation_mprotect_readonly, relocation_store};
 use core::ffi::c_void;
 use core::ptr::{from_exposed_addr, null, null_mut};

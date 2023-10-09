@@ -178,13 +178,13 @@ pub(super) unsafe fn clone(
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     asm!("mv tp, {}", in(reg) ptr);
-    debug_assert_eq!(get_thread_pointer(), ptr);
+    debug_assert_eq!(thread_pointer(), ptr);
 }
 
 /// Read the value of the platform thread-pointer register.
 #[cfg(feature = "origin-thread")]
 #[inline]
-pub(super) fn get_thread_pointer() -> *mut c_void {
+pub(super) fn thread_pointer() -> *mut c_void {
     let ptr;
     unsafe {
         asm!("mv {}, tp", out(reg) ptr, options(nostack, preserves_flags, readonly));

@@ -1,8 +1,6 @@
 //! Thread startup and shutdown.
 
-use crate::arch::{
-    clone, get_thread_pointer, munmap_and_exit_thread, set_thread_pointer, TLS_OFFSET,
-};
+use crate::arch::{clone, munmap_and_exit_thread, set_thread_pointer, thread_pointer, TLS_OFFSET};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::any::Any;
@@ -832,7 +830,7 @@ pub fn at_thread_exit(func: Box<dyn FnOnce()>) {
 #[inline]
 #[must_use]
 fn current_metadata() -> *mut Metadata {
-    get_thread_pointer()
+    thread_pointer()
         .cast::<u8>()
         .wrapping_sub(offset_of!(Metadata, abi))
         .cast()
@@ -899,7 +897,7 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
     // Platforms where TLS data goes after the ABI-exposed fields.
     #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
     {
-        get_thread_pointer()
+        thread_pointer()
             .cast::<u8>()
             .wrapping_add(TLS_OFFSET)
             .wrapping_add(size_of::<Abi>())
@@ -913,7 +911,7 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
     // [`initialize_startup_thread_info`].
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     unsafe {
-        get_thread_pointer()
+        thread_pointer()
             .cast::<u8>()
             .wrapping_add(TLS_OFFSET)
             .wrapping_sub(STARTUP_TLS_INFO.mem_size)
@@ -979,7 +977,7 @@ pub fn yield_current_thread() {
 #[cfg(target_arch = "arm")]
 #[no_mangle]
 extern "C" fn __aeabi_read_tp() -> *mut c_void {
-    get_thread_pointer()
+    thread_pointer()
 }
 
 const fn round_up(addr: usize, boundary: usize) -> usize {

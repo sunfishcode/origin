@@ -126,6 +126,8 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
         in("rdi") ptr,
         in("rsi") len,
         in("rdx") PROT_READ,
+        lateout("rcx") _,
+        lateout("r11") _,
         options(nostack, preserves_flags),
     );
 

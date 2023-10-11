@@ -494,10 +494,12 @@ pub fn create_thread(
         // of its state with the current process. We also pass additional
         // flags:
         //  - `SETTLS` to set the platform thread register.
-        //  - `CHILD_CLEARTID` to arrange for a futex wait for threads waiting in
-        //    `join_thread`.
-        //  - `PARENT_SETTID` to store the child's tid at the `parent_tid` location.
-        //  - `CHILD_SETTID` to store the child's tid at the `child_tid` location.
+        //  - `CHILD_CLEARTID` to arrange for a futex wait for threads waiting
+        //    in `join_thread`.
+        //  - `PARENT_SETTID` to store the child's tid at the `parent_tid`
+        //    location.
+        //  - `CHILD_SETTID` to store the child's tid at the `child_tid`
+        //    location.
         // We receive the tid in the same memory for the parent and the child,
         // but we set both `PARENT_SETTID` and `CHILD_SETTID` to ensure that
         // the store completes before either the parent or child reads the tid.
@@ -679,8 +681,8 @@ pub(crate) fn call_thread_dtors(current: Thread) {
     // Run the `dtors`, in reverse order of registration. Note that destructors
     // may register new destructors.
     //
-    // SAFETY: `current` points to thread-local data which is valid as long
-    // as the thread is alive.
+    // SAFETY: `current` points to thread-local data which is valid as long as
+    // the thread is alive.
     while let Some(func) = unsafe { current.0.as_mut().dtors.pop() } {
         #[cfg(feature = "log")]
         if log::log_enabled!(log::Level::Trace) {

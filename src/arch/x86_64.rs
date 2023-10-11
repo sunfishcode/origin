@@ -242,7 +242,7 @@ pub(super) unsafe extern "C" fn return_from_signal_handler() {
 }
 
 /// Invoke the appropriate system call to return control from a signal
-/// handler that does not use `SA_SIGINFO`. On x86_64, this uses the same
+/// handler that does not use `SA_SIGINFO`. On x86-64, this uses the same
 /// sequence as the `SA_SIGINFO` case.
 ///
 /// # Safety

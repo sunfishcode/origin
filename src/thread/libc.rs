@@ -266,5 +266,5 @@ pub fn yield_current_thread() {
 /// Return the address of `__dso_handle`, appropriately casted.
 unsafe fn dso_handle() -> *mut c_void {
     let dso_handle: *const *const c_void = &__dso_handle;
-    dso_handle as *mut c_void
+    dso_handle.cast::<c_void>().cast_mut()
 }

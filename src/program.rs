@@ -112,8 +112,8 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
         // and envp as extra arguments. In addition to GLIBC ABI compatibility,
         // c-scape relies on this.
         type InitFn = extern "C" fn(c_int, *mut *mut u8, *mut *mut u8);
-        let mut init = &__init_array_start as *const _ as *const InitFn;
-        let init_end = &__init_array_end as *const _ as *const InitFn;
+        let mut init = addr_of!(__init_array_start).cast::<InitFn>();
+        let init_end = addr_of!(__init_array_end).cast::<InitFn>();
         // Prevent the optimizer from optimizing the `!=` comparison to true;
         // `init` and `init_start` may have the same address.
         asm!("# {}", inout(reg) init, options(pure, nomem, nostack, preserves_flags));
@@ -252,7 +252,7 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 
         // The function to pass to `__cxa_atexit`.
         unsafe extern "C" fn at_exit_func(arg: *mut c_void) {
-            Box::from_raw(arg as *mut Box<dyn FnOnce() + Send>)();
+            Box::from_raw(arg.cast::<Box<dyn FnOnce() + Send>>())();
         }
 
         let at_exit_arg = Box::into_raw(Box::new(func)).cast::<c_void>();
@@ -301,8 +301,8 @@ pub fn exit(status: c_int) -> ! {
 
         // Call the `.fini_array` functions.
         type FiniFn = extern "C" fn();
-        let mut fini = &__fini_array_end as *const _ as *const FiniFn;
-        let fini_start = &__fini_array_start as *const _ as *const FiniFn;
+        let mut fini = addr_of!(__fini_array_end).cast::<FiniFn>();
+        let fini_start = addr_off!(__fini_array_start).cast::<FiniFn>();
         // Prevent the optimizer from optimizing the `!=` comparison to true;
         // `fini` and `fini_start` may have the same address.
         asm!("# {}", inout(reg) fini, options(pure, nomem, nostack, preserves_flags));

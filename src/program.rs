@@ -120,7 +120,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 
         while init != init_end {
             #[cfg(feature = "log")]
-            log::trace!(
+            tracing::trace!(
                 "Calling `.init_array`-registered function `{:?}({:?}, {:?}, {:?})`",
                 *init,
                 argc,
@@ -141,13 +141,13 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
         }
 
         #[cfg(feature = "log")]
-        log::trace!("Calling `origin_main({:?}, {:?}, {:?})`", argc, argv, envp);
+        tracing::trace!("Calling `origin_main({:?}, {:?}, {:?})`", argc, argv, envp);
 
         // Call `origin_main`.
         let status = origin_main(argc as usize, argv, envp);
 
         #[cfg(feature = "log")]
-        log::trace!("`origin_main` returned `{:?}`", status);
+        tracing::trace!("`origin_main` returned `{:?}`", status);
 
         // Run functions registered with `at_exit`, and exit with
         // `origin_main`'s return value.
@@ -276,7 +276,7 @@ pub fn exit(status: c_int) -> ! {
         let mut dtors = DTORS.lock();
         if let Some(dtor) = dtors.pop() {
             #[cfg(feature = "log")]
-            log::trace!("Calling `at_exit`-registered function");
+            tracing::trace!("Calling `at_exit`-registered function");
 
             dtor();
         } else {
@@ -311,7 +311,7 @@ pub fn exit(status: c_int) -> ! {
             fini = fini.sub(1);
 
             #[cfg(feature = "log")]
-            log::trace!("Calling `.fini_array`-registered function `{:?}()`", *fini);
+            tracing::trace!("Calling `.fini_array`-registered function `{:?}()`", *fini);
 
             (*fini)();
         }
@@ -337,7 +337,7 @@ pub fn exit_immediately(status: c_int) -> ! {
     #[cfg(feature = "origin-program")]
     {
         #[cfg(feature = "log")]
-        log::trace!("Program exiting with status `{:?}`", status);
+        tracing::trace!("Program exiting with status `{:?}`", status);
 
         // Call `rustix` to exit the program.
         rustix::runtime::exit_group(status)

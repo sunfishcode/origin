@@ -535,7 +535,7 @@ pub fn create_thread(
         );
         if clone_res >= 0 {
             #[cfg(feature = "log")]
-            log::trace!(
+            tracing::trace!(
                 "Thread[{:?}] launched thread Thread[{:?}] with stack_size={} and guard_size={}",
                 current_thread_id().as_raw_nonzero(),
                 clone_res,
@@ -563,7 +563,7 @@ pub(super) unsafe extern "C" fn entry(fn_: *mut Box<dyn FnOnce() -> Option<Box<d
     let fn_ = Box::from_raw(fn_);
 
     #[cfg(feature = "log")]
-    log::trace!(
+    tracing::trace!(
         "Thread[{:?}] launched",
         current_thread_id().as_raw_nonzero()
     );
@@ -636,7 +636,7 @@ unsafe fn exit_thread() -> ! {
         let current_guard_size = current.0.as_ref().guard_size;
 
         #[cfg(feature = "log")]
-        log::trace!("Thread[{:?}] exiting as detached", current_thread_id);
+        tracing::trace!("Thread[{:?}] exiting as detached", current_thread_id);
         debug_assert_eq!(e, DETACHED);
 
         // Deallocate the `ThreadData`.
@@ -658,8 +658,8 @@ unsafe fn exit_thread() -> ! {
         // The thread was not detached, so its memory will be freed when it's
         // joined.
         #[cfg(feature = "log")]
-        if log::log_enabled!(log::Level::Trace) {
-            log::trace!(
+        if tracing::log_enabled!(tracing::Level::Trace) {
+            tracing::trace!(
                 "Thread[{:?}] exiting as joinable",
                 current.0.as_ref().thread_id.load(SeqCst)
             );
@@ -681,8 +681,8 @@ pub(crate) fn call_thread_dtors(current: Thread) {
     // as the thread is alive.
     while let Some(func) = unsafe { current.0.as_mut().dtors.pop() } {
         #[cfg(feature = "log")]
-        if log::log_enabled!(log::Level::Trace) {
-            log::trace!(
+        if tracing::log_enabled!(tracing::Level::Trace) {
+            tracing::trace!(
                 "Thread[{:?}] calling `at_thread_exit`-registered function",
                 unsafe { current.0.as_ref().thread_id.load(SeqCst) },
             );
@@ -707,8 +707,8 @@ pub unsafe fn detach_thread(thread: Thread) {
     let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
 
     #[cfg(feature = "log")]
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!(
+    if tracing::log_enabled!(tracing::Level::Trace) {
+        tracing::trace!(
             "Thread[{:?}] marked as detached by Thread[{:?}]",
             thread_id,
             current_thread_id().as_raw_nonzero()
@@ -736,8 +736,8 @@ pub unsafe fn join_thread(thread: Thread) {
     let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
 
     #[cfg(feature = "log")]
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!(
+    if tracing::log_enabled!(tracing::Level::Trace) {
+        tracing::trace!(
             "Thread[{:?}] is being joined by Thread[{:?}]",
             thread_id,
             current_thread_id().as_raw_nonzero()
@@ -788,8 +788,8 @@ unsafe fn wait_for_thread_exit(thread: Thread) {
 
 #[cfg(feature = "log")]
 fn log_thread_to_be_freed(thread_id: i32) {
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!("Thread[{:?}] memory being freed", thread_id);
+    if tracing::log_enabled!(tracing::Level::Trace) {
+        tracing::trace!("Thread[{:?}] memory being freed", thread_id);
     }
 }
 

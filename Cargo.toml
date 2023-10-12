@@ -18,7 +18,7 @@ linux-raw-sys = { version = "0.4.9", default-features = false, features = ["gene
 rustix = { version = "0.38.17", default-features = false }
 bitflags = { version = "2.4.0", default-features = false }
 memoffset = { version = "0.9.0", optional = true }
-log = { version = "0.4.14", default-features = false, optional = true }
+tracing = { version = "0.1.37", default-features = false, optional = true }
 rustix-futex-sync = "0.1.0"
 
 # Optional logging backends for use with "origin-program". You can use any
@@ -65,6 +65,8 @@ rustc-dep-of-std = [
     "dep:compiler_builtins",
 ]
 
+log = ["tracing/log"]
+
 # Use origin's implementation of program startup and shutdown.
 origin-program = []
 
@@ -89,7 +91,7 @@ atomic-dbg-logger = ["atomic-dbg/log"]
 env_logger = ["dep:env_logger", "init-fini-arrays"]
 
 # Disable logging.
-max_level_off = ["log/max_level_off"]
+# max_level_off = ["log/max_level_off"]
 
 # Enable features which depend on the Rust global allocator, such as functions
 # that return owned strings or `Vec`s.

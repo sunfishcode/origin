@@ -108,7 +108,13 @@ signal = ["rustix/runtime"]
 param = ["rustix/param"]
 
 # Enable support for ELF `.init_array` and `.fini_array`.
-init-fini-arrays = []
+init-fini-arrays = ["init-array", "fini-array"]
+
+# Enable support for ELF `.init_array`.
+init-array = []
+
+# Enable support for ELF `.fini_array`.
+fini-array = []
 
 # Enable highly experimental support for performing startup-time relocations,
 # needed to support statically-linked PIE executables.

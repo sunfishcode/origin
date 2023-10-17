@@ -96,7 +96,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     init_runtime(mem, envp);
 
     // Call the functions registered via `.init_array`.
-    #[cfg(feature = "init-fini-arrays")]
+    #[cfg(feature = "init-array")]
     {
         use core::arch::asm;
         use core::ffi::c_void;
@@ -287,7 +287,7 @@ pub fn exit(status: c_int) -> ! {
     // Call the `.fini_array` functions, in reverse order. We only do this
     // in "origin-program" mode because if we're using libc, libc does this
     // in `exit`.
-    #[cfg(all(feature = "init-fini-arrays", feature = "origin-program"))]
+    #[cfg(all(feature = "fini-array", feature = "origin-program"))]
     unsafe {
         use core::arch::asm;
         use core::ffi::c_void;

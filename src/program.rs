@@ -112,8 +112,8 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
         // and envp as extra arguments. In addition to GLIBC ABI compatibility,
         // c-scape relies on this.
         type InitFn = extern "C" fn(c_int, *mut *mut u8, *mut *mut u8);
-        let mut init = addr_of!(__init_array_start).cast::<InitFn>();
-        let init_end = addr_of!(__init_array_end).cast::<InitFn>();
+        let mut init = core::ptr::addr_of!(__init_array_start).cast::<InitFn>();
+        let init_end = core::ptr::addr_of!(__init_array_end).cast::<InitFn>();
         // Prevent the optimizer from optimizing the `!=` comparison to true;
         // `init` and `init_start` may have the same address.
         asm!("# {}", inout(reg) init, options(pure, nomem, nostack, preserves_flags));
@@ -301,8 +301,8 @@ pub fn exit(status: c_int) -> ! {
 
         // Call the `.fini_array` functions.
         type FiniFn = extern "C" fn();
-        let mut fini = addr_of!(__fini_array_end).cast::<FiniFn>();
-        let fini_start = addr_off!(__fini_array_start).cast::<FiniFn>();
+        let mut fini = core::ptr::addr_of!(__fini_array_end).cast::<FiniFn>();
+        let fini_start = core::ptr::addr_of!(__fini_array_start).cast::<FiniFn>();
         // Prevent the optimizer from optimizing the `!=` comparison to true;
         // `fini` and `fini_start` may have the same address.
         asm!("# {}", inout(reg) fini, options(pure, nomem, nostack, preserves_flags));

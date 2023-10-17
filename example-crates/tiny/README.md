@@ -10,7 +10,7 @@ and `.comment` sections:
 objcopy -R .eh_frame -R .comment target/release/tiny even-smaller
 ```
 
-On x86_64, this produces a executable with size 408 bytes.
+On x86-64, this produces a executable with size 408 bytes.
 
 How is this achieved?
 
@@ -227,8 +227,8 @@ means using `exit_thread` instead of `exit_group`. This would exit only the
 current thread, but that's fine because our tiny program only ever uses one
 thread. And it would be slightly smaller on some architectures because the
 syscall number for `exit` is lower than the number for `exit_group`. For
-example, on x86_64, `exit` is 60 while `exit_group` is 231. That would enable
-the compiler to use the same `push`/`pop` trick it does does the 42 constant,
+example, on x86-64, `exit` is 60 while `exit_group` is 231. That would enable
+the compiler to use the same `push`/`pop` trick it does for the 42 constant,
 saving 2 bytes. In theory origin could have a feature to enable this, however
 it's a very minor optimization, and it would introducue undefined behavior if
 somehow some thread got created outside of origin, so I chose not to add it.
@@ -237,10 +237,11 @@ somehow some thread got created outside of origin, so I chose not to add it.
 
 Many of these optimizations came from the following websites:
 
- - [Minimizing Rust Binary Size](https://github.com/johnthagen/min-sized-rust),
-   a great general-purpose resource.
- - [A very small Rust binary indeed](https://darkcoding.net/software/a-very-small-rust-binary-indeed/),
-   a great resource for more extreme code-size optimizations.
+ - [Minimizing Rust Binary Size], a great general-purpose resource.
+ - [A very small Rust binary indeed], a great resource for more extreme
+   code-size optimizations.
 
 [origin-start example]: https://github.com/sunfishcode/origin/blob/main/example-crates/origin-start/README.md
 [The microarchitecture of Intel, AMD, and VIA CPUs]: https://www.agner.org/optimize/microarchitecture.pdf
+[Minimizing Rust Binary Size]: https://github.com/johnthagen/min-sized-rust
+[A very small Rust binary indeed]: https://darkcoding.net/software/a-very-small-rust-binary-indeed/

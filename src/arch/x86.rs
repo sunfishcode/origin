@@ -11,7 +11,7 @@ use {
     alloc::boxed::Box,
     core::any::Any,
     core::ffi::c_void,
-    core::ptr::invalid,
+    core::ptr::invalid_mut,
     linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
     rustix::thread::RawPid,
 };
@@ -207,7 +207,11 @@ pub(super) unsafe fn clone(
         "pop esi",            // Restore incoming register value.
 
         entry = sym super::thread::entry,
-        inout("eax") &[newtls as *mut c_void, invalid(__NR_clone as usize), fn_ as *mut c_void] => r0,
+        inout("eax") &[
+            newtls.cast::<c_void>().cast_mut(),
+            invalid_mut(__NR_clone as usize),
+            fn_.cast::<c_void>()
+        ] => r0,
         in("ebx") flags,
         in("ecx") child_stack,
         in("edx") parent_tid,

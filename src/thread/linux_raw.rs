@@ -259,7 +259,9 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     // See <https://lwn.net/Articles/631631/> for details.
     let execfn = linux_execfn().to_bytes_with_nul();
     let stack_base = execfn.as_ptr().add(execfn.len());
-    let stack_base = stack_base.map_addr(|ptr| round_up(ptr, page_size())) as *mut c_void;
+    let stack_base = stack_base
+        .map_addr(|ptr| round_up(ptr, page_size()))
+        .cast_mut();
 
     // We're running before any user code, so the startup soft stack limit is
     // the effective stack size. Linux sets up inaccessible memory at the end

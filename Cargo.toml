@@ -33,7 +33,7 @@ env_logger = { version = "0.10.0", optional = true, default-features = false }
 atomic-dbg = { version = "0.1", default-features = false, optional = true }
 
 # Enable this when disabling origin's implementations.
-libc = { version = "0.2.138", default-features = false, optional = true }
+libc = { version = "0.2.149", default-features = false, optional = true }
 errno = { version = "0.3.3", default-features = false, optional = true }
 
 # Special dependencies used in rustc-dep-of-std mode.

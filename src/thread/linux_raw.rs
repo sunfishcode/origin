@@ -164,8 +164,8 @@ static mut STARTUP_STACK_SIZE: usize = 0;
 
 /// Initialize `STARTUP_TLS_INFO` and `STARTUP_STACK_SIZE`.
 ///
-/// Read values from the main executable segment headers ("phdrs") relevant to
-/// initializing TLS provided to the program at startup, and store them in
+/// Read values from the main executable segment headers (“phdrs”) relevant
+/// to initializing TLS provided to the program at startup, and store them in
 /// `STARTUP_TLS_INFO`.
 pub(super) fn initialize_startup_thread_info() {
     let mut tls_phdr = null();
@@ -698,7 +698,7 @@ pub(crate) fn call_thread_dtors(current: Thread) {
     }
 }
 
-/// Marks a thread as "detached".
+/// Marks a thread as “detached”.
 ///
 /// Detached threads free their own resources automatically when they
 /// exit, rather than when they are joined.

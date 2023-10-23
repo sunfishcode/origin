@@ -99,15 +99,15 @@ pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
     );
 }
 
-/// Mark "relro" memory as readonly.
+/// Mark “relro” memory as readonly.
 ///
-/// "relro" is a relocation feature in which memory can be readonly after
+/// “relro” is a relocation feature in which memory can be readonly after
 /// relocations are applied.
 ///
 /// This function conceptually casts `ptr` to a `*mut c_void` and does a
 /// `rustix::mm::mprotect(ptr, len, MprotectFlags::READ)`. However, it does
 /// this using `asm` and `usize` types which don't carry provenance, as it's
-/// used by `relocate` to implement the "relro" feature which cannot be
+/// used by `relocate` to implement the “relro” feature which cannot be
 /// expressed in the Rust memory model.
 ///
 /// # Safety

@@ -24,8 +24,8 @@ its own implementations of this functionality, written in Rust.
 
 For a C-ABI-compatible interface to this functionality, see [c-scape].
 
-This is used by [Mustang] and [Eyra] in their libc implementations, and in
-the [Origin Studio] project in its std implementation, which are three different
+This is used by [Mustang] and [Eyra] in their libc implementations, and in the
+[Origin Studio] project in its std implementation, which are three different
 ways to support building Rust programs written entirely in Rust.
 
 ## Example crates
@@ -51,9 +51,9 @@ Origin can also be used on its own, in several different configurations:
 
  - The [origin-start-no-alloc example] is like origin-start, but disables the
    "alloc" and "thread" features, since Origin's "thread" feature currently
-   depends on "alloc". Without "alloc", functions that return owned strings
-   or `Vec`s are not available. In this mode, Origin avoids using a
-   global allocator entirely.
+   depends on "alloc". Without "alloc", functions that return owned strings or
+   `Vec`s are not available. In this mode, Origin avoids using a global
+   allocator entirely.
 
  - The [origin-start-lto example] is like origin-start, but builds with LTO.
 
@@ -69,14 +69,15 @@ default they do still depend on a dynamic linker.
 
 For fully static linking, there are two options:
 
- - Build with `RUSTFLAGS=-C target-feature=+crt-static -C relocation-model=static`.
-   This disables PIE mode, which is safer in terms of Origin's code, but loses
-   the security benefits of Address-Space Layout Randomization (ASLR).
+ - Build with
+   `RUSTFLAGS=-C target-feature=+crt-static -C relocation-model=static`. This
+   disables PIE mode, which is safer in terms of Origin's code, but loses the
+   security benefits of Address-Space Layout Randomization (ASLR).
 
- - Build with `RUSTFLAGS=-C target-feature=+crt-static` and enable
-   Origin's `experimental-relocate` feature. This allows PIE mode to work,
-   however it does so by enabling some highly experimental code in origin for
-   performing relocations.
+ - Build with `RUSTFLAGS=-C target-feature=+crt-static` and enable Origin's
+   `experimental-relocate` feature. This allows PIE mode to work, however it
+   does so by enabling some experimental code in origin for performing
+   relocations.
 
 [basic example]: https://github.com/sunfishcode/origin/blob/main/example-crates/basic/README.md
 [no-std example]: https://github.com/sunfishcode/origin/blob/main/example-crates/no-std/README.md

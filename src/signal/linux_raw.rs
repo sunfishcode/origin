@@ -43,7 +43,7 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
     rustix::runtime::sigaction(sig, action)
 }
 
-/// Return a special "ignore" signal handler for ignoring signals.
+/// Return a special “ignore” signal handler for ignoring signals.
 ///
 /// If you're looking for `sig_dlf`; use [`SigDfl`].
 #[doc(alias = "SIG_IGN")]
@@ -52,8 +52,8 @@ pub const fn sig_ign() -> Sighandler {
     linux_raw_sys::signal_macros::sig_ign()
 }
 
-/// A special "default" signal handler representing the default behavior for
-/// handling a signal.
+/// A special “default” signal handler representing the default behavior
+/// for handling a signal.
 ///
 /// If you're looking for `SigIgn`; use [`sig_ign`].
 #[doc(alias = "SIG_DFL")]

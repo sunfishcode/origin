@@ -197,7 +197,7 @@ instructions are `origin::program::entry` and everything, including the user
 
 ## Optimizations not done
 
-In theory this code code be made even smaller.
+In theory this code be made even smaller.
 
 That first `mov $rsp,%rdi` is moving the incoming stack pointer we got from the
 OS into the first argument register to pass to `origin::program::entry` so that

@@ -187,7 +187,7 @@ pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
     (stack_addr, stack_size, guard_size)
 }
 
-/// Marks a thread as "detached".
+/// Marks a thread as “detached”.
 ///
 /// Detached threads free their own resources automatically when they
 /// exit, rather than when they are joined.

@@ -242,7 +242,7 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
         use core::ffi::c_void;
 
         extern "C" {
-            // <https://refspecs.linuxbase.org/LSB_3.1.0/LSB-generic/LSB-generic/baselib---cxa-atexit.html>
+            // <https://refspecs.linuxbase.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/baselib---cxa-atexit.html>
             fn __cxa_atexit(
                 func: unsafe extern "C" fn(*mut c_void),
                 arg: *mut c_void,

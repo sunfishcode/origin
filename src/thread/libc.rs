@@ -17,17 +17,6 @@ extern "C" {
     ) -> libc::c_int;
     fn __tls_get_addr(p: &[usize; 2]) -> *mut c_void;
 
-    // TODO: PR for these has been submitted to upstream:
-    // <https://github.com/rust-lang/libc/pull/3330>
-    fn pthread_attr_getstacksize(
-        attr: *const libc::pthread_attr_t,
-        stacksize: &mut libc::size_t,
-    ) -> libc::c_int;
-    fn pthread_attr_setguardsize(
-        attr: *mut libc::pthread_attr_t,
-        guardsize: libc::size_t,
-    ) -> libc::c_int;
-
     static __dso_handle: *const c_void;
 }
 
@@ -93,7 +82,7 @@ pub fn create_thread(
             0 => (),
             err => return Err(io::Errno::from_raw_os_error(err)),
         }
-        match pthread_attr_setguardsize(&mut attr, guard_size) {
+        match libc::pthread_attr_setguardsize(&mut attr, guard_size) {
             0 => (),
             err => return Err(io::Errno::from_raw_os_error(err)),
         }
@@ -236,7 +225,7 @@ pub fn default_stack_size() -> usize {
         assert_eq!(libc::pthread_getattr_np(libc::pthread_self(), &mut attr), 0);
 
         let mut stack_size = 0;
-        assert_eq!(pthread_attr_getstacksize(&attr, &mut stack_size), 0);
+        assert_eq!(libc::pthread_attr_getstacksize(&attr, &mut stack_size), 0);
 
         stack_size
     }

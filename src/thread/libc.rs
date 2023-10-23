@@ -68,13 +68,13 @@ impl Thread {
 ///
 /// `fn_` is called on the new thread.
 pub fn create_thread(
-    fn_: Box<dyn FnOnce() -> Option<Box<dyn Any>>>,
+    fn_: Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
     stack_size: usize,
     guard_size: usize,
 ) -> io::Result<Thread> {
     extern "C" fn start(arg: *mut c_void) -> *mut c_void {
         unsafe {
-            let arg = arg.cast::<Box<dyn FnOnce() -> Option<Box<dyn Any>>>>();
+            let arg = arg.cast::<Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>>();
             let arg = Box::from_raw(arg);
             match arg() {
                 None => null_mut(),

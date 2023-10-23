@@ -144,7 +144,7 @@ pub(super) unsafe fn clone(
     parent_tid: *mut RawPid,
     newtls: *mut c_void,
     child_tid: *mut RawPid,
-    fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>>>,
+    fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
 ) -> isize {
     let r0;
     asm!(

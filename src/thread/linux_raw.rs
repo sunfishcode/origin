@@ -372,7 +372,7 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
 ///
 /// `fn_` is called on the new thread.
 pub fn create_thread(
-    fn_: Box<dyn FnOnce() -> Option<Box<dyn Any>>>,
+    fn_: Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
     stack_size: usize,
     guard_size: usize,
 ) -> io::Result<Thread> {
@@ -563,7 +563,9 @@ pub fn create_thread(
 /// `fn_` must be valid to call [`Box::from_raw`] on.
 ///
 /// After calling `fn_`, this terminates the thread.
-pub(super) unsafe extern "C" fn entry(fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>>>) -> ! {
+pub(super) unsafe extern "C" fn entry(
+    fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
+) -> ! {
     let fn_ = Box::from_raw(fn_);
 
     #[cfg(feature = "log")]

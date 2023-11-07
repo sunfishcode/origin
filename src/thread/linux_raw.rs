@@ -514,27 +514,12 @@ pub fn create_thread(
             | CloneFlags::CHILD_SETTID
             | CloneFlags::PARENT_SETTID;
         let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
-        #[cfg(target_arch = "x86_64")]
         let clone_res = clone(
             flags.bits(),
             stack.cast(),
             thread_id_ptr,
             thread_id_ptr,
             newtls.cast::<u8>().cast(),
-            Box::into_raw(Box::new(fn_)),
-        );
-        #[cfg(any(
-            target_arch = "x86",
-            target_arch = "aarch64",
-            target_arch = "arm",
-            target_arch = "riscv64"
-        ))]
-        let clone_res = clone(
-            flags.bits(),
-            stack.cast(),
-            thread_id_ptr,
-            newtls.cast::<u8>().cast(),
-            thread_id_ptr,
             Box::into_raw(Box::new(fn_)),
         );
         if clone_res >= 0 {

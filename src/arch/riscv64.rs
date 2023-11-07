@@ -142,8 +142,8 @@ pub(super) unsafe fn clone(
     flags: u32,
     child_stack: *mut c_void,
     parent_tid: *mut RawPid,
-    newtls: *mut c_void,
     child_tid: *mut RawPid,
+    newtls: *mut c_void,
     fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
 ) -> isize {
     let r0;

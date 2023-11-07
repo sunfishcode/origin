@@ -76,7 +76,7 @@ For fully static linking, there are two options:
 
  - Build with `RUSTFLAGS=-C target-feature=+crt-static` and enable Origin's
    `experimental-relocate` feature. This allows PIE mode to work, however it
-   does so by enabling some experimental code in origin for performing
+   does so by enabling some experimental code in Origin for performing
    relocations.
 
 [basic example]: https://github.com/sunfishcode/origin/blob/main/example-crates/basic/README.md

@@ -31,8 +31,6 @@
 use crate::thread::{initialize_main_thread, initialize_startup_thread_info};
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(all(feature = "alloc", feature = "origin-program"))]
-use alloc::vec::Vec;
 #[cfg(not(feature = "origin-program"))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
@@ -219,8 +217,14 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 }
 
 /// Functions registered with [`at_exit`].
+///
+/// [POSIX guarantees] at least 32 handlers can be registered, so use a
+/// `SmallVec` to ensure we can register that many without allocating.
+///
+/// [POSIX guarantees]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/atexit.html
 #[cfg(all(feature = "alloc", feature = "origin-program"))]
-static DTORS: Mutex<Vec<Box<dyn FnOnce() + Send>>> = Mutex::new(Vec::new());
+static DTORS: Mutex<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>> =
+    Mutex::new(smallvec::SmallVec::new_const());
 
 /// Register a function to be called when [`exit`] is called.
 ///

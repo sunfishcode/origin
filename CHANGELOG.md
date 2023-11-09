@@ -1,15 +1,14 @@
-# origin 0.14
+# origin 0.15
 
 ## Changes
 
-`thread::create_thread` now requires the function arugment to implement `Send`,
-which reflects the fact that it is sent to the newly-created thread.
+The `create_thread` API has been redesigned to allow it and users of it
+to avoid performing dynamic allocations. Instead of taking a boxed closure,
+it now takes a function pointer and a list of pointer arguments to pass
+to it. See #94 for details.
 
-## Features
+The default stack size has been increased, as several use cases were bumping
+up against the limit. See #91 for details.
 
-The "init-fini-arrays" feature now enables two sub-features, "init-arrays" and
-"fini-arrays" which can be enabled individually for use cases that only need one.
-
-A new "atomic-dbg-logger" feature uses the atomic-dbg packages `log` implementation,
-which is very minimal and not configurable, but which can print messages to stderr
-in more configurations.
+Thread and process destructor lists now use the `smallvec` crate to avoid
+allocating. See #93 for details.

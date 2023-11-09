@@ -3,6 +3,7 @@
 use alloc::boxed::Box;
 use core::any::Any;
 use core::ffi::c_void;
+use core::mem::zeroed;
 use core::ptr::{from_exposed_addr_mut, null_mut, NonNull};
 use rustix::io;
 
@@ -73,7 +74,7 @@ pub fn create_thread(
     }
 
     unsafe {
-        let mut attr: libc::pthread_attr_t = core::mem::zeroed();
+        let mut attr: libc::pthread_attr_t = zeroed();
         match libc::pthread_attr_init(&mut attr) {
             0 => (),
             err => return Err(io::Errno::from_raw_os_error(err)),
@@ -86,7 +87,7 @@ pub fn create_thread(
             0 => (),
             err => return Err(io::Errno::from_raw_os_error(err)),
         }
-        let mut new_thread = core::mem::zeroed();
+        let mut new_thread = zeroed();
         let arg = Box::into_raw(Box::new(fn_));
         match libc::pthread_create(&mut new_thread, &attr, start, arg.cast()) {
             0 => (),
@@ -171,7 +172,7 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
 pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
     let thread = thread.0;
 
-    let mut attr: libc::pthread_attr_t = core::mem::zeroed();
+    let mut attr: libc::pthread_attr_t = zeroed();
     assert_eq!(libc::pthread_getattr_np(thread, &mut attr), 0);
 
     let mut stack_size = 0;
@@ -221,7 +222,7 @@ pub unsafe fn join_thread(thread: Thread) {
 #[must_use]
 pub fn default_stack_size() -> usize {
     unsafe {
-        let mut attr: libc::pthread_attr_t = core::mem::zeroed();
+        let mut attr: libc::pthread_attr_t = zeroed();
         assert_eq!(libc::pthread_getattr_np(libc::pthread_self(), &mut attr), 0);
 
         let mut stack_size = 0;
@@ -236,7 +237,7 @@ pub fn default_stack_size() -> usize {
 #[must_use]
 pub fn default_guard_size() -> usize {
     unsafe {
-        let mut attr: libc::pthread_attr_t = core::mem::zeroed();
+        let mut attr: libc::pthread_attr_t = zeroed();
         assert_eq!(libc::pthread_getattr_np(libc::pthread_self(), &mut attr), 0);
 
         let mut guard_size = 0;

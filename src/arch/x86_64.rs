@@ -10,8 +10,6 @@ use linux_raw_sys::general::__NR_rt_sigreturn;
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "origin-thread")]
 use {
-    alloc::boxed::Box,
-    core::any::Any,
     linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
     rustix::thread::RawPid,
 };
@@ -134,6 +132,10 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
     assert_eq!(r0, 0);
 }
 
+/// The required alignment for the stack pointer.
+#[cfg(feature = "origin-thread")]
+pub(super) const STACK_ALIGNMENT: usize = 16;
+
 /// A wrapper around the Linux `clone` system call.
 ///
 /// This can't be implemented in `rustix` because the child starts executing at
@@ -147,7 +149,8 @@ pub(super) unsafe fn clone(
     parent_tid: *mut RawPid,
     child_tid: *mut RawPid,
     newtls: *mut c_void,
-    fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
+    fn_: extern "C" fn(),
+    num_args: usize,
 ) -> isize {
     let r0;
     asm!(
@@ -156,8 +159,10 @@ pub(super) unsafe fn clone(
         "jnz 0f",
 
         // Child thread.
-        "xor ebp, ebp",       // Zero the frame address.
         "mov rdi, r9",        // Pass `fn_` as the first argument.
+        "mov rsi, rsp",       // Pass the args pointer as the second argument.
+        "mov rdx, r12",       // Pass `num_args` as the third argument.
+        "xor ebp, ebp",       // Zero the frame address.
         "push rax",           // Zero the return address.
         "jmp {entry}",        // Call `entry`.
 
@@ -172,6 +177,7 @@ pub(super) unsafe fn clone(
         in("r10") child_tid,
         in("r8") newtls,
         in("r9") fn_,
+        in("r12") num_args,
         lateout("rcx") _,
         lateout("r11") _,
         options(nostack)

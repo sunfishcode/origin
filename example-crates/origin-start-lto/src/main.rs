@@ -36,13 +36,14 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     }));
 
     let thread = create_thread(
-        Box::new(|| {
+        |_args| {
             eprintln!("Hello from child thread");
             at_thread_exit(Box::new(|| {
                 eprintln!("Hello from child thread's at_thread_exit handler")
             }));
             None
-        }),
+        },
+        &[],
         default_stack_size(),
         default_guard_size(),
     )

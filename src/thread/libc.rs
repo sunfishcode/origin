@@ -1,10 +1,10 @@
 //! Thread startup and shutdown.
 
 use alloc::boxed::Box;
-use core::any::Any;
 use core::ffi::c_void;
-use core::mem::zeroed;
-use core::ptr::{from_exposed_addr_mut, null_mut, NonNull};
+use core::mem::{size_of, transmute, zeroed};
+use core::ptr::{from_exposed_addr_mut, invalid_mut, null_mut, NonNull};
+use core::slice;
 use rustix::io;
 
 pub use rustix::thread::Pid as ThreadId;
@@ -56,19 +56,39 @@ impl Thread {
 
 /// Creates a new thread.
 ///
-/// `fn_` is called on the new thread.
-pub fn create_thread(
-    fn_: Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
+/// `fn_(args)` is called on the new thread, except that the argument values
+/// copied to memory that can be exclusively referenced by the thread.
+///
+/// # Safety
+///
+/// `fn_(arg)` on the new thread must have defined behavior, and the return
+/// value must be valid to use on the eventual joining thread.
+pub unsafe fn create_thread(
+    fn_: unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>>,
+    args: &[Option<NonNull<c_void>>],
     stack_size: usize,
     guard_size: usize,
 ) -> io::Result<Thread> {
-    extern "C" fn start(arg: *mut c_void) -> *mut c_void {
+    extern "C" fn start(thread_arg_ptr: *mut c_void) -> *mut c_void {
         unsafe {
-            let arg = arg.cast::<Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>>();
-            let arg = Box::from_raw(arg);
-            match arg() {
+            // Unpack the thread arguments.
+            let num_args = thread_arg_ptr.cast::<*mut c_void>().read().addr();
+            let thread_args =
+                slice::from_raw_parts_mut(thread_arg_ptr.cast::<*mut c_void>(), num_args + 2);
+            let fn_: unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>> =
+                transmute(thread_args[1]);
+            let args = &mut thread_args[2..];
+
+            // Call the user's function.
+            let return_value = fn_(args);
+
+            // Free the thread argument memory.
+            libc::free(thread_arg_ptr);
+
+            // Return the return value.
+            match return_value {
+                Some(return_value) => return_value.as_ptr(),
                 None => null_mut(),
-                Some(ret) => Box::into_raw(ret).cast(),
             }
         }
     }
@@ -87,9 +107,24 @@ pub fn create_thread(
             0 => (),
             err => return Err(io::Errno::from_raw_os_error(err)),
         }
+
         let mut new_thread = zeroed();
-        let arg = Box::into_raw(Box::new(fn_));
-        match libc::pthread_create(&mut new_thread, &attr, start, arg.cast()) {
+
+        // Pack up the thread arguments.
+        let thread_arg_ptr = libc::malloc((args.len() + 2) * size_of::<*mut c_void>());
+        if thread_arg_ptr.is_null() {
+            return Err(io::Errno::NOMEM);
+        }
+        let thread_args = slice::from_raw_parts_mut(
+            thread_arg_ptr.cast::<Option<NonNull<c_void>>>(),
+            args.len() + 2,
+        );
+        thread_args[0] = NonNull::new(invalid_mut(args.len()));
+        thread_args[1] = NonNull::new(fn_ as _);
+        thread_args[2..].copy_from_slice(args);
+
+        // Call libc to create the thread.
+        match libc::pthread_create(&mut new_thread, &attr, start, thread_arg_ptr) {
             0 => (),
             err => return Err(io::Errno::from_raw_os_error(err)),
         }
@@ -206,15 +241,20 @@ pub unsafe fn detach_thread(thread: Thread) {
 
 /// Waits for a thread to finish.
 ///
+/// The return value is the value returned from the call to the `fn_` passed to
+/// `create_thread`.
+///
 /// # Safety
 ///
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
-pub unsafe fn join_thread(thread: Thread) {
+pub unsafe fn join_thread(thread: Thread) -> Option<NonNull<c_void>> {
     let thread = thread.0;
 
-    let mut retval: *mut c_void = null_mut();
-    assert_eq!(libc::pthread_join(thread, &mut retval), 0);
+    let mut return_value: *mut c_void = null_mut();
+    assert_eq!(libc::pthread_join(thread, &mut return_value), 0);
+
+    NonNull::new(return_value)
 }
 
 /// Return the default stack size for new threads.

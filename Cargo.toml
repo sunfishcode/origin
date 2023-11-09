@@ -40,6 +40,7 @@ errno = { version = "0.3.3", default-features = false, optional = true }
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
 compiler_builtins = { version = "0.1.101", optional = true }
+smallvec = { version = "1.11.1", features = ["const_new"] }
 
 [target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
 version = "0.2.0"

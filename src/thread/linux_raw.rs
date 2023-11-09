@@ -2,7 +2,6 @@
 
 use crate::arch::{clone, munmap_and_exit_thread, set_thread_pointer, thread_pointer, TLS_OFFSET};
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use core::any::Any;
 use core::cmp::max;
 use core::ffi::c_void;
@@ -63,7 +62,9 @@ struct ThreadData {
     stack_size: usize,
     guard_size: usize,
     map_size: usize,
-    dtors: Vec<Box<dyn FnOnce()>>,
+
+    // Support a few dtors before using dynamic allocation.
+    dtors: smallvec::SmallVec<[Box<dyn FnOnce()>; 4]>,
 }
 
 // Values for `ThreadData::detached`.
@@ -87,7 +88,7 @@ impl ThreadData {
             stack_size,
             guard_size,
             map_size,
-            dtors: Vec::new(),
+            dtors: smallvec::SmallVec::new(),
         }
     }
 }

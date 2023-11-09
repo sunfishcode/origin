@@ -72,7 +72,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
             }));
             None
         }),
-        2 * 1024 * 1024,
+        default_stack_size(),
         default_guard_size(),
     )
     .unwrap();

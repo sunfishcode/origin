@@ -17,7 +17,7 @@ fn main() {
             }));
             None
         }),
-        2 * 1024 * 1024,
+        default_stack_size(),
         default_guard_size(),
     )
     .unwrap();

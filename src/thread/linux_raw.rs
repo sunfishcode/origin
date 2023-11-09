@@ -947,7 +947,7 @@ pub fn default_stack_size() -> usize {
     //
     // SAFETY: `STARTUP_STACK_SIZE` has already been initialized by
     // [`initialize_startup_thread_info`].
-    unsafe { max(page_size() * 2, STARTUP_STACK_SIZE) }
+    unsafe { max(0x20000, STARTUP_STACK_SIZE) }
 }
 
 /// Return the default guard size for new threads.

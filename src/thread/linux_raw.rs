@@ -7,7 +7,7 @@ use core::any::Any;
 use core::cmp::max;
 use core::ffi::c_void;
 use core::mem::{align_of, size_of};
-use core::ptr::{self, drop_in_place, null, null_mut, NonNull};
+use core::ptr::{drop_in_place, null, null_mut, NonNull};
 use core::slice;
 use core::sync::atomic::Ordering::SeqCst;
 use core::sync::atomic::{AtomicI32, AtomicU8};
@@ -328,26 +328,23 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
 
     // Initialize the thread metadata.
-    ptr::write(
-        metadata,
-        Metadata {
-            abi: Abi {
-                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                this: newtls,
-                #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-                dtv: null(),
-                #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-                pad: [0_usize; 1],
-            },
-            thread: ThreadData::new(
-                Some(tid),
-                stack_least.cast(),
-                stack_size,
-                guard_size,
-                map_size,
-            ),
+    metadata.write(Metadata {
+        abi: Abi {
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            this: newtls,
+            #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+            dtv: null(),
+            #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+            pad: [0_usize; 1],
         },
-    );
+        thread: ThreadData::new(
+            Some(tid),
+            stack_least.cast(),
+            stack_size,
+            guard_size,
+            map_size,
+        ),
+    });
 
     // Initialize the TLS data with explicit initializer data.
     slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
@@ -456,26 +453,23 @@ pub fn create_thread(
         let newtls: *mut Abi = &mut (*metadata).abi;
 
         // Initialize the thread metadata.
-        ptr::write(
-            metadata,
-            Metadata {
-                abi: Abi {
-                    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                    this: newtls,
-                    #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-                    dtv: null(),
-                    #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-                    pad: [0_usize; 1],
-                },
-                thread: ThreadData::new(
-                    None, // the real tid will be written by `clone`.
-                    stack_least.cast(),
-                    stack_size,
-                    guard_size,
-                    map_size,
-                ),
+        metadata.write(Metadata {
+            abi: Abi {
+                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+                this: newtls,
+                #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+                dtv: null(),
+                #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+                pad: [0_usize; 1],
             },
-        );
+            thread: ThreadData::new(
+                None, // the real tid will be written by `clone`.
+                stack_least.cast(),
+                stack_size,
+                guard_size,
+                map_size,
+            ),
+        });
 
         // Initialize the TLS data with explicit initializer data.
         slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
@@ -576,17 +570,17 @@ pub(super) unsafe extern "C" fn entry(
         }
 
         // Check that the incoming stack pointer is where we expect it to be.
-        debug_assert_eq!(builtin_return_address(0), core::ptr::null());
-        debug_assert_ne!(builtin_frame_address(0), core::ptr::null());
+        debug_assert_eq!(builtin_return_address(0), null());
+        debug_assert_ne!(builtin_frame_address(0), null());
         #[cfg(not(any(target_arch = "x86", target_arch = "arm")))]
         debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
         #[cfg(target_arch = "arm")]
         debug_assert_eq!(builtin_frame_address(0).addr() & 0x3, 0);
         #[cfg(target_arch = "x86")]
         debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
-        debug_assert_eq!(builtin_frame_address(1), core::ptr::null());
+        debug_assert_eq!(builtin_frame_address(1), null());
         #[cfg(target_arch = "aarch64")]
-        debug_assert_ne!(builtin_sponentry(), core::ptr::null());
+        debug_assert_ne!(builtin_sponentry(), null());
         #[cfg(target_arch = "aarch64")]
         debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
 
@@ -754,8 +748,8 @@ unsafe fn wait_for_thread_exit(thread: Thread) {
     // Check whether the thread has exited already; we set the
     // `CloneFlags::CHILD_CLEARTID` flag on the clone syscall, so we can test
     // for `NONE` here.
-    let thread = thread.0.as_ref();
-    let thread_id = &thread.thread_id;
+    let thread_data = thread.0.as_ref();
+    let thread_id = &thread_data.thread_id;
     while let Some(id_value) = ThreadId::from_raw(thread_id.load(SeqCst)) {
         // This doesn't use any shared memory, but we can't use
         // `FutexFlags::PRIVATE` because the wake comes from Linux

@@ -31,7 +31,7 @@ pub(super) unsafe extern "C" fn _start() -> ! {
     // stack pointer. On many architectures, the incoming frame pointer is
     // already null.
     asm!(
-        "mov r0, sp\n", // Pass the incoming `sp` as the arg to `entry`.
+        "mov r0, sp",   // Pass the incoming `sp` as the arg to `entry`.
         "mov lr, #0",   // Set the return address to zero.
         "b {entry}",    // Jump to `entry`.
         entry = sym super::program::entry,

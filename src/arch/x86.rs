@@ -66,7 +66,7 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
     // happens outside the Rust memory model. As far as Rust knows, this is
     // just an arbitrary side-effecting opaque operation.
     asm!(
-        "mov {}, DWORD PTR [{}]",
+        "mov {}, [{}]",
         out(reg) r0,
         in(reg) ptr,
         options(nostack, preserves_flags),
@@ -92,7 +92,7 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
 #[inline]
 pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
     asm!(
-        "mov DWORD PTR [{}], {}",
+        "mov [{}], {}",
         in(reg) ptr,
         in(reg) value,
         options(nostack, preserves_flags),
@@ -180,7 +180,7 @@ pub(super) unsafe fn clone(
         "push ebp",           // Save incoming register value.
 
         // Pass `fn_` to the child in ebp.
-        "mov ebp, DWORD PTR [eax+8]",
+        "mov ebp, [eax+8]",
 
         "mov esi, [eax+0]",   // Pass `newtls` to the `int 0x80`.
         "mov eax, [eax+4]",   // Pass `__NR_clone` to the `int 0x80`.
@@ -250,7 +250,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 pub(super) fn thread_pointer() -> *mut c_void {
     let ptr;
     unsafe {
-        asm!("mov {}, DWORD PTR gs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
+        asm!("mov {}, gs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
     }
     ptr
 }

@@ -1,15 +1,16 @@
 //! Thread startup and shutdown.
 
-use crate::arch::{clone, munmap_and_exit_thread, set_thread_pointer, thread_pointer, TLS_OFFSET};
+use crate::arch::{
+    clone, munmap_and_exit_thread, set_thread_pointer, thread_pointer, STACK_ALIGNMENT, TLS_OFFSET,
+};
 use alloc::boxed::Box;
-use core::any::Any;
 use core::cmp::max;
 use core::ffi::c_void;
 use core::mem::{align_of, size_of};
-use core::ptr::{drop_in_place, null, null_mut, NonNull};
+use core::ptr::{copy_nonoverlapping, drop_in_place, null, null_mut, NonNull};
 use core::slice;
 use core::sync::atomic::Ordering::SeqCst;
-use core::sync::atomic::{AtomicI32, AtomicU8};
+use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU8};
 use linux_raw_sys::elf::*;
 use memoffset::offset_of;
 use rustix::io;
@@ -62,6 +63,7 @@ struct ThreadData {
     stack_size: usize,
     guard_size: usize,
     map_size: usize,
+    return_value: AtomicPtr<c_void>,
 
     // Support a few dtors before using dynamic allocation.
     dtors: smallvec::SmallVec<[Box<dyn FnOnce()>; 4]>,
@@ -88,6 +90,7 @@ impl ThreadData {
             stack_size,
             guard_size,
             map_size,
+            return_value: AtomicPtr::new(null_mut()),
             dtors: smallvec::SmallVec::new(),
         }
     }
@@ -368,9 +371,17 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
 
 /// Creates a new thread.
 ///
-/// `fn_` is called on the new thread.
-pub fn create_thread(
-    fn_: Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
+/// `fn_(args)` is called on the new thread, except that the argument values
+/// copied to memory that can be exclusively referenced by the thread.
+///
+/// # Safety
+///
+/// The values of `args` must be valid to send to the new thread, `fn_(args)`
+/// on the new thread must have defined behavior, and the return value must be
+/// valid to send to other threads.
+pub unsafe fn create_thread(
+    fn_: unsafe fn(&mut [Option<NonNull<c_void>>]) -> Option<NonNull<c_void>>,
+    args: &[Option<NonNull<c_void>>],
     stack_size: usize,
     guard_size: usize,
 ) -> io::Result<Thread> {
@@ -480,6 +491,15 @@ pub fn create_thread(
             ),
         );
 
+        // Allocate space for the thread arguments on the child's stack.
+        let stack = stack.cast::<Option<NonNull<c_void>>>().sub(args.len());
+
+        // Align the stack pointer.
+        let stack = stack.with_addr(stack.addr() & STACK_ALIGNMENT.wrapping_neg());
+
+        // Store the thread arguments on the child's stack.
+        copy_nonoverlapping(args.as_ptr(), stack, args.len());
+
         // The TLS region includes additional data beyond `file_size` which is
         // expected to be zero-initialized, but we don't need to do anything
         // here since we allocated the memory with `mmap_anonymous` so it's
@@ -515,17 +535,24 @@ pub fn create_thread(
             thread_id_ptr,
             thread_id_ptr,
             newtls.cast::<u8>().cast(),
-            Box::into_raw(Box::new(fn_)),
+            core::mem::transmute(fn_),
+            args.len(),
         );
         if clone_res >= 0 {
             #[cfg(feature = "log")]
-            log::trace!(
-                "Thread[{:?}] launched thread Thread[{:?}] with stack_size={} and guard_size={}",
-                current_thread_id().as_raw_nonzero(),
-                clone_res,
-                stack_size,
-                guard_size
-            );
+            {
+                let id = current_thread_id();
+                log::trace!(
+                    "Thread[{:?}] launched thread Thread[{:?}] with stack_size={} and guard_size={}",
+                    id.as_raw_nonzero(),
+                    clone_res,
+                    stack_size,
+                    guard_size
+                );
+                for (i, arg) in args.iter().enumerate() {
+                    log::trace!("Thread[{:?}] args[{}]: {:?}", id.as_raw_nonzero(), i, arg);
+                }
+            }
 
             Ok(Thread(NonNull::from(&mut (*metadata).thread)))
         } else {
@@ -536,18 +563,21 @@ pub fn create_thread(
 
 /// The entrypoint where Rust code is first executed on a new thread.
 ///
-/// This calls `fn_` on the new thread. When `fn_` returns, the thread exits.
+/// This transmutes `fn_` to
+/// `unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>>` and then calls
+/// it on the new thread. When `fn_` returns, the thread exits.
 ///
 /// # Safety
 ///
-/// `fn_` must be valid to call [`Box::from_raw`] on.
+/// `fn_` must be valid to transmute the function as described above and call
+/// it in the new thread.
 ///
 /// After calling `fn_`, this terminates the thread.
 pub(super) unsafe extern "C" fn entry(
-    fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
+    fn_: extern "C" fn(),
+    args: *mut *mut c_void,
+    num_args: usize,
 ) -> ! {
-    let fn_ = Box::from_raw(fn_);
-
     #[cfg(feature = "log")]
     log::trace!(
         "Thread[{:?}] launched",
@@ -591,15 +621,26 @@ pub(super) unsafe extern "C" fn entry(
 
     // Call the user thread function. In `std`, this is `thread_start`. Ignore
     // the return value for now, as `std` doesn't need it.
-    let _result = fn_();
+    let fn_: unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>> = core::mem::transmute(fn_);
+    let args = slice::from_raw_parts_mut(args, num_args);
+    let return_value = fn_(args);
 
-    exit_thread()
+    exit_thread(return_value)
 }
 
 /// Call the destructors registered with [`at_thread_exit`] and exit the
 /// thread.
-unsafe fn exit_thread() -> ! {
+unsafe fn exit_thread(return_value: Option<NonNull<c_void>>) -> ! {
     let current = current_thread();
+
+    #[cfg(feature = "log")]
+    if log::log_enabled!(log::Level::Trace) {
+        log::trace!(
+            "Thread[{:?}] returned {:?}",
+            current.0.as_ref().thread_id.load(SeqCst),
+            return_value
+        );
+    }
 
     // Call functions registered with `at_thread_exit`.
     call_thread_dtors(current);
@@ -650,6 +691,16 @@ unsafe fn exit_thread() -> ! {
                 current.0.as_ref().thread_id.load(SeqCst)
             );
         }
+
+        // Convert `return_value` into a `*mut c_void` so that we can store it
+        // in an `AtomicPtr`.
+        let return_value = match return_value {
+            Some(return_value) => return_value.as_ptr(),
+            None => null_mut(),
+        };
+
+        // Store the return value in the thread for `join_thread` to read.
+        current.0.as_ref().return_value.store(return_value, SeqCst);
     }
 
     // Terminate the thread.
@@ -713,13 +764,18 @@ pub unsafe fn detach_thread(thread: Thread) {
 
 /// Waits for a thread to finish.
 ///
+/// The return value is the value returned from the call to the `fn_` passed to
+/// `create_thread`.
+///
 /// # Safety
 ///
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
-pub unsafe fn join_thread(thread: Thread) {
+pub unsafe fn join_thread(thread: Thread) -> Option<NonNull<c_void>> {
+    let thread_data = thread.0.as_ref();
+
     #[cfg(feature = "log")]
-    let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
+    let thread_id = thread_data.thread_id.load(SeqCst);
 
     #[cfg(feature = "log")]
     if log::log_enabled!(log::Level::Trace) {
@@ -731,12 +787,21 @@ pub unsafe fn join_thread(thread: Thread) {
     }
 
     wait_for_thread_exit(thread);
-    debug_assert_eq!(thread.0.as_ref().detached.load(SeqCst), ABANDONED);
+    debug_assert_eq!(thread_data.detached.load(SeqCst), ABANDONED);
 
     #[cfg(feature = "log")]
     log_thread_to_be_freed(thread_id);
 
+    // Load the return value stored by `exit_thread`, before we free the
+    // thread's memory.
+    let return_value = thread_data.return_value.load(SeqCst);
+
+    // `munmap` the stack and metadata for the thread.
     free_thread_memory(thread);
+
+    // Convert the `*mut c_void` we stored in the `AtomicPtr` back into an
+    // `Option<NonNull<c_void>>`.
+    NonNull::new(return_value)
 }
 
 /// Wait until `thread` has exited.

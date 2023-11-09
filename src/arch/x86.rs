@@ -8,8 +8,6 @@ use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
 #[cfg(feature = "origin-thread")]
 use {
-    alloc::boxed::Box,
-    core::any::Any,
     core::ffi::c_void,
     core::ptr::invalid_mut,
     linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
@@ -136,6 +134,10 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
     assert_eq!(r0, 0);
 }
 
+/// The required alignment for the stack pointer.
+#[cfg(feature = "origin-thread")]
+pub(super) const STACK_ALIGNMENT: usize = 16;
+
 /// A wrapper around the Linux `clone` system call.
 ///
 /// This can't be implemented in `rustix` because the child starts executing at
@@ -149,7 +151,8 @@ pub(super) unsafe fn clone(
     parent_tid: *mut RawPid,
     child_tid: *mut RawPid,
     newtls: *mut c_void,
-    fn_: *mut Box<dyn FnOnce() -> Option<Box<dyn Any>> + Send>,
+    fn_: extern "C" fn(),
+    num_args: usize,
 ) -> isize {
     let mut gs: u32 = 0;
     asm!("mov {0:x}, gs", inout(reg) gs);
@@ -171,6 +174,11 @@ pub(super) unsafe fn clone(
     user_desc.set_useable(1);
     let newtls: *const _ = &user_desc;
 
+    // Push `fn_` to the child stack, since after all the `clone` args, and
+    // `num_args` in `ebp`, there are no more free registers.
+    let child_stack = child_stack.cast::<*mut c_void>().sub(1);
+    child_stack.write(fn_ as _);
+
     // See the comments for x86's `syscall6` in `rustix`. Inline asm isn't
     // allowed to name ebp or esi as operands, so we have to jump through
     // extra hoops here.
@@ -179,7 +187,7 @@ pub(super) unsafe fn clone(
         "push esi",           // Save incoming register value.
         "push ebp",           // Save incoming register value.
 
-        // Pass `fn_` to the child in ebp.
+        // Pass `num_args` to the child in `ebp`.
         "mov ebp, [eax+8]",
 
         "mov esi, [eax+0]",   // Pass `newtls` to the `int 0x80`.
@@ -193,10 +201,12 @@ pub(super) unsafe fn clone(
         "jnz 0f",
 
         // Child thread.
-        "push eax",           // Pad for alignment.
-        "push eax",           // Pad for alignment.
-        "push eax",           // Pad for alignment.
-        "push ebp",           // Pass `fn` as the first argument.
+        "pop edi",            // Load `fn_` from the child stack.
+        "mov esi, esp",       // Snapshot the args pointer.
+        "push eax",           // Pad for stack pointer alignment.
+        "push ebp",           // Pass `num_args` as the third argument.
+        "push esi",           // Pass the args pointer as the second argument.
+        "push edi",           // Pass `fn_` as the first argument.
         "xor ebp, ebp",       // Zero the frame address.
         "push eax",           // Zero the return address.
         "jmp {entry}",        // Call `entry`.
@@ -210,7 +220,7 @@ pub(super) unsafe fn clone(
         inout("eax") &[
             newtls.cast::<c_void>().cast_mut(),
             invalid_mut(__NR_clone as usize),
-            fn_.cast::<c_void>()
+            invalid_mut(num_args)
         ] => r0,
         in("ebx") flags,
         in("ecx") child_stack,

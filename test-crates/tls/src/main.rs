@@ -101,7 +101,7 @@ struct SyncTestData([*const u32; 3]);
 unsafe impl Sync for SyncTestData {}
 static TEST_DATA: SyncTestData = unsafe {
     SyncTestData([
-        invalid_mut(0xa0b1a2b3a4b5a6b7),
+        invalid_mut(0xa0b1a2b3a4b5a6b7_u64 as usize),
         addr_of_mut!(SOME_REGULAR_DATA),
         addr_of_mut!(SOME_ZERO_DATA),
     ])

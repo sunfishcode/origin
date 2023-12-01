@@ -1,0 +1,14 @@
+[package]
+name = "tls"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+origin = { path = "../..", default-features = false, features = ["origin-thread", "origin-start"] }
+atomic-dbg = { version = "0.1.8", default-features = false }
+rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
+compiler_builtins = { version = "0.1.101", features = ["mem"] }
+
+# This is just a test crate, and not part of the origin workspace.
+[workspace]

@@ -114,45 +114,59 @@ struct Metadata {
     thread: ThreadData,
 }
 
-/// Fields which accessed by user code via known offsets from the platform
-/// thread-pointer register.
+/// Fields which accessed by user code via well-known offsets from the platform
+/// thread-pointer register. Specifically, the thread-pointer register points
+/// to the `thread_pointee` field.
 #[repr(C)]
 #[cfg_attr(target_arch = "arm", repr(align(8)))]
 struct Abi {
+    /// The address the thread pointer points to.
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    thread_pointee: [u8; 0],
+
     /// The ABI-exposed `canary` field.
     #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
     canary: usize,
+
+    /// The address the thread pointer points to.
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm",))]
+    thread_pointee: [u8; 0],
 
     /// The ABI-exposed `dtv` field (though we don't yet implement dynamic
     /// linking).
     #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
     dtv: *const c_void,
+
+    /// The address the thread pointer points to.
+    #[cfg(target_arch = "riscv64")]
+    thread_pointee: [u8; 0],
+
+    /// Padding to put the TLS data which follows at its well-known offset.
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+    _pad: [usize; 1],
+
+    /// Padding to put the TLS data which follows at its well-known offset.
+    #[cfg(target_arch = "riscv64")]
+    _pad: [usize; 0],
 
     /// x86 and x86-64 put a copy of the thread-pointer register at the memory
     /// location pointed to by the thread-pointer register, because reading the
     /// thread-pointer register directly is slow.
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    this: *mut Abi,
+    this: *mut c_void,
 
     /// The ABI-exposed `dtv` field (though we don't yet implement dynamic
     /// linking).
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     dtv: *const c_void,
 
+    /// Padding to put the `canary` field at its well-known offset.
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     _pad: [usize; 3],
 
     /// The ABI-exposed `canary` field.
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     canary: usize,
-
-    /// Padding to put the TLS data which follows at its known offset.
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-    _pad: [usize; 1],
-
-    /// Padding to put the TLS data which follows at its known offset.
-    #[cfg(target_arch = "riscv64")]
-    _pad: [usize; 0],
 }
 
 /// Information obtained from the `DT_TLS` segment of the executable.
@@ -270,7 +284,9 @@ pub use rustix::thread::Pid as ThreadId;
 ///
 /// This function is similar to `create_thread` except that the OS thread is
 /// already created, and already has a stack (which we need to locate), and is
-/// already running.
+/// already running. We still need to create the thread [`Metadata`], copy in
+/// the TLS initializers, and point the thread pointer to it so that it follows
+/// the thread ABI that all the other threads follow.
 ///
 /// # Safety
 ///
@@ -346,7 +362,7 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
 
     let tls_data = new.add(tls_data_bottom);
     let metadata: *mut Metadata = new.add(header).cast();
-    let newtls: *mut Abi = &mut (*metadata).abi;
+    let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
 
     let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
     let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
@@ -364,6 +380,7 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
             #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             this: newtls,
             _pad: Default::default(),
+            thread_pointee: [],
         },
         thread: ThreadData::new(
             Some(tid),
@@ -390,7 +407,7 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     .fill(0);
 
     // Point the platform thread-pointer register at the new thread metadata.
-    set_thread_pointer(newtls.cast::<u8>().cast());
+    set_thread_pointer(newtls);
 }
 
 /// Creates a new thread.
@@ -486,7 +503,7 @@ pub unsafe fn create_thread(
 
         let tls_data = map.add(tls_data_bottom);
         let metadata: *mut Metadata = map.add(header).cast();
-        let newtls: *mut Abi = &mut (*metadata).abi;
+        let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
 
         // Copy the current thread's canary to the new thread.
         let canary = (*current_metadata()).abi.canary;
@@ -499,6 +516,7 @@ pub unsafe fn create_thread(
                 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                 this: newtls,
                 _pad: Default::default(),
+                thread_pointee: [],
             },
             thread: ThreadData::new(
                 None, // the real tid will be written by `clone`.
@@ -560,7 +578,7 @@ pub unsafe fn create_thread(
             stack.cast(),
             thread_id_ptr,
             thread_id_ptr,
-            newtls.cast::<u8>().cast(),
+            newtls,
             core::mem::transmute(fn_),
             args.len(),
         );
@@ -909,7 +927,7 @@ pub fn at_thread_exit(func: Box<dyn FnOnce()>) {
 fn current_metadata() -> *mut Metadata {
     thread_pointer()
         .cast::<u8>()
-        .wrapping_sub(offset_of!(Metadata, abi))
+        .wrapping_sub(offset_of!(Metadata, abi) + offset_of!(Abi, thread_pointee))
         .cast()
 }
 
@@ -976,8 +994,8 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
     {
         thread_pointer()
             .cast::<u8>()
+            .wrapping_add(size_of::<Abi>() - offset_of!(Abi, thread_pointee))
             .wrapping_add(TLS_OFFSET)
-            .wrapping_add(size_of::<Abi>())
             .wrapping_add(offset)
             .cast()
     }
@@ -990,8 +1008,8 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
     unsafe {
         thread_pointer()
             .cast::<u8>()
-            .wrapping_add(TLS_OFFSET)
             .wrapping_sub(STARTUP_TLS_INFO.mem_size)
+            .wrapping_add(TLS_OFFSET)
             .wrapping_add(offset)
             .cast()
     }

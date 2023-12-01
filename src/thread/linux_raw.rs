@@ -119,9 +119,13 @@ struct Metadata {
 #[repr(C)]
 #[cfg_attr(target_arch = "arm", repr(align(8)))]
 struct Abi {
-    /// Aarch64 has an ABI-exposed `dtv` field (though we don't yet implement
-    /// dynamic linking).
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+    /// The ABI-exposed `canary` field.
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
+    canary: usize,
+
+    /// The ABI-exposed `dtv` field (though we don't yet implement dynamic
+    /// linking).
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
     dtv: *const c_void,
 
     /// x86 and x86-64 put a copy of the thread-pointer register at the memory
@@ -130,9 +134,25 @@ struct Abi {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     this: *mut Abi,
 
+    /// The ABI-exposed `dtv` field (though we don't yet implement dynamic
+    /// linking).
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    dtv: *const c_void,
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    _pad: [usize; 3],
+
+    /// The ABI-exposed `canary` field.
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    canary: usize,
+
     /// Padding to put the TLS data which follows at its known offset.
     #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-    pad: [usize; 1],
+    _pad: [usize; 1],
+
+    /// Padding to put the TLS data which follows at its known offset.
+    #[cfg(target_arch = "riscv64")]
+    _pad: [usize; 0],
 }
 
 /// Information obtained from the `DT_TLS` segment of the executable.
@@ -331,15 +351,19 @@ pub(super) unsafe fn initialize_main_thread(mem: *mut c_void) {
     let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
     let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
 
+    // Initialize the canary value from the OS-provided random bytes.
+    let random_ptr = rustix::runtime::random().cast::<usize>();
+    let canary = random_ptr.read_unaligned();
+    __stack_chk_guard = canary;
+
     // Initialize the thread metadata.
     metadata.write(Metadata {
         abi: Abi {
+            canary,
+            dtv: null(),
             #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             this: newtls,
-            #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-            dtv: null(),
-            #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-            pad: [0_usize; 1],
+            _pad: Default::default(),
         },
         thread: ThreadData::new(
             Some(tid),
@@ -464,15 +488,17 @@ pub unsafe fn create_thread(
         let metadata: *mut Metadata = map.add(header).cast();
         let newtls: *mut Abi = &mut (*metadata).abi;
 
+        // Copy the current thread's canary to the new thread.
+        let canary = (*current_metadata()).abi.canary;
+
         // Initialize the thread metadata.
         metadata.write(Metadata {
             abi: Abi {
+                canary,
+                dtv: null(),
                 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                 this: newtls,
-                #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-                dtv: null(),
-                #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-                pad: [0_usize; 1],
+                _pad: Default::default(),
             },
             thread: ThreadData::new(
                 None, // the real tid will be written by `clone`.
@@ -1030,6 +1056,10 @@ pub fn yield_current_thread() {
 extern "C" fn __aeabi_read_tp() -> *mut c_void {
     thread_pointer()
 }
+
+/// Some targets use this global variable instead of the TLS `canary` field.
+#[no_mangle]
+static mut __stack_chk_guard: usize = 0;
 
 const fn round_up(addr: usize, boundary: usize) -> usize {
     (addr + (boundary - 1)) & boundary.wrapping_neg()

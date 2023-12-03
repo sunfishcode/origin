@@ -9,7 +9,7 @@
 extern crate compiler_builtins;
 
 use atomic_dbg::{dbg, eprintln};
-use origin::program::*;
+use origin::program;
 
 #[panic_handler]
 fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
@@ -27,5 +27,5 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     // Unlike origin-start, this example can't create threads because origin's
     // thread support requires an allocator.
 
-    exit(0);
+    program::exit(0);
 }

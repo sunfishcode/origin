@@ -46,10 +46,10 @@ pub fn test_crate(
 /// Stderr output for most of the example crates.
 pub const COMMON_STDERR: &str = "Hello from main thread\n\
     Hello from child thread\n\
-    Hello from child thread's at_thread_exit handler\n\
+    Hello from child thread's `thread::at_exit` handler\n\
     Goodbye from main\n\
-    Hello from a main-thread at_thread_exit handler\n\
-    Hello from an at_exit handler\n";
+    Hello from a main-thread `thread::at_exit` handler\n\
+    Hello from an `program::at_exit` handler\n";
 
 /// Stderr output for the origin-start-no-alloc crate.
 pub const NO_ALLOC_STDERR: &str = "Hello!\n";

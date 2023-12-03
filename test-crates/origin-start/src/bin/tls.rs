@@ -17,8 +17,7 @@ use alloc::boxed::Box;
 use atomic_dbg::dbg;
 use core::arch::asm;
 use core::ptr::{addr_of_mut, invalid_mut};
-use origin::program::*;
-use origin::thread::*;
+use origin::{program, thread};
 
 #[panic_handler]
 fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
@@ -43,7 +42,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     // Assert that the mutation happened properly.
     check_eq([TEST_DATA.0[0], invalid_mut(77), TEST_DATA.0[2]]);
 
-    at_exit(Box::new(|| {
+    program::at_exit(Box::new(|| {
         // This is the last thing to run. Assert that we see the value stored
         // by the `at_thread_exit` callback.
         check_eq([TEST_DATA.0[0], invalid_mut(79), TEST_DATA.0[2]]);
@@ -51,7 +50,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
         // Mutate one of the TLS fields.
         THREAD_LOCAL[1] = invalid_mut(80);
     }));
-    at_thread_exit(Box::new(|| {
+    thread::at_exit(Box::new(|| {
         // Assert that we see the value stored at the end of `main`.
         check_eq([TEST_DATA.0[0], invalid_mut(78), TEST_DATA.0[2]]);
 
@@ -59,7 +58,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
         THREAD_LOCAL[1] = invalid_mut(79);
     }));
 
-    let thread = create_thread(
+    let thread = thread::create(
         |_args| {
             // Assert that the new thread initialized its TLS properly.
             check_eq(TEST_DATA.0);
@@ -70,7 +69,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
             // Assert that the mutation happened properly.
             check_eq([TEST_DATA.0[0], invalid_mut(175), TEST_DATA.0[2]]);
 
-            at_thread_exit(Box::new(|| {
+            thread::at_exit(Box::new(|| {
                 // Assert that we still see the value stored in the thread.
                 check_eq([TEST_DATA.0[0], invalid_mut(175), TEST_DATA.0[2]]);
             }));
@@ -78,12 +77,12 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
             None
         },
         &[],
-        default_stack_size(),
-        default_guard_size(),
+        thread::default_stack_size(),
+        thread::default_guard_size(),
     )
     .unwrap();
 
-    join_thread(thread);
+    thread::join(thread);
 
     // Assert that the main thread's TLS is still in place.
     check_eq([TEST_DATA.0[0], invalid_mut(77), TEST_DATA.0[2]]);
@@ -94,7 +93,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     // Assert that the mutation happened properly.
     check_eq([TEST_DATA.0[0], invalid_mut(78), TEST_DATA.0[2]]);
 
-    exit(200);
+    program::exit(200);
 }
 
 struct SyncTestData([*const u32; 3]);

@@ -17,7 +17,7 @@ fn test_crate(
 }
 
 #[test]
-fn test_crate_tls() {
+fn test_tls() {
     test_crate(
         "origin-start",
         &["--bin=tls", "--release"],
@@ -29,7 +29,7 @@ fn test_crate_tls() {
 }
 
 #[test]
-fn test_crate_tls_crt_static() {
+fn test_tls_crt_static() {
     test_crate(
         "origin-start",
         &["--bin=tls", "--features=origin/experimental-relocate"],
@@ -41,7 +41,7 @@ fn test_crate_tls_crt_static() {
 }
 
 #[test]
-fn test_crate_tls_crt_static_relocation_static() {
+fn test_tls_crt_static_relocation_static() {
     test_crate(
         "origin-start",
         &["--bin=tls"],
@@ -56,6 +56,6 @@ fn test_crate_tls_crt_static_relocation_static() {
 }
 
 #[test]
-fn test_crate_thread_id() {
+fn test_thread_id() {
     test_crate("origin-start", &["--bin=thread-id"], &[], "", "", Some(201));
 }

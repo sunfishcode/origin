@@ -1,14 +1,14 @@
-# origin 0.15
+# origin 0.16
 
 ## Changes
 
-The `create_thread` API has been redesigned to allow it and users of it
-to avoid performing dynamic allocations. Instead of taking a boxed closure,
-it now takes a function pointer and a list of pointer arguments to pass
-to it. See #94 for details.
+The functions in the `thread` module have been renamed to remove the
+redundant `thread` in their names. For example, `thread::create_thread` is
+now just `thread::create`, and so on.
 
-The default stack size has been increased, as several use cases were bumping
-up against the limit. See #91 for details.
+The `thread::id` function (formerly `thread::thread_id`), now returns an
+`Option`, to allow it to indicate that the thread has exited, in which case
+it no longer has an ID.
 
-Thread and process destructor lists now use the `smallvec` crate to avoid
-allocating. See #93 for details.
+Origin now supports linking with code compiled with stack protection features,
+such as `-fstack-protector`.

@@ -28,7 +28,7 @@
 //! mean that origin can avoid doing any work that users might not need.
 
 #[cfg(feature = "origin-thread")]
-use crate::thread::{initialize_main_thread, initialize_startup_thread_info};
+use crate::thread;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(not(feature = "origin-program"))]
@@ -209,11 +209,11 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 
     // Read the program headers and extract the TLS info.
     #[cfg(feature = "origin-thread")]
-    initialize_startup_thread_info();
+    thread::initialize_startup_info();
 
     // Initialize the main thread.
     #[cfg(feature = "origin-thread")]
-    initialize_main_thread(mem.cast());
+    thread::initialize_main(mem.cast());
 }
 
 /// Functions registered with [`at_exit`].
@@ -270,7 +270,7 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
     #[cfg(all(feature = "thread", feature = "origin-program"))]
-    crate::thread::call_thread_dtors(crate::thread::current_thread());
+    crate::thread::call_dtors(crate::thread::current());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`
     // unlocked while making the call so that functions can add more functions

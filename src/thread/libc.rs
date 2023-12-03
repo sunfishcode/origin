@@ -23,8 +23,8 @@ extern "C" {
 
 /// An opaque pointer to a thread.
 ///
-/// This type does not detach on drop. It just leaks the thread. To detach or
-/// join, call `detach_thread` or `join_thread` explicitly.
+/// This type does not detach or free resources on drop. It just leaks the
+/// thread. To detach or join, call [`detach`] or [`join`] explicitly.
 #[derive(Copy, Clone)]
 pub struct Thread(libc::pthread_t);
 
@@ -63,7 +63,7 @@ impl Thread {
 ///
 /// `fn_(arg)` on the new thread must have defined behavior, and the return
 /// value must be valid to use on the eventual joining thread.
-pub unsafe fn create_thread(
+pub unsafe fn create(
     fn_: unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>>,
     args: &[Option<NonNull<c_void>>],
     stack_size: usize,
@@ -134,7 +134,7 @@ pub unsafe fn create_thread(
 }
 
 /// Registers a function to call when the current thread exits.
-pub fn at_thread_exit(func: Box<dyn FnOnce()>) {
+pub fn at_exit(func: Box<dyn FnOnce()>) {
     extern "C" fn call(arg: *mut c_void) {
         unsafe {
             let arg = arg.cast::<Box<dyn FnOnce()>>();
@@ -153,7 +153,7 @@ pub fn at_thread_exit(func: Box<dyn FnOnce()>) {
 /// Return a raw pointer to the data associated with the current thread.
 #[inline]
 #[must_use]
-pub fn current_thread() -> Thread {
+pub fn current() -> Thread {
     unsafe { Thread(libc::pthread_self()) }
 }
 
@@ -163,7 +163,7 @@ pub fn current_thread() -> Thread {
 /// field in the runtime rather than making a system call.
 #[inline]
 #[must_use]
-pub fn current_thread_id() -> ThreadId {
+pub fn current_id() -> ThreadId {
     // Actually, in the pthread implementation here we do just make a system
     // call, because we don't have access to the pthread internals.
     rustix::thread::gettid()
@@ -192,7 +192,7 @@ pub unsafe fn set_current_thread_id_after_a_fork(tid: ThreadId) {
 /// Return the TLS address for the given `offset` for the current thread.
 #[inline]
 #[must_use]
-pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
+pub fn current_tls_addr(offset: usize) -> *mut c_void {
     let p = [1, offset];
     unsafe { __tls_get_addr(&p) }
 }
@@ -233,7 +233,7 @@ pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
 /// `thread` must point to a valid thread record that has not yet been detached
 /// and will not be joined.
 #[inline]
-pub unsafe fn detach_thread(thread: Thread) {
+pub unsafe fn detach(thread: Thread) {
     let thread = thread.0;
 
     assert_eq!(libc::pthread_detach(thread), 0);
@@ -248,7 +248,7 @@ pub unsafe fn detach_thread(thread: Thread) {
 ///
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
-pub unsafe fn join_thread(thread: Thread) -> Option<NonNull<c_void>> {
+pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
     let thread = thread.0;
 
     let mut return_value: *mut c_void = null_mut();
@@ -289,7 +289,7 @@ pub fn default_guard_size() -> usize {
 
 /// Yield the current thread, encouraging other threads to run.
 #[inline]
-pub fn yield_current_thread() {
+pub fn yield_current() {
     let _ = unsafe { libc::sched_yield() };
 }
 

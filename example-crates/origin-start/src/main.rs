@@ -11,8 +11,7 @@ extern crate compiler_builtins;
 
 use alloc::boxed::Box;
 use atomic_dbg::{dbg, eprintln};
-use origin::program::*;
-use origin::thread::*;
+use origin::{program, thread};
 
 #[panic_handler]
 fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
@@ -30,27 +29,29 @@ static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::Glob
 unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
     eprintln!("Hello from main thread");
 
-    at_exit(Box::new(|| eprintln!("Hello from an at_exit handler")));
-    at_thread_exit(Box::new(|| {
-        eprintln!("Hello from a main-thread at_thread_exit handler")
+    program::at_exit(Box::new(|| {
+        eprintln!("Hello from an `program::at_exit` handler")
+    }));
+    thread::at_exit(Box::new(|| {
+        eprintln!("Hello from a main-thread `thread::at_exit` handler")
     }));
 
-    let thread = create_thread(
+    let thread = thread::create(
         |_args| {
             eprintln!("Hello from child thread");
-            at_thread_exit(Box::new(|| {
-                eprintln!("Hello from child thread's at_thread_exit handler")
+            thread::at_exit(Box::new(|| {
+                eprintln!("Hello from child thread's `thread::at_exit` handler")
             }));
             None
         },
         &[],
-        default_stack_size(),
-        default_guard_size(),
+        thread::default_stack_size(),
+        thread::default_guard_size(),
     )
     .unwrap();
 
-    join_thread(thread);
+    thread::join(thread);
 
     eprintln!("Goodbye from main");
-    exit(0);
+    program::exit(0);
 }

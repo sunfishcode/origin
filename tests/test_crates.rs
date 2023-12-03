@@ -18,14 +18,21 @@ fn test_crate(
 
 #[test]
 fn test_crate_tls() {
-    test_crate("tls", &["--release"], &[], "", "", Some(200));
+    test_crate(
+        "origin-start",
+        &["--bin=tls", "--release"],
+        &[],
+        "",
+        "",
+        Some(200),
+    );
 }
 
 #[test]
 fn test_crate_tls_crt_static() {
     test_crate(
-        "tls",
-        &["--features=origin/experimental-relocate"],
+        "origin-start",
+        &["--bin=tls", "--features=origin/experimental-relocate"],
         &[("RUSTFLAGS", "-C target-feature=+crt-static")],
         "",
         "",
@@ -36,8 +43,8 @@ fn test_crate_tls_crt_static() {
 #[test]
 fn test_crate_tls_crt_static_relocation_static() {
     test_crate(
-        "tls",
-        &[],
+        "origin-start",
+        &["--bin=tls"],
         &[(
             "RUSTFLAGS",
             "-C target-feature=+crt-static -C relocation-model=static",
@@ -46,4 +53,9 @@ fn test_crate_tls_crt_static_relocation_static() {
         "",
         Some(200),
     );
+}
+
+#[test]
+fn test_crate_thread_id() {
+    test_crate("origin-start", &["--bin=thread-id"], &[], "", "", Some(201));
 }

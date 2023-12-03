@@ -59,3 +59,13 @@ fn test_tls_crt_static_relocation_static() {
 fn test_thread_id() {
     test_crate("origin-start", &["--bin=thread-id"], &[], "", "", Some(201));
 }
+
+#[test]
+fn test_detach() {
+    test_crate("origin-start", &["--bin=detach"], &[], "", "", Some(202));
+}
+
+#[test]
+fn test_canary() {
+    test_crate("origin-start", &["--bin=canary"], &[], "", "", Some(203));
+}

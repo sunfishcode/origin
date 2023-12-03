@@ -1,5 +1,5 @@
-//! Like `origin-start`, but add a `#[thread_local]` variable and asserts
-//! to ensure that it works.
+//! Like the `origin-start` example, but add a `#[thread_local]` variable and
+//! asserts to ensure that it works.
 
 #![no_std]
 #![no_main]

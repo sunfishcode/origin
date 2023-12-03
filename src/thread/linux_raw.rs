@@ -231,10 +231,10 @@ pub(super) fn initialize_startup_thread_info() {
             current_phdr = current_phdr.cast::<u8>().add(phent).cast();
 
             match phdr.p_type {
-                // Compute the offset from the static virtual addresses
-                // in the `p_vaddr` fields to the dynamic addresses. We don't
-                // always get a `PT_PHDR` or `PT_DYNAMIC` header, so use
-                // whichever one we get.
+                // Compute the offset from the static virtual addresses in the
+                // `p_vaddr` fields to the dynamic addresses. We don't always
+                // get a `PT_PHDR` or `PT_DYNAMIC` header, so use whichever one
+                // we get.
                 PT_PHDR => offset = first_phdr.addr().wrapping_sub(phdr.p_vaddr),
                 PT_DYNAMIC => offset = dynamic_addr.addr().wrapping_sub(phdr.p_vaddr),
 
@@ -950,9 +950,17 @@ pub fn current_thread_id() -> ThreadId {
     // SAFETY: All threads have been initialized, including the main thread
     // with `initialize_main_thread`, so `current_thread()` returns a valid
     // pointer.
-    let tid = unsafe { thread_id(current_thread()) };
-    debug_assert_eq!(tid, gettid(), "`current_thread_id` disagrees with `gettid`");
-    tid
+    unsafe {
+        // Don't use the `thread_id` function here because it returns an
+        // `Option` to handle the case where the thread has exited. We're
+        // querying the current thread which we know is still running because
+        // we're on it.
+        let raw = current_thread().0.as_ref().thread_id.load(SeqCst);
+        debug_assert!(raw > 0);
+        let tid = ThreadId::from_raw_unchecked(raw);
+        debug_assert_eq!(tid, gettid(), "`current_thread_id` disagrees with `gettid`");
+        tid
+    }
 }
 
 /// Set the current thread id, after a `fork`.
@@ -1015,7 +1023,7 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
     }
 }
 
-/// Return the id of a thread.
+/// Return the id of a thread, or `None` if the thread has exited.
 ///
 /// This is the same as [`rustix::thread::gettid`], but loads the value from a
 /// field in the runtime rather than making a system call.
@@ -1024,10 +1032,9 @@ pub fn current_thread_tls_addr(offset: usize) -> *mut c_void {
 ///
 /// `thread` must point to a valid thread record.
 #[inline]
-pub unsafe fn thread_id(thread: Thread) -> ThreadId {
+pub unsafe fn thread_id(thread: Thread) -> Option<ThreadId> {
     let raw = thread.0.as_ref().thread_id.load(SeqCst);
-    debug_assert!(raw > 0);
-    ThreadId::from_raw_unchecked(raw)
+    ThreadId::from_raw(raw)
 }
 
 /// Return the current thread's stack address (lowest address), size, and guard

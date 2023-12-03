@@ -1,5 +1,5 @@
 [package]
-name = "tls"
+name = "origin-start-tests"
 version = "0.0.0"
 edition = "2021"
 publish = false
@@ -9,6 +9,13 @@ origin = { path = "../..", default-features = false, features = ["origin-thread"
 atomic-dbg = { version = "0.1.8", default-features = false }
 rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
 compiler_builtins = { version = "0.1.101", features = ["mem"] }
+rustix = { version = "0.38", default-features = false, features = ["thread"] }
+rustix-futex-sync = { version = "0.1.5", default-features = false }
 
 # This is just a test crate, and not part of the origin workspace.
 [workspace]
+
+[profile.release]
+debug = true
+debug-assertions = true
+overflow-checks = true

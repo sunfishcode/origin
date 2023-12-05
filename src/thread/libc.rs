@@ -184,7 +184,7 @@ pub fn current_id() -> ThreadId {
 #[cfg(feature = "set_thread_id")]
 #[doc(hidden)]
 #[inline]
-pub unsafe fn set_current_thread_id_after_a_fork(tid: ThreadId) {
+pub unsafe fn set_current_id_after_a_fork(tid: ThreadId) {
     // Nothing to do here; libc does the update automatically.
     let _ = tid;
 }

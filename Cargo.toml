@@ -53,7 +53,6 @@ assert_cmd = "2.0.12"
 [features]
 default = ["std", "log", "libc", "errno", "thread", "init-fini-arrays"]
 std = ["rustix/std", "bitflags/std"]
-set_thread_id = []
 rustc-dep-of-std = [
     "dep:core",
     "dep:alloc",
@@ -65,6 +64,9 @@ rustc-dep-of-std = [
     "rustix-futex-sync/rustc-dep-of-std",
     "dep:compiler_builtins",
 ]
+
+# Enable the `set_current_id_after_a_fork` function.
+set_thread_id = []
 
 # Use origin's implementation of program startup and shutdown.
 origin-program = []

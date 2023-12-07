@@ -46,6 +46,16 @@ impl Thread {
         Self(NonNull::new(raw.cast()).unwrap())
     }
 
+    /// Convert to `Self` from a raw non-null pointer.
+    ///
+    /// # Safety
+    ///
+    /// `raw` must be a valid non-null thread pointer.
+    #[inline]
+    pub unsafe fn from_raw_unchecked(raw: *mut c_void) -> Self {
+        Self(NonNull::new_unchecked(raw.cast()))
+    }
+
     /// Convert to `Self` from a raw non-null pointer that was returned from
     /// `Thread::to_raw_non_null`.
     #[inline]

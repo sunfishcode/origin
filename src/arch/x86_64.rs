@@ -199,6 +199,10 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 #[inline]
 pub(super) fn thread_pointer() -> *mut c_void {
     let ptr;
+    // SAFETY: On x86_64, reading the thread register itself is expensive, so
+    // the ABI specifies that the thread pointer value is also stored in memory
+    // at offset 0 from the thread pointer value, where it can be read with
+    // just a load.
     unsafe {
         asm!("mov {}, fs:0", out(reg) ptr, options(nostack, preserves_flags, readonly));
     }

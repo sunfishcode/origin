@@ -953,6 +953,7 @@ pub fn current_id() -> ThreadId {
     // Don't use the `id` function here because it returns an `Option` to
     // handle the case where the thread has exited. We're querying the current
     // thread which we know is still running because we're on it.
+    //
     // SAFETY: All threads have been initialized, including the main thread
     // with `initialize_main`, so `current()` returns a valid pointer.
     let tid = unsafe { ThreadId::from_raw_unchecked(current().0.as_ref().thread_id.load(SeqCst)) };

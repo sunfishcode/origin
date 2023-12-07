@@ -322,7 +322,10 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     user_desc.set_limit_in_pages(1);
     user_desc.set_seg_not_present(0);
     user_desc.set_useable(1);
-    rustix::runtime::set_thread_area(&mut user_desc).expect("set_thread_area");
+    let res = rustix::runtime::set_thread_area(&mut user_desc);
+    debug_assert_eq!(res, Ok(()));
+    debug_assert_ne!(user_desc.entry_number, !0);
+
     asm!("mov gs, {0:x}", in(reg) ((user_desc.entry_number << 3) | 3) as u16);
     debug_assert_eq!(*ptr.cast::<*const c_void>(), ptr);
     debug_assert_eq!(thread_pointer(), ptr);

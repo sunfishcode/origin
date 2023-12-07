@@ -31,6 +31,6 @@ fn init() {
     log::trace!(
         target: "origin::thread",
         "Main Thread[{:?}] initialized",
-        crate::thread::current_thread_id().as_raw_nonzero()
+        crate::thread::current_id().as_raw_nonzero()
     );
 }

@@ -31,29 +31,39 @@ use rustix::thread::gettid;
 ///
 /// This type does not detach or free resources on drop. It just leaks the
 /// thread. To detach or join, call [`detach`] or [`join`] explicitly.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Thread(NonNull<ThreadData>);
 
 impl Thread {
-    /// Convert to `Self` from a raw pointer.
+    /// Convert to `Self` from a raw pointer that was returned from
+    /// `Thread::to_raw`.
     #[inline]
     pub fn from_raw(raw: *mut c_void) -> Self {
         Self(NonNull::new(raw.cast()).unwrap())
     }
 
-    /// Convert to `Self` from a raw non-null pointer.
+    /// Convert to `Self` from a raw non-null pointer that was returned from
+    /// `Thread::to_raw_non_null`.
     #[inline]
     pub fn from_raw_non_null(raw: NonNull<c_void>) -> Self {
         Self(raw.cast())
     }
 
     /// Convert to a raw pointer from a `Self`.
+    ///
+    /// This value is guaranteed to uniquely identify a thread, while it is
+    /// running. After a thread has exited, this value may be reused by new
+    /// threads.
     #[inline]
     pub fn to_raw(self) -> *mut c_void {
         self.0.cast().as_ptr()
     }
 
     /// Convert to a raw non-null pointer from a `Self`.
+    ///
+    /// This value is guaranteed to uniquely identify a thread, while it is
+    /// running. After a thread has exited, this value may be reused by new
+    /// threads.
     #[inline]
     pub fn to_raw_non_null(self) -> NonNull<c_void> {
         self.0.cast()

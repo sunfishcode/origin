@@ -25,29 +25,44 @@ extern "C" {
 ///
 /// This type does not detach or free resources on drop. It just leaks the
 /// thread. To detach or join, call [`detach`] or [`join`] explicitly.
-#[derive(Copy, Clone)]
+// In this library, we assume `libc::pthread` can be casted to and from a
+// `usize` and directly compared for equality (without using `pthread_equal`).
+// POSIX says that `pthread_t` can be a struct type; if any platform ever
+// does that, the code below won't compile, and we'll have to figure out what
+// to do about it.
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Thread(libc::pthread_t);
 
 impl Thread {
-    /// Convert to `Self` from a raw pointer.
+    /// Convert to `Self` from a raw pointer that was returned from
+    /// `Thread::to_raw`.
     #[inline]
     pub fn from_raw(raw: *mut c_void) -> Self {
         Self(raw.expose_addr() as libc::pthread_t)
     }
 
-    /// Convert to `Self` from a raw non-null pointer.
+    /// Convert to `Self` from a raw non-null pointer that was returned from
+    /// `Thread::to_raw_non_null`.
     #[inline]
     pub fn from_raw_non_null(raw: NonNull<c_void>) -> Self {
         Self::from_raw(raw.as_ptr())
     }
 
     /// Convert to a raw pointer from a `Self`.
+    ///
+    /// This value is guaranteed to uniquely identify a thread, while it is
+    /// running. After a thread has exited, this value may be reused by new
+    /// threads.
     #[inline]
     pub fn to_raw(self) -> *mut c_void {
         from_exposed_addr_mut(self.0 as usize)
     }
 
     /// Convert to a raw non-null pointer from a `Self`.
+    ///
+    /// This value is guaranteed to uniquely identify a thread, while it is
+    /// running. After a thread has exited, this value may be reused by new
+    /// threads.
     #[inline]
     pub fn to_raw_non_null(self) -> NonNull<c_void> {
         NonNull::new(self.to_raw()).unwrap()

@@ -192,6 +192,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 #[inline]
 pub(super) fn thread_pointer() -> *mut c_void {
     let ptr;
+    // SAFETY: This reads the thread register.
     unsafe {
         asm!("mv {}, tp", out(reg) ptr, options(nostack, preserves_flags, readonly));
     }

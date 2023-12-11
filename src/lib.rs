@@ -7,6 +7,7 @@
 #![cfg_attr(debug_assertions, feature(link_llvm_intrinsics))]
 #![cfg_attr(feature = "experimental-relocate", feature(cfg_relocation_model))]
 #![feature(strict_provenance)]
+#![feature(exposed_provenance)]
 #![deny(fuzzy_provenance_casts, lossy_provenance_casts)]
 #![no_std]
 

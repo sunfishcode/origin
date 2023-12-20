@@ -149,7 +149,7 @@ struct Abi {
     canary: usize,
 
     /// The address the thread pointer points to.
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm",))]
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
     thread_pointee: [u8; 0],
 
     /// The ABI-exposed `dtv` field (though we don't yet implement dynamic

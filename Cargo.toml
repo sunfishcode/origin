@@ -40,19 +40,19 @@ errno = { version = "0.3.3", default-features = false, optional = true }
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
 compiler_builtins = { version = "0.1.101", optional = true }
-smallvec = { version = "1.11.1", features = ["const_new"] }
+smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
 
 [target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
 version = "0.2.0"
 default-features = false
-features = [ "unwinder" ]
+features = ["unwinder"]
 
 [dev-dependencies]
 assert_cmd = "2.0.12"
 
 [features]
 default = ["std", "log", "libc", "errno", "thread", "init-fini-arrays"]
-std = ["rustix/std", "bitflags/std"]
+std = ["rustix/std", "bitflags/std", "alloc"]
 rustc-dep-of-std = [
     "dep:core",
     "dep:alloc",
@@ -72,10 +72,14 @@ set_thread_id = []
 origin-program = []
 
 # Use origin's implementation of thread startup and shutdown.
-origin-thread = ["memoffset", "rustix/runtime", "origin-program", "thread"]
+#
+# To use threads, it's also necessary to enable the "thread" feature.
+origin-thread = ["memoffset", "rustix/runtime", "origin-program"]
 
 # Use origin's implementation of signal handle registrtion.
-origin-signal = ["rustix/runtime", "signal"]
+#
+# To use threads, it's also necessary to enable the "signal" feature.
+origin-signal = ["rustix/runtime"]
 
 # Use origin's `_start` definition.
 origin-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime", "origin-program"]
@@ -96,13 +100,10 @@ max_level_off = ["log/max_level_off"]
 
 # Enable features which depend on the Rust global allocator, such as functions
 # that return owned strings or `Vec`s.
-alloc = ["rustix/alloc"]
+alloc = ["rustix/alloc", "smallvec"]
 
 # Enable support for threads.
-#
-# Origin's threads support currently depends on dynamic allocation, so it
-# pulls in the "alloc" feature.
-thread = ["alloc", "rustix/thread", "rustix/mm", "param", "rustix/process", "rustix/runtime", "rustix-futex-sync"]
+thread = ["rustix/thread", "rustix/mm", "param", "rustix/process", "rustix/runtime", "rustix-futex-sync"]
 
 # Enable support for signal handlers.
 signal = ["rustix/runtime"]

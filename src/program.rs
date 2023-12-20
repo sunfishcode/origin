@@ -27,7 +27,7 @@
 //! with origin's goal of providing Rust-idiomatic interfaces, however it does
 //! mean that origin can avoid doing any work that users might not need.
 
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 use crate::thread;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
@@ -208,11 +208,11 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     rustix::param::init(envp);
 
     // Read the program headers and extract the TLS info.
-    #[cfg(feature = "origin-thread")]
+    #[cfg(all(feature = "origin-thread", feature = "thread"))]
     thread::initialize_startup_info();
 
     // Initialize the main thread.
-    #[cfg(feature = "origin-thread")]
+    #[cfg(all(feature = "origin-thread", feature = "thread"))]
     thread::initialize_main(mem.cast());
 }
 
@@ -289,7 +289,7 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 /// `.fini_array` section, and exit the program.
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
-    #[cfg(all(feature = "thread", feature = "origin-program"))]
+    #[cfg(all(feature = "alloc", feature = "thread", feature = "origin-program"))]
     crate::thread::call_dtors(crate::thread::current());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`

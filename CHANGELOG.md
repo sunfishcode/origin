@@ -1,14 +1,11 @@
-# origin 0.16
+# origin 0.17
 
 ## Changes
 
-The functions in the `thread` module have been renamed to remove the
-redundant `thread` in their names. For example, `thread::create_thread` is
-now just `thread::create`, and so on.
+The "thread" feature is no longer implied by the "origin-thread" feature, so
+users using threads with "origin-thread" will need to also enable "thread"
+explicitly.
 
-The `thread::id` function (formerly `thread::thread_id`), now returns an
-`Option`, to allow it to indicate that the thread has exited, in which case
-it no longer has an ID.
-
-Origin now supports linking with code compiled with stack protection features,
-such as `-fstack-protector`.
+The "alloc" feature is no longer implied by the "origin-thread" or "thread"
+features, so users using program or thread destructors with "origin-thread"
+will need to also enable "alloc" explicitly.

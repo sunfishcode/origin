@@ -27,14 +27,14 @@
 //! with origin's goal of providing Rust-idiomatic interfaces, however it does
 //! mean that origin can avoid doing any work that users might not need.
 
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 use crate::thread;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(not(feature = "origin-program"))]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
-#[cfg(all(feature = "alloc", feature = "origin-program"))]
+#[cfg(all(feature = "alloc", feature = "origin-program", feature = "thread"))]
 use rustix_futex_sync::Mutex;
 
 #[cfg(all(
@@ -208,11 +208,11 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     rustix::param::init(envp);
 
     // Read the program headers and extract the TLS info.
-    #[cfg(feature = "origin-thread")]
+    #[cfg(all(feature = "origin-thread", feature = "thread"))]
     thread::initialize_startup_info();
 
     // Initialize the main thread.
-    #[cfg(feature = "origin-thread")]
+    #[cfg(all(feature = "origin-thread", feature = "thread"))]
     thread::initialize_main(mem.cast());
 }
 
@@ -222,9 +222,24 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 /// `SmallVec` to ensure we can register that many without allocating.
 ///
 /// [POSIX guarantees]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/atexit.html
-#[cfg(all(feature = "alloc", feature = "origin-program"))]
+#[cfg(all(feature = "alloc", feature = "origin-program", feature = "thread"))]
 static DTORS: Mutex<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>> =
     Mutex::new(smallvec::SmallVec::new_const());
+
+/// A type for `DTORS` in the single-threaded case that we can mark as `Sync`.
+#[cfg(all(feature = "alloc", feature = "origin-program", not(feature = "thread")))]
+struct Dtors(smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>);
+
+/// SAFETY: With `feature = "origin-program"`, we can assume that Origin is
+/// responsible for creating all threads in the program, and with
+/// `not(feature = "thread")` mode, Origin can't create any new threads, so we
+/// don't need to synchronize.
+#[cfg(all(feature = "alloc", feature = "origin-program", not(feature = "thread")))]
+unsafe impl Sync for Dtors {}
+
+/// The single-threaded version of `DTORS`.
+#[cfg(all(feature = "alloc", feature = "origin-program", not(feature = "thread")))]
+static mut DTORS: Dtors = Dtors(smallvec::SmallVec::new_const());
 
 /// Register a function to be called when [`exit`] is called.
 ///
@@ -237,8 +252,13 @@ static DTORS: Mutex<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>> =
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     #[cfg(feature = "origin-program")]
     {
-        let mut funcs = DTORS.lock();
-        funcs.push(func);
+        #[cfg(feature = "thread")]
+        let mut dtors = DTORS.lock();
+        // SAFETY: See the safety comments on the `unsafe impl Sync for Dtors`.
+        #[cfg(not(feature = "thread"))]
+        let dtors = unsafe { &mut DTORS.0 };
+
+        dtors.push(func);
     }
 
     #[cfg(not(feature = "origin-program"))]
@@ -269,7 +289,7 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 /// `.fini_array` section, and exit the program.
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
-    #[cfg(all(feature = "thread", feature = "origin-program"))]
+    #[cfg(all(feature = "alloc", feature = "thread", feature = "origin-program"))]
     crate::thread::call_dtors(crate::thread::current());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`
@@ -277,12 +297,17 @@ pub fn exit(status: c_int) -> ! {
     // to the end of the list.
     #[cfg(all(feature = "alloc", feature = "origin-program"))]
     loop {
+        #[cfg(feature = "thread")]
         let mut dtors = DTORS.lock();
-        if let Some(dtor) = dtors.pop() {
+        // SAFETY: See the safety comments on the `unsafe impl Sync for Dtors`.
+        #[cfg(not(feature = "thread"))]
+        let dtors = unsafe { &mut DTORS.0 };
+
+        if let Some(func) = dtors.pop() {
             #[cfg(feature = "log")]
             log::trace!("Calling `at_exit`-registered function");
 
-            dtor();
+            func();
         } else {
             break;
         }

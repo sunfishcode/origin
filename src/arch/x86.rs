@@ -6,7 +6,7 @@ use core::arch::asm;
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "origin-signal")]
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 use {
     core::ffi::c_void,
     core::ptr::invalid_mut,
@@ -135,7 +135,7 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
 }
 
 /// The required alignment for the stack pointer.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 pub(super) const STACK_ALIGNMENT: usize = 16;
 
 /// A wrapper around the Linux `clone` system call.
@@ -143,7 +143,7 @@ pub(super) const STACK_ALIGNMENT: usize = 16;
 /// This can't be implemented in `rustix` because the child starts executing at
 /// the same point as the parent and we need to use inline asm to have the
 /// child jump to our new-thread entrypoint.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 #[inline]
 pub(super) unsafe fn clone(
     flags: u32,
@@ -231,7 +231,7 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     let mut user_desc = rustix::runtime::UserDesc {
@@ -255,7 +255,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 }
 
 /// Read the value of the platform thread-pointer register.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 #[inline]
 pub(super) fn thread_pointer() -> *mut c_void {
     let ptr;
@@ -270,12 +270,12 @@ pub(super) fn thread_pointer() -> *mut c_void {
 }
 
 /// TLS data ends at the location pointed to by the thread pointer.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 pub(super) const TLS_OFFSET: usize = 0;
 
 /// `munmap` the current thread, then carefully exit the thread without
 /// touching the deallocated stack.
-#[cfg(feature = "origin-thread")]
+#[cfg(all(feature = "origin-thread", feature = "thread"))]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
     asm!(

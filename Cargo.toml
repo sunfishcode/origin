@@ -19,7 +19,7 @@ rustix = { version = "0.38.26", default-features = false }
 bitflags = { version = "2.4.0", default-features = false }
 memoffset = { version = "0.9.0", optional = true }
 log = { version = "0.4.14", default-features = false, optional = true }
-rustix-futex-sync = "0.2.1"
+rustix-futex-sync = { version = "0.2.1", optional = true }
 
 # Optional logging backends for use with "origin-program". You can use any
 # external logger, but using these features allows origin to initialize the
@@ -102,7 +102,7 @@ alloc = ["rustix/alloc"]
 #
 # Origin's threads support currently depends on dynamic allocation, so it
 # pulls in the "alloc" feature.
-thread = ["alloc", "rustix/thread", "rustix/mm", "param", "rustix/process", "rustix/runtime"]
+thread = ["alloc", "rustix/thread", "rustix/mm", "param", "rustix/process", "rustix/runtime", "rustix-futex-sync"]
 
 # Enable support for signal handlers.
 signal = ["rustix/runtime"]

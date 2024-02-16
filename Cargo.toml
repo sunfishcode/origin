@@ -65,9 +65,6 @@ rustc-dep-of-std = [
     "dep:compiler_builtins",
 ]
 
-# Enable the `set_current_id_after_a_fork` function.
-set_thread_id = []
-
 # Use origin's implementation of program startup and shutdown.
 origin-program = []
 

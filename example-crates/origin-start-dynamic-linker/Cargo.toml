@@ -1,0 +1,21 @@
+[package]
+name = "origin-start"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Origin can be depended on just like any other crate. For no_std, disable
+# the default features, and the desired features.
+origin = { path = "../..", default-features = false, features = ["origin-thread", "origin-start", "thread", "alloc", "experimental-relocate"] }
+
+# Crates to help writing no_std code.
+atomic-dbg = { version = "0.1.8", default-features = false }
+rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
+compiler_builtins = { version = "0.1.101", features = ["mem"] }
+
+# This is just an example crate, and not part of the origin workspace.
+[workspace]

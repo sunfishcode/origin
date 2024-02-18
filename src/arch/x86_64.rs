@@ -30,6 +30,10 @@ pub(super) unsafe extern "C" fn _start() -> ! {
     // already null.
     asm!(
         "mov rdi, rsp", // Pass the incoming `rsp` as the arg to `entry`.
+        ".weak _DYNAMIC",
+        ".hidden _DYNAMIC",
+        // Pass the address of `_DYNAMIC` as arg to `entry`
+        "lea rsi, [rip + _DYNAMIC]",
         "push rbp",     // Set the return address to zero.
         "jmp {entry}",  // Jump to `entry`.
         entry = sym super::program::entry,

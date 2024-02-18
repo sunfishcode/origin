@@ -15,7 +15,7 @@ fn test_crate(
     stderr: &'static str,
     code: Option<i32>,
 ) {
-    utils::test_crate("example", name, args, envs, stdout, stderr, code);
+    utils::test_crate("example", "run", name, args, envs, stdout, stderr, code);
 }
 
 #[test]
@@ -134,6 +134,74 @@ fn example_crate_origin_start_crt_static_relocation_static_relocate() {
         COMMON_STDERR,
         None,
     );
+}
+
+/// Act as dynamic linker, run `relocate`.
+#[test]
+fn example_crate_origin_start_dynamic_linker() {
+    use assert_cmd::Command;
+
+    utils::test_crate(
+        "example",
+        "build",
+        "origin-start-dynamic-linker",
+        &[],
+        &[],
+        "",
+        "",
+        None,
+    );
+
+    let arch = utils::arch();
+    let target_dir = format!("example-crates/origin-start-dynamic-linker/target/{arch}/debug");
+    let linker = if let Ok(linker) = std::env::var(format!(
+        "CARGO_TARGET_{}_LINKER",
+        arch.to_uppercase().replace('-', "_")
+    )) {
+        vec![format!("-Clinker={linker}")]
+    } else {
+        vec![]
+    };
+
+    // Build a dummy executable with the previously built liborigin_start.so as dynamic linker.
+    let assert = Command::new("rustc")
+        .args(&[
+            "-",
+            "--crate-type",
+            "bin",
+            "--target",
+            &arch,
+            "-Cpanic=abort",
+            "-Clink-arg=-nostartfiles",
+        ])
+        .args(linker)
+        .arg(format!(
+            "-Clink-arg=-Wl,--dynamic-linker={target_dir}/liborigin_start.so",
+        ))
+        .arg("-o")
+        .arg(format!("{target_dir}/libempty.so"))
+        .write_stdin(
+            "#![no_std]\
+            #![no_main]\
+            #[panic_handler]\
+            fn panic_handler(_: &core::panic::PanicInfo) -> ! { loop {} }",
+        )
+        .assert();
+    assert.stdout("").stderr("").success();
+
+    // Run the executable
+    if let Ok(runner) = std::env::var(format!(
+        "CARGO_TARGET_{}_RUNNER",
+        arch.to_uppercase().replace('-', "_")
+    )) {
+        let assert = Command::new(runner.split(' ').next().unwrap())
+            .arg(format!("{target_dir}/libempty.so"))
+            .assert();
+        assert.stdout("").stderr(COMMON_STDERR).success();
+    } else {
+        let assert = Command::new(format!("{target_dir}/libempty.so")).assert();
+        assert.stdout("").stderr(COMMON_STDERR).success();
+    };
 }
 
 /// Use a dynamic linker.

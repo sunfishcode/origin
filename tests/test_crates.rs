@@ -13,7 +13,7 @@ fn test_crate(
     stderr: &'static str,
     code: Option<i32>,
 ) {
-    utils::test_crate("test", name, args, envs, stdout, stderr, code);
+    utils::test_crate("test", "run", name, args, envs, stdout, stderr, code);
 }
 
 #[test]

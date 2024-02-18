@@ -32,6 +32,10 @@ pub(super) unsafe extern "C" fn _start() -> ! {
     // already null.
     asm!(
         "mv a0, sp",    // Pass the incoming `sp` as the arg to `entry`.
+        ".weak _DYNAMIC",
+        ".hidden _DYNAMIC",
+        // Pass the address of `_DYNAMIC` as arg to `entry`
+        "lla a1, _DYNAMIC",
         "mv ra, zero",  // Set the return address to zero.
         "mv fp, zero",  // Set the frame address to zero.
         "tail {entry}", // Jump to `entry`.

@@ -1,16 +1,6 @@
 #![allow(dead_code)]
 
-pub fn test_crate(
-    dir: &str,
-    name: &str,
-    args: &[&str],
-    envs: &[(&str, &str)],
-    stdout: &'static str,
-    stderr: &'static str,
-    code: Option<i32>,
-) {
-    use assert_cmd::Command;
-
+pub fn arch() -> String {
     #[cfg(target_arch = "x86_64")]
     let arch = "x86_64";
     #[cfg(target_arch = "aarch64")]
@@ -28,9 +18,24 @@ pub fn test_crate(
     #[cfg(all(target_env = "gnu", not(target_abi = "eabi")))]
     let env = "gnu";
 
+    format!("{arch}-unknown-linux-{env}")
+}
+
+pub fn test_crate(
+    dir: &str,
+    cmd: &str,
+    name: &str,
+    args: &[&str],
+    envs: &[(&str, &str)],
+    stdout: &'static str,
+    stderr: &'static str,
+    code: Option<i32>,
+) {
+    use assert_cmd::Command;
+
     let mut command = Command::new("cargo");
-    command.arg("run").arg("--quiet");
-    command.arg(&format!("--target={arch}-unknown-linux-{env}"));
+    command.arg(cmd).arg("--quiet");
+    command.arg(format!("--target={}", arch()));
     command.args(args);
     command.envs(envs.iter().copied());
     command.current_dir(format!("{dir}-crates/{name}"));

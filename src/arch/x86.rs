@@ -34,6 +34,9 @@ pub(super) unsafe extern "C" fn _start() -> ! {
         "push ebp",     // Pad for stack pointer alignment.
         "push ebp",     // Pad for stack pointer alignment.
         "push ebp",     // Pad for stack pointer alignment.
+        "push eax",
+        "call 1f",
+        "1:	add [esp], _DYNAMIC-1b",
         "push eax",     // Pass saved the incoming `esp` as the arg to `entry`.
         "push ebp",     // Set the return address to zero.
         "jmp {entry}",  // Jump to `entry`.

@@ -30,7 +30,7 @@ use crate::arch::{relocation_load, relocation_mprotect_readonly, relocation_stor
 use core::ffi::c_void;
 use core::ptr::{from_exposed_addr, null, null_mut};
 use linux_raw_sys::elf::*;
-use linux_raw_sys::general::{AT_ENTRY, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM};
+use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM};
 
 /// Locate the dynamic (startup-time) relocations and perform them.
 ///
@@ -52,11 +52,12 @@ use linux_raw_sys::general::{AT_ENTRY, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT
 ///
 /// So yes, there's a reason this code is behind a feature flag.
 #[cold]
-pub(super) unsafe fn relocate(envp: *mut *mut u8) {
+pub(super) unsafe fn relocate(envp: *mut *mut u8, dynv: *const usize) {
     // Locate the AUX records we need.
     let auxp = compute_auxp(envp);
 
     // The page size, segment headers info, and runtime entry address.
+    let mut auxv_base = 0;
     let mut auxv_page_size = 0;
     let mut auxv_phdr = null();
     let mut auxv_phent = 0;
@@ -71,6 +72,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         current_aux = current_aux.add(1);
 
         match a_type as _ {
+            AT_BASE => auxv_base = a_val.addr(),
             AT_PAGESZ => auxv_page_size = a_val.addr(),
             AT_PHDR => auxv_phdr = a_val.cast::<Elf_Phdr>(),
             AT_PHNUM => auxv_phnum = a_val.addr(),
@@ -81,57 +83,67 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         }
     }
 
+    // There are four cases to consider here:
+    //
+    // 1. Static executable
+    //    This is the trivial case. No relocations necessary.
+    // 2. Static pie executable
+    //    We need to relocate ourself. `AT_PHDR` points to our own program
+    //    headers and `AT_ENTRY` to our own entry point.
+    // 3. Dynamic pie executable with external dynamic linker
+    //    We don't need to relocate ourself as the dynamic linker has already
+    //    done this. `AT_PHDR` points to our own program headers and `AT_ENTRY`
+    //    to our own entry point. `AT_BASE` contains the relocation offset of
+    //    the dynamic linker.
+    // 4. Shared library acting as dynamic linker.
+    //    We do need to relocate ourself. `AT_PHDR` doesn't point to our own
+    //    program headers and `AT_ENTRY` doesn't point to our own entry point.
+    //    `AT_BASE` contains our own relocation offset.
+
     // Compute the static address of `_start`.
     let static_start = compute_static_start();
 
-    // Our offset is the difference between the static address of `_start` and
-    // the actual runtime address of `_start` as given to us as the entry
-    // address in the AUX table.
-    let offset = auxv_entry.wrapping_sub(static_start);
+    if auxv_base != 0 && static_start == auxv_entry {
+        // This is case 3) as AT_BASE only exists if a dynamic linker and
+        // `AT_ENTRY` only points to the entry function if we are the main
+        // executable. In addition because `compute_static_start()`` returns
+        // the same value as `AT_ENTRY`, we know for sure that we are already
+        // relocated by the dynamic linker.
+        return;
+    }
+
+    let mut offset = auxv_base;
+    if offset == 0 {
+        // This is case 4) as `AT_BASE` indicates that there is a dynamic
+        // linker, yet we are not already relocated by a dynamic linker.
+        let mut i = auxv_phnum;
+        while i > 0 {
+            i -= 1;
+            if (*auxv_phdr.add(i)).p_type == PT_DYNAMIC {
+                // Use the offset between the static address of the Dynamic
+                // table in the `PT_DYNAMIC` entry and the dynamic address the
+                // Dynamic table as relocation offset.
+                offset = dynv.addr() - (*auxv_phdr.add(i)).p_vaddr;
+                break;
+            }
+        }
+    } else {
+        // This is case 1) or 2) as without dynamic linker `AT_BASE` doesn't
+        // exist.
+    }
 
     // If we're loaded at our static address, or if we were run by a dynamic
     // linker that has already performed the relocations, then there's nothing
     // to do.
     if offset == 0 {
+        // This is case 1) as we are already loaded at our static address
+        // despite the lack of any dynamic linker.
         return;
     }
 
-    // The location and size of the Dynamic section.
-    let mut dynamic = null();
-    let mut dynamic_size = 0;
-
-    // The location and size of the `relro` region.
-    let mut relro = 0;
-    let mut relro_size = 0;
-
-    // Next, look through the static segment headers (phdrs) to find the
-    // Dynamic section and the relro description if present. In the Dynamic
-    // section, find the rela and/or rel tables.
-    let mut current_phdr = auxv_phdr;
-    let phdrs_end = current_phdr
-        .cast::<u8>()
-        .add(auxv_phnum * auxv_phent)
-        .cast();
-    while current_phdr != phdrs_end {
-        let phdr = &*current_phdr;
-        current_phdr = current_phdr.cast::<u8>().add(auxv_phent).cast();
-
-        match phdr.p_type {
-            PT_DYNAMIC => {
-                // We found the dynamic section. We model this as
-                // `from_exposed_addr` for now because `with_addr` is a call.
-                dynamic = from_exposed_addr(phdr.p_vaddr.wrapping_add(offset));
-                dynamic_size = phdr.p_memsz;
-            }
-            PT_GNU_RELRO => {
-                // A relro description is present. Make a note of it so that we
-                // can mark the memory readonly after relocations are done.
-                relro = phdr.p_vaddr;
-                relro_size = phdr.p_memsz;
-            }
-            _ => (),
-        }
-    }
+    // This is case 2) or 4). We need to do all R_RELATIVE relocations.
+    // There should be no other kind of relocation because we are either a
+    // static PIE binary or a dynamic linker compiled with `-Bsymbolic`.
 
     // Rela tables contain `Elf_Rela` elements which have an
     // `r_addend` field.
@@ -148,9 +160,8 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
 
     // Look through the `Elf_Dyn` entries to find the location and
     // size of the relocation table(s).
-    let mut current_dyn: *const Elf_Dyn = dynamic;
-    let dyns_end = current_dyn.cast::<u8>().add(dynamic_size).cast();
-    while current_dyn != dyns_end {
+    let mut current_dyn: *const Elf_Dyn = dynv.cast();
+    loop {
         let Elf_Dyn { d_tag, d_un } = &*current_dyn;
         current_dyn = current_dyn.add(1);
 
@@ -166,6 +177,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
             DT_REL => rel_ptr = from_exposed_addr(d_un.d_ptr.wrapping_add(offset)),
             DT_RELSZ => rel_total_size = d_un.d_val as usize,
             DT_RELENT => rel_entry_size = d_un.d_val as usize,
+
+            // End of the Dynamic section
+            DT_NULL => break,
 
             _ => (),
         }
@@ -213,6 +227,10 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         }
     }
 
+    // FIXME split function into two here with a hint::black_box around the
+    // function pointer to prevent the compiler from moving code between the
+    // functions.
+
     #[cfg(debug_assertions)]
     {
         // Check that the page size is a power of two.
@@ -225,7 +243,48 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         // Check that relocation did its job. Do the same static start
         // computation we did earlier; this time it should match the dynamic
         // address.
-        assert_eq!(compute_static_start(), auxv_entry);
+        // AT_ENTRY points to the main executable's entry point rather than our
+        // entry point when AT_BASE is not zero and thus a dynamic linker is in
+        // use. In this case the assertion would fail.
+        if auxv_base == 0 {
+            assert_eq!(compute_static_start(), auxv_entry);
+        }
+    }
+
+    // Finally, look through the static segment headers (phdrs) to find the
+    // the relro description if present. Also do a debug assertion that
+    // the dynv argument matches the PT_DYNAMIC segment.
+    extern "C" {
+        #[link_name = "__ehdr_start"]
+        static EHDR: Elf_Ehdr;
+    }
+
+    // The location and size of the `relro` region.
+    let mut relro = 0;
+    let mut relro_size = 0;
+
+    let mut current_phdr = from_exposed_addr::<Elf_Phdr>(offset + EHDR.e_phoff);
+    let phdrs_end = current_phdr
+        .cast::<u8>()
+        .add((EHDR.e_phnum * EHDR.e_phentsize) as usize)
+        .cast();
+    while current_phdr != phdrs_end {
+        let phdr = &*current_phdr;
+        current_phdr = current_phdr.cast::<u8>().add(auxv_phent).cast();
+
+        match phdr.p_type {
+            #[cfg(debug_assertions)]
+            PT_DYNAMIC => {
+                assert_eq!(dynv.addr(), phdr.p_vaddr.wrapping_add(offset));
+            }
+            PT_GNU_RELRO => {
+                // A relro description is present. Make a note of it so that we
+                // can mark the memory readonly after relocations are done.
+                relro = phdr.p_vaddr;
+                relro_size = phdr.p_memsz;
+            }
+            _ => (),
+        }
     }
 
     // If we saw a relro description, mark the memory readonly.

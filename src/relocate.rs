@@ -30,7 +30,7 @@ use crate::arch::{relocation_load, relocation_mprotect_readonly, relocation_stor
 use core::ffi::c_void;
 use core::ptr::{from_exposed_addr, null, null_mut};
 use linux_raw_sys::elf::*;
-use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM};
+use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
 
 /// Locate the dynamic (startup-time) relocations and perform them.
 ///
@@ -59,9 +59,6 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8, dynv: *const usize) {
     // The page size, segment headers info, and runtime entry address.
     let mut auxv_base = 0;
     let mut auxv_page_size = 0;
-    let mut auxv_phdr = null();
-    let mut auxv_phent = 0;
-    let mut auxv_phnum = 0;
     let mut auxv_entry = 0;
 
     // Look through the AUX records to find the segment headers, page size,
@@ -74,9 +71,6 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8, dynv: *const usize) {
         match a_type as _ {
             AT_BASE => auxv_base = a_val.addr(),
             AT_PAGESZ => auxv_page_size = a_val.addr(),
-            AT_PHDR => auxv_phdr = a_val.cast::<Elf_Phdr>(),
-            AT_PHNUM => auxv_phnum = a_val.addr(),
-            AT_PHENT => auxv_phent = a_val.addr(),
             AT_ENTRY => auxv_entry = a_val.addr(),
             AT_NULL => break,
             _ => (),
@@ -112,25 +106,16 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8, dynv: *const usize) {
         return;
     }
 
-    let mut offset = auxv_base;
-    if offset == 0 {
-        // This is case 4) as `AT_BASE` indicates that there is a dynamic
-        // linker, yet we are not already relocated by a dynamic linker.
-        let mut i = auxv_phnum;
-        while i > 0 {
-            i -= 1;
-            if (*auxv_phdr.add(i)).p_type == PT_DYNAMIC {
-                // Use the offset between the static address of the Dynamic
-                // table in the `PT_DYNAMIC` entry and the dynamic address the
-                // Dynamic table as relocation offset.
-                offset = dynv.addr() - (*auxv_phdr.add(i)).p_vaddr;
-                break;
-            }
-        }
-    } else {
+    let offset = if auxv_base == 0 {
         // This is case 1) or 2) as without dynamic linker `AT_BASE` doesn't
         // exist.
-    }
+        auxv_entry.wrapping_sub(static_start)
+    } else {
+        // This is case 4) as `AT_BASE` indicates that there is a dynamic
+        // linker, yet we are not already relocated by a dynamic linker.
+        // `AT_BASE` contains the relocation offset of the dynamic linker.
+        auxv_base
+    };
 
     // If we're loaded at our static address, or if we were run by a dynamic
     // linker that has already performed the relocations, then there's nothing
@@ -263,14 +248,15 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8, dynv: *const usize) {
     let mut relro = 0;
     let mut relro_size = 0;
 
+    let phentsize = EHDR.e_phentsize as usize;
     let mut current_phdr = from_exposed_addr::<Elf_Phdr>(offset + EHDR.e_phoff);
     let phdrs_end = current_phdr
         .cast::<u8>()
-        .add((EHDR.e_phnum * EHDR.e_phentsize) as usize)
+        .add(EHDR.e_phnum as usize * phentsize)
         .cast();
     while current_phdr != phdrs_end {
         let phdr = &*current_phdr;
-        current_phdr = current_phdr.cast::<u8>().add(auxv_phent).cast();
+        current_phdr = current_phdr.cast::<u8>().add(phentsize).cast();
 
         match phdr.p_type {
             #[cfg(debug_assertions)]

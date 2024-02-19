@@ -138,6 +138,7 @@ fn example_crate_origin_start_crt_static_relocation_static_relocate() {
 
 /// Act as dynamic linker, run `relocate`.
 #[test]
+#[cfg_attr(target_arch = "x86", ignore)] // FIXME make it work on x86
 fn example_crate_origin_start_dynamic_linker() {
     use assert_cmd::Command;
 

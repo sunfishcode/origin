@@ -26,7 +26,9 @@
 
 #![allow(clippy::cmp_null)]
 
-use crate::arch::{relocation_load, relocation_mprotect_readonly, relocation_store};
+use crate::arch::{
+    dynamic_table_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
+};
 use core::ffi::c_void;
 use core::ptr::{from_exposed_addr, null, null_mut};
 use linux_raw_sys::elf::*;
@@ -52,7 +54,7 @@ use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
 ///
 /// So yes, there's a reason this code is behind a feature flag.
 #[cold]
-pub(super) unsafe fn relocate(envp: *mut *mut u8, dynv: *const usize) {
+pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     // Locate the AUX records we need.
     let auxp = compute_auxp(envp);
 
@@ -130,6 +132,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8, dynv: *const usize) {
     // There should be no other kind of relocation because we are either a
     // static PIE binary or a dynamic linker compiled with `-Bsymbolic`.
 
+    // Compute the dynamic address of `_DYNAMIC`.
+    let dynv = dynamic_table_addr();
+
     // Rela tables contain `Elf_Rela` elements which have an
     // `r_addend` field.
     let mut rela_ptr: *const Elf_Rela = null();
@@ -145,7 +150,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8, dynv: *const usize) {
 
     // Look through the `Elf_Dyn` entries to find the location and
     // size of the relocation table(s).
-    let mut current_dyn: *const Elf_Dyn = dynv.cast();
+    let mut current_dyn: *const Elf_Dyn = dynv;
     loop {
         let Elf_Dyn { d_tag, d_un } = &*current_dyn;
         current_dyn = current_dyn.add(1);

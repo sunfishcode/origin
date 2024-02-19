@@ -3,6 +3,9 @@
 use core::arch::asm;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
+use linux_raw_sys::elf::Elf_Dyn;
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "origin-signal")]
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
@@ -34,15 +37,30 @@ pub(super) unsafe extern "C" fn _start() -> ! {
         "push ebp",     // Pad for stack pointer alignment.
         "push ebp",     // Pad for stack pointer alignment.
         "push ebp",     // Pad for stack pointer alignment.
-        "push eax",
-        "call 1f",
-        "1:	add [esp], _DYNAMIC-1b",
         "push eax",     // Pass saved the incoming `esp` as the arg to `entry`.
         "push ebp",     // Set the return address to zero.
         "jmp {entry}",  // Jump to `entry`.
         entry = sym super::program::entry,
         options(noreturn),
     )
+}
+
+/// Compute the dynamic address of `_DYNAMIC`.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
+    let addr;
+    unsafe {
+        asm!(
+            ".weak _DYNAMIC",
+            ".hidden _DYNAMIC",
+            "call 1f",
+            "1: pop eax",
+            "add eax, _DYNAMIC-1b",
+            out("eax") addr,
+        );
+    }
+    addr
 }
 
 /// Perform a single load operation, outside the Rust memory model.

@@ -7,6 +7,9 @@
 use core::arch::asm;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
+use linux_raw_sys::elf::Elf_Dyn;
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(all(feature = "origin-thread", feature = "thread"))]
 use {
@@ -32,16 +35,28 @@ pub(super) unsafe extern "C" fn _start() -> ! {
     // already null.
     asm!(
         "mv a0, sp",    // Pass the incoming `sp` as the arg to `entry`.
-        ".weak _DYNAMIC",
-        ".hidden _DYNAMIC",
-        // Pass the address of `_DYNAMIC` as arg to `entry`
-        "lla a1, _DYNAMIC",
         "mv ra, zero",  // Set the return address to zero.
         "mv fp, zero",  // Set the frame address to zero.
         "tail {entry}", // Jump to `entry`.
         entry = sym super::program::entry,
         options(noreturn),
     )
+}
+
+/// Compute the dynamic address of `_DYNAMIC`.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
+    let addr;
+    unsafe {
+        asm!(
+            ".weak _DYNAMIC",
+            ".hidden _DYNAMIC",
+            "lla a0, _DYNAMIC",
+            out("a0") addr,
+        );
+    }
+    addr
 }
 
 /// Perform a single load operation, outside the Rust memory model.

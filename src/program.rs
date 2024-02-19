@@ -49,7 +49,7 @@ compile_error!("\"origin-program\" depends on either \"origin-start\" or \"exter
 ///
 /// `mem` must point to the stack as provided by the operating system.
 #[cfg(feature = "origin-program")]
-pub(super) unsafe extern "C" fn entry(mem: *mut usize, dynv: *const usize) -> ! {
+pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // Do some basic precondition checks, to ensure that our assembly code did
     // what we expect it to do. These are debug-only, to keep the release-mode
     // startup code small and simple to disassemble and inspect.
@@ -91,7 +91,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize, dynv: *const usize) -> ! 
     let (argc, argv, envp) = compute_args(mem);
 
     // Initialize program state before running any user code.
-    init_runtime(mem, dynv, envp);
+    init_runtime(mem, envp);
 
     // Call the functions registered via `.init_array`.
     #[cfg(feature = "init-array")]
@@ -162,10 +162,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize, dynv: *const usize) -> ! 
 /// on the initial stack.
 #[cfg(feature = "external-start")]
 pub unsafe fn start(mem: *mut usize) -> ! {
-    entry(
-        mem,
-        core::ptr::null(), // dummy as relocation isn't done here anyway
-    )
+    entry(mem)
 }
 
 /// Compute `argc`, `argv`, and `envp`.
@@ -199,11 +196,11 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
 /// must point to the incoming environment variables.
 #[cfg(feature = "origin-program")]
 #[allow(unused_variables)]
-unsafe fn init_runtime(mem: *mut usize, dynv: *const usize, envp: *mut *mut u8) {
+unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     // Before doing anything else, perform dynamic relocations.
     #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
     #[cfg(relocation_model = "pic")]
-    crate::relocate::relocate(envp, dynv);
+    crate::relocate::relocate(envp);
 
     // Explicitly initialize `rustix`. This is needed for things like
     // `page_size()` to work.

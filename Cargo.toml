@@ -66,12 +66,12 @@ rustc-dep-of-std = [
 ]
 
 # Use origin's implementation of program startup and shutdown.
-origin-program = []
+origin-program = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
 
 # Use origin's implementation of thread startup and shutdown.
 #
 # To use threads, it's also necessary to enable the "thread" feature.
-origin-thread = ["memoffset", "rustix/runtime", "origin-program"]
+origin-thread = ["memoffset", "origin-program"]
 
 # Use origin's implementation of signal handle registrtion.
 #
@@ -79,12 +79,12 @@ origin-thread = ["memoffset", "rustix/runtime", "origin-program"]
 origin-signal = ["rustix/runtime"]
 
 # Use origin's `_start` definition.
-origin-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime", "origin-program"]
+origin-start = ["origin-program"]
 
 # Don't use origin's `_start` definition, but export a `start` function which
 # is meant to be run very early in program startup and passed a pointer to
 # the initial stack. Don't enable this when enabling "origin-start".
-external-start = ["rustix/use-explicitly-provided-auxv", "rustix/runtime", "origin-program"]
+external-start = ["origin-program"]
 
 # The loggers depend on a `.init_array` entry to initialize themselves, and
 # `env_logger` needs it so that `c-scape` can initialize environment variables

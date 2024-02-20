@@ -38,7 +38,7 @@ use linux_raw_sys::ctypes::c_int;
 use rustix_futex_sync::Mutex;
 
 #[cfg(all(
-    feature = "program-start",
+    feature = "origin-program",
     not(any(feature = "origin-start", feature = "external-start"))
 ))]
 compile_error!("\"origin-program\" depends on either \"origin-start\" or \"external-start\".");

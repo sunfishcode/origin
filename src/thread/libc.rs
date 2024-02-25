@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use core::ffi::c_void;
 use core::mem::{size_of, transmute, zeroed};
-use core::ptr::{from_exposed_addr_mut, invalid_mut, null_mut, NonNull};
+use core::ptr::{from_exposed_addr_mut, without_provenance_mut, null_mut, NonNull};
 use core::slice;
 use rustix::io;
 
@@ -134,7 +134,7 @@ pub unsafe fn create(
             thread_arg_ptr.cast::<Option<NonNull<c_void>>>(),
             args.len() + 2,
         );
-        thread_args[0] = NonNull::new(invalid_mut(args.len()));
+        thread_args[0] = NonNull::new(without_provenance_mut(args.len()));
         thread_args[1] = NonNull::new(fn_ as _);
         thread_args[2..].copy_from_slice(args);
 

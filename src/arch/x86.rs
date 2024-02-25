@@ -9,7 +9,7 @@ use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
 #[cfg(all(feature = "origin-thread", feature = "thread"))]
 use {
     core::ffi::c_void,
-    core::ptr::invalid_mut,
+    core::ptr::without_provenance_mut,
     linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
     rustix::thread::RawPid,
 };
@@ -219,8 +219,8 @@ pub(super) unsafe fn clone(
         entry = sym super::thread::entry,
         inout("eax") &[
             newtls.cast::<c_void>().cast_mut(),
-            invalid_mut(__NR_clone as usize),
-            invalid_mut(num_args)
+            without_provenance_mut(__NR_clone as usize),
+            without_provenance_mut(num_args)
         ] => r0,
         in("ebx") flags,
         in("ecx") child_stack,

@@ -16,7 +16,7 @@ extern crate compiler_builtins;
 use alloc::boxed::Box;
 use atomic_dbg::dbg;
 use core::arch::asm;
-use core::ptr::{addr_of_mut, invalid_mut};
+use core::ptr::{addr_of_mut, without_provenance_mut};
 use origin::{program, thread};
 
 #[panic_handler]
@@ -37,25 +37,25 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     check_eq(TEST_DATA.0);
 
     // Mutate one of the TLS fields.
-    THREAD_LOCAL[1] = invalid_mut(77);
+    THREAD_LOCAL[1] = without_provenance_mut(77);
 
     // Assert that the mutation happened properly.
-    check_eq([TEST_DATA.0[0], invalid_mut(77), TEST_DATA.0[2]]);
+    check_eq([TEST_DATA.0[0], without_provenance_mut(77), TEST_DATA.0[2]]);
 
     program::at_exit(Box::new(|| {
         // This is the last thing to run. Assert that we see the value stored
         // by the `at_thread_exit` callback.
-        check_eq([TEST_DATA.0[0], invalid_mut(79), TEST_DATA.0[2]]);
+        check_eq([TEST_DATA.0[0], without_provenance_mut(79), TEST_DATA.0[2]]);
 
         // Mutate one of the TLS fields.
-        THREAD_LOCAL[1] = invalid_mut(80);
+        THREAD_LOCAL[1] = without_provenance_mut(80);
     }));
     thread::at_exit(Box::new(|| {
         // Assert that we see the value stored at the end of `main`.
-        check_eq([TEST_DATA.0[0], invalid_mut(78), TEST_DATA.0[2]]);
+        check_eq([TEST_DATA.0[0], without_provenance_mut(78), TEST_DATA.0[2]]);
 
         // Mutate one of the TLS fields.
-        THREAD_LOCAL[1] = invalid_mut(79);
+        THREAD_LOCAL[1] = without_provenance_mut(79);
     }));
 
     let thread = thread::create(
@@ -64,14 +64,14 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
             check_eq(TEST_DATA.0);
 
             // Mutate one of the TLS fields.
-            THREAD_LOCAL[1] = invalid_mut(175);
+            THREAD_LOCAL[1] = without_provenance_mut(175);
 
             // Assert that the mutation happened properly.
-            check_eq([TEST_DATA.0[0], invalid_mut(175), TEST_DATA.0[2]]);
+            check_eq([TEST_DATA.0[0], without_provenance_mut(175), TEST_DATA.0[2]]);
 
             thread::at_exit(Box::new(|| {
                 // Assert that we still see the value stored in the thread.
-                check_eq([TEST_DATA.0[0], invalid_mut(175), TEST_DATA.0[2]]);
+                check_eq([TEST_DATA.0[0], without_provenance_mut(175), TEST_DATA.0[2]]);
             }));
 
             None
@@ -85,13 +85,13 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     thread::join(thread);
 
     // Assert that the main thread's TLS is still in place.
-    check_eq([TEST_DATA.0[0], invalid_mut(77), TEST_DATA.0[2]]);
+    check_eq([TEST_DATA.0[0], without_provenance_mut(77), TEST_DATA.0[2]]);
 
     // Mutate one of the TLS fields.
-    THREAD_LOCAL[1] = invalid_mut(78);
+    THREAD_LOCAL[1] = without_provenance_mut(78);
 
     // Assert that the mutation happened properly.
-    check_eq([TEST_DATA.0[0], invalid_mut(78), TEST_DATA.0[2]]);
+    check_eq([TEST_DATA.0[0], without_provenance_mut(78), TEST_DATA.0[2]]);
 
     program::exit(200);
 }
@@ -100,7 +100,7 @@ struct SyncTestData([*const u32; 3]);
 unsafe impl Sync for SyncTestData {}
 static TEST_DATA: SyncTestData = unsafe {
     SyncTestData([
-        invalid_mut(0xa0b1a2b3a4b5a6b7_u64 as usize),
+        without_provenance_mut(0xa0b1a2b3a4b5a6b7_u64 as usize),
         addr_of_mut!(SOME_REGULAR_DATA),
         addr_of_mut!(SOME_ZERO_DATA),
     ])

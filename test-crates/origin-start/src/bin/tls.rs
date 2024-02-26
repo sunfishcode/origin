@@ -120,7 +120,7 @@ fn check_eq(data: [*const u32; 3]) {
         assert_eq!(THREAD_LOCAL, data);
 
         // Check `THREAD_LOCAL` using a dynamic address.
-        let mut thread_local_addr: *mut [*const u32; 3] = &mut THREAD_LOCAL;
+        let mut thread_local_addr: *mut [*const u32; 3] = addr_of_mut!(THREAD_LOCAL);
         asm!("# {}", inout(reg) thread_local_addr, options(pure, nomem, nostack, preserves_flags));
         assert_eq!(*thread_local_addr, data);
     }

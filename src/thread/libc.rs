@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use core::ffi::c_void;
 use core::mem::{size_of, transmute, zeroed};
-use core::ptr::{from_exposed_addr_mut, without_provenance_mut, null_mut, NonNull};
+use core::ptr::{from_exposed_addr_mut, null_mut, without_provenance_mut, NonNull};
 use core::slice;
 use rustix::io;
 

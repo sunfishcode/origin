@@ -3,6 +3,9 @@
 use core::arch::asm;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
+use linux_raw_sys::elf::Elf_Dyn;
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "origin-signal")]
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
@@ -40,6 +43,29 @@ pub(super) unsafe extern "C" fn _start() -> ! {
         entry = sym super::program::entry,
         options(noreturn),
     )
+}
+
+/// Compute the dynamic address of `_DYNAMIC`.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
+    panic!("acting as dynamic linker not yet supported on 32-bit x86");
+    // FIXME somehow get LLVM to accept `add dword ptr [esp], _DYNAMIC-1b` or
+    // some other way to emit an `R_386_PC32` relocation against `_DYNAMIC`.
+    /*
+    let addr;
+    unsafe {
+        asm!(
+            ".weak _DYNAMIC",
+            ".hidden _DYNAMIC",
+            "call 1f",
+            "1: add dword ptr [esp], _DYNAMIC-1b",
+            "pop eax",
+            out("eax") addr,
+        );
+    }
+    addr
+    */
 }
 
 /// Perform a single load operation, outside the Rust memory model.

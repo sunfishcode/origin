@@ -99,18 +99,18 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     // Compute the static address of `_start`.
     let static_start = compute_static_start();
 
-    if auxv_base != 0 && static_start == auxv_entry {
-        // This is case 3) as AT_BASE only exists if a dynamic linker and
-        // `AT_ENTRY` only points to the entry function if we are the main
-        // executable. In addition because `compute_static_start()`` returns
-        // the same value as `AT_ENTRY`, we know for sure that we are already
-        // relocated by the dynamic linker.
+    if static_start == auxv_entry {
+        // This is case 1) or case 3). If AT_BASE doesn't exist, then we are
+        // already loaded at our static address despite the lack of any dynamic
+        // linker. As such it would be case 1). If AT_BASE exists, we have
+        // already been relocated by the dynamic linker, which is case 3).
+        // In either case there is no need to do any relocations.
         return;
     }
 
     let offset = if auxv_base == 0 {
-        // This is case 1) or 2) as without dynamic linker `AT_BASE` doesn't
-        // exist.
+        // This is case 2) as without dynamic linker `AT_BASE` doesn't exist
+        // and we have already excluded case 1) above.
         auxv_entry.wrapping_sub(static_start)
     } else {
         // This is case 4) as `AT_BASE` indicates that there is a dynamic
@@ -118,15 +118,6 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         // `AT_BASE` contains the relocation offset of the dynamic linker.
         auxv_base
     };
-
-    // If we're loaded at our static address, or if we were run by a dynamic
-    // linker that has already performed the relocations, then there's nothing
-    // to do.
-    if offset == 0 {
-        // This is case 1) as we are already loaded at our static address
-        // despite the lack of any dynamic linker.
-        return;
-    }
 
     // This is case 2) or 4). We need to do all R_RELATIVE relocations.
     // There should be no other kind of relocation because we are either a

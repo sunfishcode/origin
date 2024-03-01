@@ -121,6 +121,12 @@ fini-array = []
 # needed to support statically-linked PIE executables.
 experimental-relocate = ["rustix/mm", "rustix/runtime"]
 
+# Enable unstable support for storing C errno values in the TLS header. This
+# will likely be removed in the future and only exists to make it easier to
+# possibly integrate a dynamic linker written in C in the near future before
+# until a dynamic linker is written in Rust.
+unstable-errno = ["thread"]
+
 [package.metadata.docs.rs]
 features = ["origin-thread", "origin-signal", "origin-start"]
 rustdoc-args = ["--cfg", "doc_cfg"]

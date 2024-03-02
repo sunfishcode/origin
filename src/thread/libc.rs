@@ -1,7 +1,7 @@
 //! Thread startup and shutdown.
 
 use alloc::boxed::Box;
-use core::ffi::c_void;
+use core::ffi::{c_int, c_void};
 use core::mem::{size_of, transmute, zeroed};
 use core::ptr::{from_exposed_addr_mut, null_mut, without_provenance_mut, NonNull};
 use core::slice;
@@ -16,6 +16,7 @@ extern "C" {
         obj: *mut c_void,
         _dso_symbol: *mut c_void,
     ) -> libc::c_int;
+    fn __errno_location() -> *mut c_int;
     fn __tls_get_addr(p: &[usize; 2]) -> *mut c_void;
 
     static __dso_handle: *const c_void;
@@ -201,6 +202,15 @@ pub fn current_id() -> ThreadId {
 pub unsafe fn set_current_id_after_a_fork(tid: ThreadId) {
     // Nothing to do here; libc does the update automatically.
     let _ = tid;
+}
+
+/// Return the address of the thread-local `errno` state.
+///
+/// This is equivalent to `__errno_location()` in glibc and musl.
+#[cfg(feature = "unstable-errno")]
+#[inline]
+pub fn errno_location() -> *mut i32 {
+    unsafe { __errno_location() }
 }
 
 /// Return the TLS address for the given `offset` for the current thread.

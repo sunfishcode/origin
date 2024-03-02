@@ -12,6 +12,8 @@ use crate::arch::{
 };
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
+#[cfg(feature = "unstable-errno")]
+use core::cell::Cell;
 use core::cmp::max;
 use core::ffi::c_void;
 use core::mem::{align_of, size_of};
@@ -76,6 +78,8 @@ impl Thread {
 /// This is not `repr(C)` and not ABI-exposed.
 struct ThreadData {
     thread_id: AtomicI32,
+    #[cfg(feature = "unstable-errno")]
+    errno_val: Cell<i32>,
     detached: AtomicU8,
     stack_addr: *mut c_void,
     stack_size: usize,
@@ -104,6 +108,8 @@ impl ThreadData {
     ) -> Self {
         Self {
             thread_id: AtomicI32::new(ThreadId::as_raw(tid)),
+            #[cfg(feature = "unstable-errno")]
+            errno_val: Cell::new(0),
             detached: AtomicU8::new(INITIAL),
             stack_addr,
             stack_size,
@@ -1004,6 +1010,15 @@ pub unsafe fn set_current_id_after_a_fork(tid: ThreadId) {
         .as_ref()
         .thread_id
         .store(tid.as_raw_nonzero().get(), SeqCst);
+}
+
+/// Return the address of the thread-local `errno` state.
+///
+/// This is equivalent to `__errno_location()` in glibc and musl.
+#[cfg(feature = "unstable-errno")]
+#[inline]
+pub fn errno_location() -> *mut i32 {
+    unsafe { core::ptr::addr_of_mut!((*current_metadata()).thread.errno_val).cast::<i32>() }
 }
 
 /// Return the TLS address for the given `offset` for the current thread.

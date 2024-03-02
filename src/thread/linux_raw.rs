@@ -84,7 +84,9 @@ struct ThreadData {
     stack_addr: *mut c_void,
     stack_size: usize,
     guard_size: usize,
-    map_size: usize,
+    stack_map_size: usize,
+    tls_addr: *mut u8,
+    tls_map_size: usize,
     return_value: AtomicPtr<c_void>,
 
     // Support a few dtors before using dynamic allocation.
@@ -99,7 +101,12 @@ const ABANDONED: u8 = 2;
 
 impl ThreadData {
     #[inline]
-    fn new(stack_addr: *mut c_void, stack_size: usize, guard_size: usize, map_size: usize) -> Self {
+    fn new(
+        stack_addr: *mut c_void,
+        stack_size: usize,
+        guard_size: usize,
+        stack_map_size: usize,
+    ) -> Self {
         Self {
             thread_id: AtomicI32::new(0),
             #[cfg(feature = "unstable-errno")]
@@ -108,7 +115,9 @@ impl ThreadData {
             stack_addr,
             stack_size,
             guard_size,
-            map_size,
+            stack_map_size,
+            tls_addr: null_mut(),
+            tls_map_size: 0,
             return_value: AtomicPtr::new(null_mut()),
             #[cfg(feature = "alloc")]
             dtors: smallvec::SmallVec::new(),
@@ -336,8 +345,20 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
     let canary = random_ptr.read_unaligned();
     __stack_chk_guard = canary;
 
-    let map_size = 0;
+    let (newtls, metadata) = allocate_tls(
+        canary,
+        ThreadData::new(stack_least.cast(), stack_size, guard_size, 0),
+    );
 
+    let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
+    let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
+    *thread_id_ptr = tid.as_raw_nonzero().get();
+
+    // Point the platform thread-pointer register at the new thread metadata.
+    set_thread_pointer(newtls);
+}
+
+unsafe fn allocate_tls(canary: usize, thread: ThreadData) -> (*mut c_void, *mut Metadata) {
     // Compute relevant alignments.
     let tls_data_align = STARTUP_TLS_INFO.align;
     let header_align = align_of::<Metadata>();
@@ -400,8 +421,11 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
             _pad: Default::default(),
             thread_pointee: [],
         },
-        thread: ThreadData::new(stack_least.cast(), stack_size, guard_size, map_size),
+        thread,
     });
+
+    (*metadata).thread.tls_addr = new;
+    (*metadata).thread.tls_map_size = alloc_size;
 
     // Initialize the TLS data with explicit initializer data.
     slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
@@ -411,19 +435,12 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
         ),
     );
 
-    // Initialize the TLS data beyond `file_size` which is zero-filled.
-    slice::from_raw_parts_mut(
-        tls_data.add(STARTUP_TLS_INFO.file_size),
-        STARTUP_TLS_INFO.mem_size - STARTUP_TLS_INFO.file_size,
-    )
-    .fill(0);
+    // The TLS region includes additional data beyond `file_size` which is
+    // expected to be zero-initialized, but we don't need to do anything
+    // here since we allocated the memory with `mmap_anonymous` so it's
+    // already zeroed.
 
-    let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
-    let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
-    *thread_id_ptr = tid.as_raw_nonzero().get();
-
-    // Point the platform thread-pointer register at the new thread metadata.
-    set_thread_pointer(newtls);
+    (newtls, metadata)
 }
 
 /// Creates a new thread.
@@ -442,19 +459,10 @@ pub unsafe fn create(
     stack_size: usize,
     guard_size: usize,
 ) -> io::Result<Thread> {
-    // SAFETY: `STARTUP_TLS_INFO` is initialized at program startup before
-    // we come here creating new threads.
-    let (startup_tls_align, startup_tls_mem_size) =
-        unsafe { (STARTUP_TLS_INFO.align, STARTUP_TLS_INFO.mem_size) };
-
     // Compute relevant alignments.
-    let tls_data_align = startup_tls_align;
     let page_align = page_size();
     let stack_align = 16;
-    let header_align = align_of::<Metadata>();
-    let metadata_align = max(tls_data_align, header_align);
-    let stack_metadata_align = max(stack_align, metadata_align);
-    debug_assert!(stack_metadata_align <= page_align);
+    debug_assert!(stack_align <= page_align);
 
     // Compute the `mmap` size.
     let mut map_size = 0;
@@ -463,36 +471,9 @@ pub unsafe fn create(
 
     let stack_bottom = map_size;
 
-    map_size += round_up(stack_size, stack_metadata_align);
+    map_size += round_up(stack_size, stack_align);
 
     let stack_top = map_size;
-
-    // Variant II: TLS data goes below the TCB.
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    let tls_data_bottom = map_size;
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        map_size += round_up(startup_tls_mem_size, tls_data_align);
-    }
-
-    let header = map_size;
-
-    map_size += size_of::<Metadata>();
-
-    // Variant I: TLS data goes above the TCB.
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    {
-        map_size = round_up(map_size, tls_data_align);
-    }
-
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    let tls_data_bottom = map_size;
-
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    {
-        map_size += round_up(startup_tls_mem_size, tls_data_align);
-    }
 
     // Now we'll `mmap` the memory, initialize it, and create the OS thread.
     unsafe {
@@ -505,8 +486,8 @@ pub unsafe fn create(
         )?
         .cast::<u8>();
 
-        // Make the thread metadata and stack readable and writeable, leaving
-        // the guard region inaccessible.
+        // Make the stack readable and writeable, leaving the guard region
+        // inaccessible.
         mprotect(
             map.add(stack_bottom).cast(),
             map_size - stack_bottom,
@@ -517,32 +498,12 @@ pub unsafe fn create(
         let stack = map.add(stack_top);
         let stack_least = map.add(stack_bottom);
 
-        let tls_data = map.add(tls_data_bottom);
-        let metadata: *mut Metadata = map.add(header).cast();
-        let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
-
         // Copy the current thread's canary to the new thread.
         let canary = (*current_metadata()).abi.canary;
 
-        // Initialize the thread metadata.
-        metadata.write(Metadata {
-            abi: Abi {
-                canary,
-                dtv: null(),
-                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                this: newtls,
-                _pad: Default::default(),
-                thread_pointee: [],
-            },
-            thread: ThreadData::new(stack_least.cast(), stack_size, guard_size, map_size),
-        });
-
-        // Initialize the TLS data with explicit initializer data.
-        slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
-            slice::from_raw_parts(
-                STARTUP_TLS_INFO.addr.cast::<u8>(),
-                STARTUP_TLS_INFO.file_size,
-            ),
+        let (newtls, metadata) = allocate_tls(
+            canary,
+            ThreadData::new(stack_least.cast(), stack_size, guard_size, map_size),
         );
 
         // Allocate space for the thread arguments on the child's stack.
@@ -553,11 +514,6 @@ pub unsafe fn create(
 
         // Store the thread arguments on the child's stack.
         copy_nonoverlapping(args.as_ptr(), stack, args.len());
-
-        // The TLS region includes additional data beyond `file_size` which is
-        // expected to be zero-initialized, but we don't need to do anything
-        // here since we allocated the memory with `mmap_anonymous` so it's
-        // already zeroed.
 
         // Create the OS thread. In Linux, this is a process that shares much
         // of its state with the current process. We also pass additional
@@ -709,9 +665,11 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
         // all the fields that we'll need before freeing it.
         #[cfg(feature = "log")]
         let current_thread_id = current.0.as_ref().thread_id.load(SeqCst);
-        let current_map_size = current.0.as_ref().map_size;
+        let current_stack_map_size = current.0.as_ref().stack_map_size;
         let current_stack_addr = current.0.as_ref().stack_addr;
         let current_guard_size = current.0.as_ref().guard_size;
+        let current_tls_addr = current.0.as_ref().tls_addr;
+        let current_tls_map_size = current.0.as_ref().tls_map_size;
 
         #[cfg(feature = "log")]
         log::trace!("Thread[{:?}] exiting as detached", current_thread_id);
@@ -720,13 +678,16 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
         // Deallocate the `ThreadData`.
         drop_in_place(current.0.as_ptr());
 
-        // Free the thread's `mmap` region, if we allocated it.
-        let map_size = current_map_size;
-        if map_size != 0 {
-            // Null out the tid address so that the kernel doesn't write to
-            // memory that we've freed trying to clear our tid when we exit.
-            let _ = set_tid_address(null_mut());
+        // Null out the tid address so that the kernel doesn't write to
+        // memory that we've freed trying to clear our tid when we exit.
+        let _ = set_tid_address(null_mut());
 
+        // Free the thread's TLS data.
+        rustix::mm::munmap(current_tls_addr.cast(), current_tls_map_size).unwrap();
+
+        // Free the thread's stack, if we allocated it.
+        let map_size = current_stack_map_size;
+        if current_stack_map_size != 0 {
             // `munmap` the memory, which also frees the stack we're currently
             // on, and do an `exit` carefully without touching the stack.
             let map = current_stack_addr.cast::<u8>().sub(current_guard_size);
@@ -907,17 +868,22 @@ unsafe fn free_memory(thread: Thread) {
 
     // The thread was detached. Prepare to free the memory. First read out
     // all the fields that we'll need before freeing it.
-    let map_size = thread.0.as_ref().map_size;
+    let stack_map_size = thread.0.as_ref().stack_map_size;
     let stack_addr = thread.0.as_ref().stack_addr;
     let guard_size = thread.0.as_ref().guard_size;
+    let tls_addr = thread.0.as_ref().tls_addr;
+    let tls_map_size = thread.0.as_ref().tls_map_size;
 
     // Deallocate the `ThreadData`.
     drop_in_place(thread.0.as_ptr());
 
-    // Free the thread's `mmap` region, if we allocated it.
-    if map_size != 0 {
-        let map = stack_addr.cast::<u8>().sub(guard_size);
-        munmap(map.cast(), map_size).unwrap();
+    // Free the thread's TLS data.
+    munmap(tls_addr.cast(), tls_map_size).unwrap();
+
+    // Free the thread's stack, if we allocated it.
+    if stack_map_size != 0 {
+        let stack_map = stack_addr.cast::<u8>().sub(guard_size);
+        munmap(stack_map.cast(), stack_map_size).unwrap();
     }
 }
 

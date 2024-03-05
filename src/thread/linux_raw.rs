@@ -1008,7 +1008,11 @@ pub fn errno_location() -> *mut i32 {
 /// Return the TLS address for the given `offset` for the current thread.
 #[inline]
 #[must_use]
-pub fn current_tls_addr(offset: usize) -> *mut c_void {
+pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
+    // Offset 0 is the generation field, and we don't support dynamic linking,
+    // so we should only ever see 1 here.
+    assert_eq!(module, 1);
+
     // Platforms where TLS data goes after the ABI-exposed fields.
     #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
     {

@@ -213,12 +213,12 @@ pub fn errno_location() -> *mut i32 {
     unsafe { __errno_location() }
 }
 
-/// Return the TLS address for the given `offset` for the current thread.
+/// Return the TLS address for the given `module` and `offset` for the current
+/// thread.
 #[inline]
 #[must_use]
-pub fn current_tls_addr(offset: usize) -> *mut c_void {
-    let p = [1, offset];
-    unsafe { __tls_get_addr(&p) }
+pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
+    unsafe { __tls_get_addr(&[module, offset]) }
 }
 
 /// Return the current thread's stack address (lowest address), size, and guard

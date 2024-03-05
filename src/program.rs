@@ -90,6 +90,13 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // Compute `argc`, `argv`, and `envp`.
     let (argc, argv, envp) = compute_args(mem);
 
+    // Before doing anything else, perform dynamic relocations.
+    #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+    #[cfg(relocation_model = "pic")]
+    {
+        crate::relocate::relocate(envp);
+    }
+
     // Initialize program state before running any user code.
     init_runtime(mem, envp);
 
@@ -187,8 +194,7 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     (argc, argv, envp)
 }
 
-/// Perform dynamic relocation (if enabled), and initialize `origin` and
-/// `rustix` runtime state.
+/// Initialize `origin` and `rustix` runtime state.
 ///
 /// # Safety
 ///
@@ -197,11 +203,6 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
 #[cfg(feature = "origin-program")]
 #[allow(unused_variables)]
 unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
-    // Before doing anything else, perform dynamic relocations.
-    #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
-    #[cfg(relocation_model = "pic")]
-    crate::relocate::relocate(envp);
-
     // Explicitly initialize `rustix`. This is needed for things like
     // `page_size()` to work.
     #[cfg(feature = "param")]

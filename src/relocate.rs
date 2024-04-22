@@ -30,7 +30,7 @@ use crate::arch::{
     dynamic_table_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
 };
 use core::ffi::c_void;
-use core::ptr::{from_exposed_addr, null, null_mut};
+use core::ptr::{with_exposed_provenance, null, null_mut};
 use linux_raw_sys::elf::*;
 use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
 
@@ -148,14 +148,14 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
 
         match *d_tag {
             // We found a rela table. As above, model this as
-            // `from_exposed_addr`.
-            DT_RELA => rela_ptr = from_exposed_addr(d_un.d_ptr.wrapping_add(offset)),
+            // `with_exposed_provenance`.
+            DT_RELA => rela_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
             DT_RELASZ => rela_total_size = d_un.d_val as usize,
             DT_RELAENT => rela_entry_size = d_un.d_val as usize,
 
             // We found a rel table. As above, model this as
-            // `from_exposed_addr`.
-            DT_REL => rel_ptr = from_exposed_addr(d_un.d_ptr.wrapping_add(offset)),
+            // `with_exposed_provenance`.
+            DT_REL => rel_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
             DT_RELSZ => rel_total_size = d_un.d_val as usize,
             DT_RELENT => rel_entry_size = d_un.d_val as usize,
 
@@ -245,7 +245,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let mut relro_size = 0;
 
     let phentsize = EHDR.e_phentsize as usize;
-    let mut current_phdr = from_exposed_addr::<Elf_Phdr>(offset + EHDR.e_phoff);
+    let mut current_phdr = with_exposed_provenance::<Elf_Phdr>(offset + EHDR.e_phoff);
     let phdrs_end = current_phdr
         .cast::<u8>()
         .add(EHDR.e_phnum as usize * phentsize)

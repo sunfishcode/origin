@@ -1,8 +1,6 @@
 //! Run the programs in the `test-crates` directory and compare their
 //! outputs with expected outputs.
 
-#![feature(cfg_target_abi)]
-
 mod utils;
 
 fn test_crate(

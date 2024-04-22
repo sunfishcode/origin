@@ -1,8 +1,6 @@
 //! Run the programs in the `example-crates` directory and compare their
 //! outputs with expected outputs.
 
-#![feature(cfg_target_abi)]
-
 mod utils;
 
 use utils::{COMMON_STDERR, NO_ALLOC_STDERR};

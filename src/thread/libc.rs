@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use core::ffi::{c_int, c_void};
 use core::mem::{size_of, transmute, zeroed};
-use core::ptr::{from_exposed_addr_mut, null_mut, without_provenance_mut, NonNull};
+use core::ptr::{with_exposed_provenance_mut, null_mut, without_provenance_mut, NonNull};
 use core::slice;
 use rustix::io;
 
@@ -39,7 +39,7 @@ impl Thread {
     /// `Thread::to_raw`.
     #[inline]
     pub fn from_raw(raw: *mut c_void) -> Self {
-        Self(raw.expose_addr() as libc::pthread_t)
+        Self(raw.expose_provenance() as libc::pthread_t)
     }
 
     /// Convert to `Self` from a raw non-null pointer that was returned from
@@ -56,7 +56,7 @@ impl Thread {
     /// threads.
     #[inline]
     pub fn to_raw(self) -> *mut c_void {
-        from_exposed_addr_mut(self.0 as usize)
+        with_exposed_provenance_mut(self.0 as usize)
     }
 
     /// Convert to a raw non-null pointer from a `Self`.

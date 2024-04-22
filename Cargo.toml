@@ -27,7 +27,7 @@ rustix-futex-sync = { version = "0.2.1", optional = true }
 # before `origin_main` is called.
 
 # Enable `env_logger`; eg. recognizing `RUST_LOG=trace`. This requires `std`.
-env_logger = { version = "0.10.0", optional = true, default-features = false }
+env_logger = { version = "0.11.0", optional = true, default-features = false }
 
 # Enable `atomic-dbg`'s simple logger. This doesn't require `std`.
 atomic-dbg = { version = "0.1", default-features = false, optional = true }

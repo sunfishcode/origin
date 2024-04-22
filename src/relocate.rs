@@ -30,7 +30,7 @@ use crate::arch::{
     dynamic_table_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
 };
 use core::ffi::c_void;
-use core::ptr::{with_exposed_provenance, null, null_mut};
+use core::ptr::{null, null_mut, with_exposed_provenance};
 use linux_raw_sys::elf::*;
 use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
 

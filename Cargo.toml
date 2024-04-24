@@ -20,6 +20,7 @@ bitflags = { version = "2.4.0", default-features = false }
 memoffset = { version = "0.9.0", optional = true }
 log = { version = "0.4.14", default-features = false, optional = true }
 rustix-futex-sync = { version = "0.2.1", optional = true }
+smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
 
 # Optional logging backends for use with "origin-program". You can use any
 # external logger, but using these features allows origin to initialize the
@@ -40,7 +41,6 @@ errno = { version = "0.3.3", default-features = false, optional = true }
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
 compiler_builtins = { version = "0.1.101", optional = true }
-smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
 
 [target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
 version = "0.2.0"

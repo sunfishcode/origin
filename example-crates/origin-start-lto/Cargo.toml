@@ -12,7 +12,7 @@ origin = { path = "../..", default-features = false, features = ["origin-thread"
 # Crates to help writing no_std code.
 atomic-dbg = { version = "0.1.8", default-features = false }
 rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
-compiler_builtins = { version = "0.1.101", features = ["mem"] }
+compiler_builtins = { version = "0.1.112", features = ["mem", "no-f16-f128"] }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]

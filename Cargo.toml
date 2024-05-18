@@ -40,7 +40,8 @@ errno = { version = "0.3.3", default-features = false, optional = true }
 # Special dependencies used in rustc-dep-of-std mode.
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
-compiler_builtins = { version = "0.1.101", optional = true }
+# Enable "no-f16-f128" for now, to work around lack of support on some targets.
+compiler_builtins = { version = "0.1.112", features = ["no-f16-f128"], optional = true }
 
 [target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
 version = "0.2.0"

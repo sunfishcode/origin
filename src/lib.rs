@@ -9,7 +9,6 @@
 #![feature(strict_provenance)]
 #![feature(exposed_provenance)]
 #![deny(fuzzy_provenance_casts, lossy_provenance_casts)]
-#![allow(unexpected_cfgs)]
 #![no_std]
 
 #[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]

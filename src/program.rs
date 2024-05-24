@@ -248,7 +248,7 @@ static mut DTORS: Dtors = Dtors(smallvec::SmallVec::new_const());
 /// This arranges for `func` to be called, and passed `obj`, when the program
 /// exits.
 #[cfg(feature = "alloc")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     #[cfg(feature = "origin-program")]
     {

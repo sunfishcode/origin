@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
 #![cfg_attr(debug_assertions, allow(internal_features))]
-#![cfg_attr(doc_cfg, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![feature(asm_const)]
 #![feature(naked_functions)]
 #![cfg_attr(debug_assertions, feature(link_llvm_intrinsics))]
@@ -42,12 +42,12 @@ mod relocate;
 
 pub mod program;
 #[cfg(feature = "signal")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "signal")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
 #[cfg_attr(feature = "origin-signal", path = "signal/linux_raw.rs")]
 #[cfg_attr(not(feature = "origin-signal"), path = "signal/libc.rs")]
 pub mod signal;
 #[cfg(feature = "thread")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "thread")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "thread")))]
 #[cfg_attr(feature = "origin-thread", path = "thread/linux_raw.rs")]
 #[cfg_attr(not(feature = "origin-thread"), path = "thread/libc.rs")]
 pub mod thread;

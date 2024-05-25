@@ -3,7 +3,7 @@
 use core::arch::asm;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
-use linux_raw_sys::elf::Elf_Dyn;
+use linux_raw_sys::elf::{Elf_Dyn, Elf_Ehdr};
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
@@ -49,23 +49,44 @@ pub(super) unsafe extern "C" fn _start() -> ! {
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
-    panic!("acting as dynamic linker not yet supported on 32-bit x86");
-    // FIXME somehow get LLVM to accept `add dword ptr [esp], _DYNAMIC-1b` or
-    // some other way to emit an `R_386_PC32` relocation against `_DYNAMIC`.
-    /*
     let addr;
     unsafe {
         asm!(
             ".weak _DYNAMIC",
             ".hidden _DYNAMIC",
-            "call 1f",
-            "1: add dword ptr [esp], _DYNAMIC-1b",
-            "pop eax",
-            out("eax") addr,
-        );
+            "call 0f",
+            ".cfi_adjust_cfa_offset 4",
+            "0:",
+            "pop {0}",
+            ".cfi_adjust_cfa_offset -4",
+            "1:",
+            "add {0}, offset _GLOBAL_OFFSET_TABLE_+(1b-0b)",
+            "lea {0}, [{0} + _DYNAMIC@GOTOFF]",
+            out(reg) addr
+        )
     }
     addr
-    */
+}
+
+/// Compute the dynamic address of `__ehdr_start`.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+pub(super) fn ehdr_addr() -> *const Elf_Ehdr {
+    let addr;
+    unsafe {
+        asm!(
+            "call 0f",
+            ".cfi_adjust_cfa_offset 4",
+            "0:",
+            "pop {0}",
+            ".cfi_adjust_cfa_offset -4",
+            "1:",
+            "add {0}, offset _GLOBAL_OFFSET_TABLE_+(1b-0b)",
+            "lea {0}, [{0} + __ehdr_start@GOTOFF]",
+            out(reg) addr
+        )
+    }
+    addr
 }
 
 /// Perform a single load operation, outside the Rust memory model.

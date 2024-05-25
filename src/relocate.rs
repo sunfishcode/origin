@@ -27,7 +27,7 @@
 #![allow(clippy::cmp_null)]
 
 use crate::arch::{
-    dynamic_table_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
+    dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
 };
 use core::ffi::c_void;
 use core::ptr::{null, null_mut, with_exposed_provenance};
@@ -81,12 +81,12 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
 
     // There are four cases to consider here:
     //
-    // 1. Static executable
+    // 1. Static executable.
     //    This is the trivial case. No relocations necessary.
-    // 2. Static pie executable
+    // 2. Static pie executable.
     //    We need to relocate ourself. `AT_PHDR` points to our own program
     //    headers and `AT_ENTRY` to our own entry point.
-    // 3. Dynamic pie executable with external dynamic linker
+    // 3. Dynamic pie executable with external dynamic linker.
     //    We don't need to relocate ourself as the dynamic linker has already
     //    done this. `AT_PHDR` points to our own program headers and `AT_ENTRY`
     //    to our own entry point. `AT_BASE` contains the relocation offset of
@@ -96,19 +96,20 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     //    program headers and `AT_ENTRY` doesn't point to our own entry point.
     //    `AT_BASE` contains our own relocation offset.
 
-    // Compute the static address of `_start`.
-    let static_start = compute_static_start();
-
-    if static_start == auxv_entry {
-        // This is case 1) or case 3). If AT_BASE doesn't exist, then we are
+    if load_static_start() == auxv_entry {
+        // This is case 1) or case 3). If `AT_BASE` doesn't exist, then we are
         // already loaded at our static address despite the lack of any dynamic
-        // linker. As such it would be case 1). If AT_BASE exists, we have
+        // linker. As such it would be case 1). If `AT_BASE` does exist, we have
         // already been relocated by the dynamic linker, which is case 3).
         // In either case there is no need to do any relocations.
         return;
     }
 
     let offset = if auxv_base == 0 {
+        // Obtain the static address of `_start`, which is recorded in the
+        // entry field of the ELF header.
+        let static_start = (*ehdr_addr()).e_entry;
+
         // This is case 2) as without dynamic linker `AT_BASE` doesn't exist
         // and we have already excluded case 1) above.
         auxv_entry.wrapping_sub(static_start)
@@ -119,7 +120,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         auxv_base
     };
 
-    // This is case 2) or 4). We need to do all R_RELATIVE relocations.
+    // This is case 2) or 4). We need to do all `R_RELATIVE` relocations.
     // There should be no other kind of relocation because we are either a
     // static PIE binary or a dynamic linker compiled with `-Bsymbolic`.
 
@@ -228,7 +229,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         // entry point when AT_BASE is not zero and thus a dynamic linker is in
         // use. In this case the assertion would fail.
         if auxv_base == 0 {
-            assert_eq!(compute_static_start(), auxv_entry);
+            assert_eq!(load_static_start(), auxv_entry);
         }
     }
 
@@ -288,21 +289,24 @@ unsafe fn compute_auxp(envp: *mut *mut u8) -> *const Elf_auxv_t {
     auxp.add(1).cast()
 }
 
-/// Compute the static address of `_start`.
+/// Load the address of `_start` from static memory.
+///
+/// This function contains a static variable initialized with the address of
+/// the `_start` function. This requires an `R_RELATIVE` relocation, because
+/// it requires an absolute address exist in memory, rather than being able
+/// to use PC-relative addressing. This allows us to tell whether relocation
+/// has already been done or whether we need to do it.
 ///
 /// This returns a `usize` because we don't dereference the address; we just
 /// use it for address computation.
-fn compute_static_start() -> usize {
-    // This relies on the sneaky fact that we initialize a static variable with
-    // the address of `_start`, and if we haven't performed relocations yet,
-    // we'll be able to see the static address. Also, the program *just*
-    // started so there are no other threads yet, so loading from static memory
-    // without synchronization is fine. But we still use `asm` to do everything
-    // we can to protect this code because the optimizer won't have any idea
-    // what we're up to.
+fn load_static_start() -> usize {
+    // Initialize a static variable with the address of `_start`.
     struct StaticStart(*const c_void);
     unsafe impl Sync for StaticStart {}
     static STATIC_START: StaticStart = StaticStart(crate::arch::_start as *const c_void);
+
+    // Use `relocation_load` to do the load because the optimizer won't have
+    // any idea what we're up to.
     let static_start_addr: *const *const c_void = &STATIC_START.0;
     unsafe { relocation_load(static_start_addr.addr()) }
 }

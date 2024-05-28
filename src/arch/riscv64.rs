@@ -7,7 +7,7 @@
 use core::arch::asm;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
-use linux_raw_sys::elf::Elf_Dyn;
+use linux_raw_sys::elf::{Elf_Dyn, Elf_Ehdr};
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
@@ -52,10 +52,23 @@ pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
         asm!(
             ".weak _DYNAMIC",
             ".hidden _DYNAMIC",
-            "lla a0, _DYNAMIC",
-            out("a0") addr,
+            "lla {}, _DYNAMIC",
+            out(reg) addr
         );
     }
+    addr
+}
+
+/// Compute the dynamic address of `__ehdr_start`.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+pub(super) fn ehdr_addr() -> *const Elf_Ehdr {
+    let addr: *const Elf_Ehdr;
+    unsafe {
+        asm!(
+            "lla {}, __ehdr_start",
+            out(reg) addr)
+    };
     addr
 }
 

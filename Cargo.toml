@@ -130,4 +130,3 @@ unstable-errno = ["thread"]
 
 [package.metadata.docs.rs]
 features = ["origin-thread", "origin-signal", "origin-start"]
-rustdoc-args = ["--cfg", "doc_cfg"]

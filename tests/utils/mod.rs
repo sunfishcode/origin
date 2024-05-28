@@ -11,8 +11,6 @@ pub fn arch() -> String {
     let arch = "i686";
     #[cfg(target_arch = "arm")]
     let arch = "armv5te";
-    #[cfg(target_env = "gnueabi")]
-    let env = "gnueabi";
     #[cfg(all(target_env = "gnu", target_abi = "eabi"))]
     let env = "gnueabi";
     #[cfg(all(target_env = "gnu", not(target_abi = "eabi")))]

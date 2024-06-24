@@ -99,15 +99,9 @@ const ABANDONED: u8 = 2;
 
 impl ThreadData {
     #[inline]
-    fn new(
-        tid: Option<ThreadId>,
-        stack_addr: *mut c_void,
-        stack_size: usize,
-        guard_size: usize,
-        map_size: usize,
-    ) -> Self {
+    fn new(stack_addr: *mut c_void, stack_size: usize, guard_size: usize, map_size: usize) -> Self {
         Self {
-            thread_id: AtomicI32::new(ThreadId::as_raw(tid)),
+            thread_id: AtomicI32::new(0),
             #[cfg(feature = "unstable-errno")]
             errno_val: Cell::new(0),
             detached: AtomicU8::new(INITIAL),
@@ -336,6 +330,12 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
     let stack_least = stack_base.cast::<u8>().sub(stack_map_size);
     let stack_size = stack_least.offset_from(mem.cast::<u8>()) as usize;
     let guard_size = page_size();
+
+    // Initialize the canary value from the OS-provided random bytes.
+    let random_ptr = rustix::runtime::random().cast::<usize>();
+    let canary = random_ptr.read_unaligned();
+    __stack_chk_guard = canary;
+
     let map_size = 0;
 
     // Compute relevant alignments.
@@ -390,14 +390,6 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
     let metadata: *mut Metadata = new.add(header).cast();
     let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
 
-    let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
-    let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
-
-    // Initialize the canary value from the OS-provided random bytes.
-    let random_ptr = rustix::runtime::random().cast::<usize>();
-    let canary = random_ptr.read_unaligned();
-    __stack_chk_guard = canary;
-
     // Initialize the thread metadata.
     metadata.write(Metadata {
         abi: Abi {
@@ -408,13 +400,7 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
             _pad: Default::default(),
             thread_pointee: [],
         },
-        thread: ThreadData::new(
-            Some(tid),
-            stack_least.cast(),
-            stack_size,
-            guard_size,
-            map_size,
-        ),
+        thread: ThreadData::new(stack_least.cast(), stack_size, guard_size, map_size),
     });
 
     // Initialize the TLS data with explicit initializer data.
@@ -431,6 +417,10 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
         STARTUP_TLS_INFO.mem_size - STARTUP_TLS_INFO.file_size,
     )
     .fill(0);
+
+    let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
+    let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
+    *thread_id_ptr = tid.as_raw_nonzero().get();
 
     // Point the platform thread-pointer register at the new thread metadata.
     set_thread_pointer(newtls);
@@ -544,13 +534,7 @@ pub unsafe fn create(
                 _pad: Default::default(),
                 thread_pointee: [],
             },
-            thread: ThreadData::new(
-                None, // the real tid will be written by `clone`.
-                stack_least.cast(),
-                stack_size,
-                guard_size,
-                map_size,
-            ),
+            thread: ThreadData::new(stack_least.cast(), stack_size, guard_size, map_size),
         });
 
         // Initialize the TLS data with explicit initializer data.

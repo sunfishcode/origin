@@ -388,6 +388,32 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
 
     let tls_data = new.add(tls_data_bottom);
     let metadata: *mut Metadata = new.add(header).cast();
+
+    let (newtls, thread_id_ptr) = initialize_tls(
+        tls_data,
+        metadata,
+        canary,
+        stack_least,
+        stack_size,
+        guard_size,
+        map_size,
+    );
+    let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
+    *thread_id_ptr = tid.as_raw_nonzero().get();
+
+    // Point the platform thread-pointer register at the new thread metadata.
+    set_thread_pointer(newtls);
+}
+
+unsafe fn initialize_tls(
+    tls_data: *mut u8,
+    metadata: *mut Metadata,
+    canary: usize,
+    stack_least: *mut u8,
+    stack_size: usize,
+    guard_size: usize,
+    map_size: usize,
+) -> (*mut c_void, *mut i32) {
     let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
 
     // Initialize the thread metadata.
@@ -419,11 +445,8 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
     .fill(0);
 
     let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
-    let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
-    *thread_id_ptr = tid.as_raw_nonzero().get();
 
-    // Point the platform thread-pointer register at the new thread metadata.
-    set_thread_pointer(newtls);
+    (newtls, thread_id_ptr)
 }
 
 /// Creates a new thread.
@@ -519,30 +542,18 @@ pub unsafe fn create(
 
         let tls_data = map.add(tls_data_bottom);
         let metadata: *mut Metadata = map.add(header).cast();
-        let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
 
         // Copy the current thread's canary to the new thread.
         let canary = (*current_metadata()).abi.canary;
 
-        // Initialize the thread metadata.
-        metadata.write(Metadata {
-            abi: Abi {
-                canary,
-                dtv: null(),
-                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-                this: newtls,
-                _pad: Default::default(),
-                thread_pointee: [],
-            },
-            thread: ThreadData::new(stack_least.cast(), stack_size, guard_size, map_size),
-        });
-
-        // Initialize the TLS data with explicit initializer data.
-        slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
-            slice::from_raw_parts(
-                STARTUP_TLS_INFO.addr.cast::<u8>(),
-                STARTUP_TLS_INFO.file_size,
-            ),
+        let (newtls, thread_id_ptr) = initialize_tls(
+            tls_data,
+            metadata,
+            canary,
+            stack_least,
+            stack_size,
+            guard_size,
+            map_size,
         );
 
         // Allocate space for the thread arguments on the child's stack.
@@ -582,7 +593,6 @@ pub unsafe fn create(
             | CloneFlags::CHILD_CLEARTID
             | CloneFlags::CHILD_SETTID
             | CloneFlags::PARENT_SETTID;
-        let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
         let clone_res = clone(
             flags.bits(),
             stack.cast(),

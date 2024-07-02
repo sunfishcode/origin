@@ -336,42 +336,8 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
     let canary = random_ptr.read_unaligned();
     __stack_chk_guard = canary;
 
-    let map_size = 0;
-
-    // Compute relevant alignments.
-    let tls_data_align = STARTUP_TLS_INFO.align;
-    let header_align = align_of::<Metadata>();
-    let metadata_align = max(tls_data_align, header_align);
-
-    // Compute the size to allocate for thread data.
     let mut alloc_size = 0;
-
-    // Variant II: TLS data goes below the TCB.
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    let tls_data_bottom = alloc_size;
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        alloc_size += round_up(STARTUP_TLS_INFO.mem_size, metadata_align);
-    }
-
-    let header = alloc_size;
-
-    alloc_size += size_of::<Metadata>();
-
-    // Variant I: TLS data goes above the TCB.
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    {
-        alloc_size = round_up(alloc_size, tls_data_align);
-    }
-
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    let tls_data_bottom = alloc_size;
-
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    {
-        alloc_size += round_up(STARTUP_TLS_INFO.mem_size, tls_data_align);
-    }
+    let (tls_data_bottom, header) = calculate_tls_size(&mut alloc_size);
 
     // Allocate the thread data. Use `mmap_anonymous` rather than `alloc` here
     // as the allocator may depend on thread-local data, which is what we're
@@ -384,6 +350,8 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
     )
     .unwrap()
     .cast::<u8>();
+
+    let metadata_align = max(unsafe { STARTUP_TLS_INFO.align }, align_of::<Metadata>());
     debug_assert_eq!(new.addr() % metadata_align, 0);
 
     let tls_data = new.add(tls_data_bottom);
@@ -396,13 +364,57 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
         stack_least,
         stack_size,
         guard_size,
-        map_size,
+        0,
     );
     let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
     *thread_id_ptr = tid.as_raw_nonzero().get();
 
     // Point the platform thread-pointer register at the new thread metadata.
     set_thread_pointer(newtls);
+}
+
+fn calculate_tls_size(map_size: &mut usize) -> (usize, usize) {
+    // SAFETY: `STARTUP_TLS_INFO` is initialized at program startup before
+    // we come here creating new threads.
+    let (startup_tls_align, startup_tls_mem_size) =
+        unsafe { (STARTUP_TLS_INFO.align, STARTUP_TLS_INFO.mem_size) };
+
+    // Compute relevant alignments.
+    let tls_data_align = startup_tls_align;
+    let page_align = page_size();
+    let header_align = align_of::<Metadata>();
+    let metadata_align = max(tls_data_align, header_align);
+    debug_assert!(metadata_align <= page_align);
+
+    *map_size = round_up(*map_size, metadata_align);
+
+    // Variant II: TLS data goes below the TCB.
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    let tls_data_bottom = *map_size;
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        *map_size += round_up(startup_tls_mem_size, tls_data_align);
+    }
+
+    let header = *map_size;
+
+    *map_size += size_of::<Metadata>();
+
+    // Variant I: TLS data goes above the TCB.
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
+    {
+        *map_size = round_up(*map_size, tls_data_align);
+    }
+
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
+    let tls_data_bottom = *map_size;
+
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
+    {
+        *map_size += round_up(startup_tls_mem_size, tls_data_align);
+    }
+    (tls_data_bottom, header)
 }
 
 unsafe fn initialize_tls(
@@ -465,19 +477,9 @@ pub unsafe fn create(
     stack_size: usize,
     guard_size: usize,
 ) -> io::Result<Thread> {
-    // SAFETY: `STARTUP_TLS_INFO` is initialized at program startup before
-    // we come here creating new threads.
-    let (startup_tls_align, startup_tls_mem_size) =
-        unsafe { (STARTUP_TLS_INFO.align, STARTUP_TLS_INFO.mem_size) };
-
     // Compute relevant alignments.
-    let tls_data_align = startup_tls_align;
     let page_align = page_size();
     let stack_align = 16;
-    let header_align = align_of::<Metadata>();
-    let metadata_align = max(tls_data_align, header_align);
-    let stack_metadata_align = max(stack_align, metadata_align);
-    debug_assert!(stack_metadata_align <= page_align);
 
     // Compute the `mmap` size.
     let mut map_size = 0;
@@ -486,36 +488,11 @@ pub unsafe fn create(
 
     let stack_bottom = map_size;
 
-    map_size += round_up(stack_size, stack_metadata_align);
+    map_size += round_up(stack_size, stack_align);
 
     let stack_top = map_size;
 
-    // Variant II: TLS data goes below the TCB.
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    let tls_data_bottom = map_size;
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        map_size += round_up(startup_tls_mem_size, tls_data_align);
-    }
-
-    let header = map_size;
-
-    map_size += size_of::<Metadata>();
-
-    // Variant I: TLS data goes above the TCB.
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    {
-        map_size = round_up(map_size, tls_data_align);
-    }
-
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    let tls_data_bottom = map_size;
-
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
-    {
-        map_size += round_up(startup_tls_mem_size, tls_data_align);
-    }
+    let (tls_data_bottom, header) = calculate_tls_size(&mut map_size);
 
     // Now we'll `mmap` the memory, initialize it, and create the OS thread.
     unsafe {

@@ -39,6 +39,8 @@ mod log;
 #[cfg(relocation_model = "pic")]
 mod relocate;
 
+#[cfg_attr(feature = "origin-program", path = "program/linux_raw.rs")]
+#[cfg_attr(not(feature = "origin-program"), path = "program/libc.rs")]
 pub mod program;
 #[cfg(feature = "signal")]
 #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]

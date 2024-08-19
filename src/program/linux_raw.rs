@@ -31,16 +31,11 @@
 use crate::thread;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(not(feature = "origin-program"))]
-use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
-#[cfg(all(feature = "alloc", feature = "origin-program", feature = "thread"))]
+#[cfg(all(feature = "alloc", feature = "thread"))]
 use rustix_futex_sync::Mutex;
 
-#[cfg(all(
-    feature = "origin-program",
-    not(any(feature = "origin-start", feature = "external-start"))
-))]
+#[cfg(not(any(feature = "origin-start", feature = "external-start")))]
 compile_error!("\"origin-program\" depends on either \"origin-start\" or \"external-start\".");
 
 /// The entrypoint where Rust code is first executed when the program starts.
@@ -48,7 +43,6 @@ compile_error!("\"origin-program\" depends on either \"origin-start\" or \"exter
 /// # Safety
 ///
 /// `mem` must point to the stack as provided by the operating system.
-#[cfg(feature = "origin-program")]
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     // Do some basic precondition checks, to ensure that our assembly code did
     // what we expect it to do. These are debug-only, to keep the release-mode
@@ -177,7 +171,6 @@ pub unsafe fn start(mem: *mut usize) -> ! {
 /// # Safety
 ///
 /// `mem` must point to the stack as provided by the operating system.
-#[cfg(feature = "origin-program")]
 unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     use linux_raw_sys::ctypes::c_uint;
 
@@ -200,7 +193,6 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
 ///
 /// `mem` must point to the stack as provided by the operating system. `envp`
 /// must point to the incoming environment variables.
-#[cfg(feature = "origin-program")]
 #[allow(unused_variables)]
 unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     // Explicitly initialize `rustix`. This is needed for things like
@@ -223,23 +215,23 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 /// `SmallVec` to ensure we can register that many without allocating.
 ///
 /// [POSIX guarantees]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/atexit.html
-#[cfg(all(feature = "alloc", feature = "origin-program", feature = "thread"))]
+#[cfg(all(feature = "alloc", feature = "thread"))]
 static DTORS: Mutex<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>> =
     Mutex::new(smallvec::SmallVec::new_const());
 
 /// A type for `DTORS` in the single-threaded case that we can mark as `Sync`.
-#[cfg(all(feature = "alloc", feature = "origin-program", not(feature = "thread")))]
+#[cfg(all(feature = "alloc", not(feature = "thread")))]
 struct Dtors(smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>);
 
 /// SAFETY: With `feature = "origin-program"`, we can assume that Origin is
 /// responsible for creating all threads in the program, and with
 /// `not(feature = "thread")` mode, Origin can't create any new threads, so we
 /// don't need to synchronize.
-#[cfg(all(feature = "alloc", feature = "origin-program", not(feature = "thread")))]
+#[cfg(all(feature = "alloc", not(feature = "thread")))]
 unsafe impl Sync for Dtors {}
 
 /// The single-threaded version of `DTORS`.
-#[cfg(all(feature = "alloc", feature = "origin-program", not(feature = "thread")))]
+#[cfg(all(feature = "alloc", not(feature = "thread")))]
 static mut DTORS: Dtors = Dtors(smallvec::SmallVec::new_const());
 
 /// Register a function to be called when [`exit`] is called.
@@ -251,52 +243,26 @@ static mut DTORS: Dtors = Dtors(smallvec::SmallVec::new_const());
 #[cfg(feature = "alloc")]
 #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
-    #[cfg(feature = "origin-program")]
-    {
-        #[cfg(feature = "thread")]
-        let mut dtors = DTORS.lock();
-        // SAFETY: See the safety comments on the `unsafe impl Sync for Dtors`.
-        #[cfg(not(feature = "thread"))]
-        let dtors = unsafe { &mut DTORS.0 };
+    #[cfg(feature = "thread")]
+    let mut dtors = DTORS.lock();
+    // SAFETY: See the safety comments on the `unsafe impl Sync for Dtors`.
+    #[cfg(not(feature = "thread"))]
+    let dtors = unsafe { &mut DTORS.0 };
 
-        dtors.push(func);
-    }
-
-    #[cfg(not(feature = "origin-program"))]
-    {
-        use core::ffi::c_void;
-
-        extern "C" {
-            // <https://refspecs.linuxbase.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/baselib---cxa-atexit.html>
-            fn __cxa_atexit(
-                func: unsafe extern "C" fn(*mut c_void),
-                arg: *mut c_void,
-                _dso: *mut c_void,
-            ) -> c_int;
-        }
-
-        // The function to pass to `__cxa_atexit`.
-        unsafe extern "C" fn at_exit_func(arg: *mut c_void) {
-            Box::from_raw(arg.cast::<Box<dyn FnOnce() + Send>>())();
-        }
-
-        let at_exit_arg = Box::into_raw(Box::new(func)).cast::<c_void>();
-        let r = unsafe { __cxa_atexit(at_exit_func, at_exit_arg, null_mut()) };
-        assert_eq!(r, 0);
-    }
+    dtors.push(func);
 }
 
 /// Call all the functions registered with [`at_exit`] or with the
 /// `.fini_array` section, and exit the program.
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
-    #[cfg(all(feature = "alloc", feature = "thread", feature = "origin-program"))]
+    #[cfg(all(feature = "alloc", feature = "thread"))]
     crate::thread::call_dtors(crate::thread::current());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`
     // unlocked while making the call so that functions can add more functions
     // to the end of the list.
-    #[cfg(all(feature = "alloc", feature = "origin-program"))]
+    #[cfg(feature = "alloc")]
     loop {
         #[cfg(feature = "thread")]
         let mut dtors = DTORS.lock();
@@ -314,10 +280,8 @@ pub fn exit(status: c_int) -> ! {
         }
     }
 
-    // Call the `.fini_array` functions, in reverse order. We only do this
-    // in "origin-program" mode because if we're using libc, libc does this
-    // in `exit`.
-    #[cfg(all(feature = "fini-array", feature = "origin-program"))]
+    // Call the `.fini_array` functions, in reverse order.
+    #[cfg(feature = "fini-array")]
     unsafe {
         use core::arch::asm;
         use core::ffi::c_void;
@@ -347,35 +311,17 @@ pub fn exit(status: c_int) -> ! {
         }
     }
 
-    #[cfg(feature = "origin-program")]
-    {
-        // Call `exit_immediately` to exit the program.
-        exit_immediately(status)
-    }
-
-    #[cfg(not(feature = "origin-program"))]
-    unsafe {
-        // Call `libc` to run *its* dtors, and exit the program.
-        libc::exit(status)
-    }
+    // Call `exit_immediately` to exit the program.
+    exit_immediately(status)
 }
 
 /// Exit the program without calling functions registered with [`at_exit`] or
 /// with the `.fini_array` section.
 #[inline]
 pub fn exit_immediately(status: c_int) -> ! {
-    #[cfg(feature = "origin-program")]
-    {
-        #[cfg(feature = "log")]
-        log::trace!("Program exiting with status `{:?}`", status);
+    #[cfg(feature = "log")]
+    log::trace!("Program exiting with status `{:?}`", status);
 
-        // Call `rustix` to exit the program.
-        rustix::runtime::exit_group(status)
-    }
-
-    #[cfg(not(feature = "origin-program"))]
-    unsafe {
-        // Call `libc` to exit the program.
-        libc::_exit(status)
-    }
+    // Call `rustix` to exit the program.
+    rustix::runtime::exit_group(status)
 }

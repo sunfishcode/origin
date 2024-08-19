@@ -22,33 +22,29 @@ extern crate unwinding;
 #[cfg(target_arch = "arm")]
 mod unwind_unimplemented;
 
-#[cfg(any(
-    feature = "origin-thread",
-    feature = "origin-signal",
-    feature = "origin-start"
-))]
+#[cfg(feature = "take-charge")]
 #[cfg_attr(target_arch = "aarch64", path = "arch/aarch64.rs")]
 #[cfg_attr(target_arch = "x86_64", path = "arch/x86_64.rs")]
 #[cfg_attr(target_arch = "x86", path = "arch/x86.rs")]
 #[cfg_attr(target_arch = "riscv64", path = "arch/riscv64.rs")]
 #[cfg_attr(target_arch = "arm", path = "arch/arm.rs")]
 mod arch;
-#[cfg(all(feature = "origin-program", feature = "log"))]
+#[cfg(all(feature = "take-charge", feature = "log"))]
 mod log;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 mod relocate;
 
-#[cfg_attr(feature = "origin-program", path = "program/linux_raw.rs")]
-#[cfg_attr(not(feature = "origin-program"), path = "program/libc.rs")]
+#[cfg_attr(feature = "take-charge", path = "program/linux_raw.rs")]
+#[cfg_attr(not(feature = "take-charge"), path = "program/libc.rs")]
 pub mod program;
 #[cfg(feature = "signal")]
 #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
-#[cfg_attr(feature = "origin-signal", path = "signal/linux_raw.rs")]
-#[cfg_attr(not(feature = "origin-signal"), path = "signal/libc.rs")]
+#[cfg_attr(feature = "take-charge", path = "signal/linux_raw.rs")]
+#[cfg_attr(not(feature = "take-charge"), path = "signal/libc.rs")]
 pub mod signal;
 #[cfg(feature = "thread")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thread")))]
-#[cfg_attr(feature = "origin-thread", path = "thread/linux_raw.rs")]
-#[cfg_attr(not(feature = "origin-thread"), path = "thread/libc.rs")]
+#[cfg_attr(feature = "take-charge", path = "thread/linux_raw.rs")]
+#[cfg_attr(not(feature = "take-charge"), path = "thread/libc.rs")]
 pub mod thread;

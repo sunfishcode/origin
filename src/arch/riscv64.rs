@@ -1,7 +1,7 @@
 //! Architecture-specific assembly code.
 
 #[cfg(any(
-    all(feature = "origin-thread", feature = "thread"),
+    all(feature = "take-charge", feature = "thread"),
     feature = "origin-start"
 ))]
 use core::arch::asm;
@@ -11,7 +11,7 @@ use linux_raw_sys::elf::{Elf_Dyn, Elf_Ehdr};
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
-#[cfg(all(feature = "origin-thread", feature = "thread"))]
+#[cfg(all(feature = "take-charge", feature = "thread"))]
 use {
     core::ffi::c_void,
     linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
@@ -165,7 +165,7 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
 }
 
 /// The required alignment for the stack pointer.
-#[cfg(all(feature = "origin-thread", feature = "thread"))]
+#[cfg(all(feature = "take-charge", feature = "thread"))]
 pub(super) const STACK_ALIGNMENT: usize = 16;
 
 /// A wrapper around the Linux `clone` system call.
@@ -173,7 +173,7 @@ pub(super) const STACK_ALIGNMENT: usize = 16;
 /// This can't be implemented in `rustix` because the child starts executing at
 /// the same point as the parent and we need to use inline asm to have the
 /// child jump to our new-thread entrypoint.
-#[cfg(all(feature = "origin-thread", feature = "thread"))]
+#[cfg(all(feature = "take-charge", feature = "thread"))]
 #[inline]
 pub(super) unsafe fn clone(
     flags: u32,
@@ -215,7 +215,7 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
-#[cfg(all(feature = "origin-thread", feature = "thread"))]
+#[cfg(all(feature = "take-charge", feature = "thread"))]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
     asm!("mv tp, {}", in(reg) ptr);
@@ -223,7 +223,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 }
 
 /// Read the value of the platform thread-pointer register.
-#[cfg(all(feature = "origin-thread", feature = "thread"))]
+#[cfg(all(feature = "take-charge", feature = "thread"))]
 #[inline]
 pub(super) fn thread_pointer() -> *mut c_void {
     let ptr;
@@ -236,12 +236,12 @@ pub(super) fn thread_pointer() -> *mut c_void {
 
 /// TLS data starts 0x800 bytes below the location pointed to by the thread
 /// pointer.
-#[cfg(all(feature = "origin-thread", feature = "thread"))]
+#[cfg(all(feature = "take-charge", feature = "thread"))]
 pub(super) const TLS_OFFSET: usize = 0x800;
 
 /// `munmap` the current thread, then carefully exit the thread without
 /// touching the deallocated stack.
-#[cfg(all(feature = "origin-thread", feature = "thread"))]
+#[cfg(all(feature = "take-charge", feature = "thread"))]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
     asm!(

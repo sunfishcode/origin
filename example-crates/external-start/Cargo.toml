@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 # Origin can be depended on just like any other crate. For no_std, disable
 # the default features, and the desired features.
-origin = { path = "../..", default-features = false, features = ["origin-thread", "external-start", "thread", "alloc"] }
+origin = { path = "../..", default-features = false, features = ["take-charge", "external-start", "thread", "alloc"] }
 
 # Ensure that libc gets linked.
 libc = { version = "0.2", default-features = false }

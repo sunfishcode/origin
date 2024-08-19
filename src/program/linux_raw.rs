@@ -27,7 +27,7 @@
 //! with origin's goal of providing Rust-idiomatic interfaces, however it does
 //! mean that origin can avoid doing any work that users might not need.
 
-#[cfg(all(feature = "origin-thread", feature = "thread"))]
+#[cfg(feature = "thread")]
 use crate::thread;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
@@ -201,11 +201,11 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     rustix::param::init(envp);
 
     // Read the program headers and extract the TLS info.
-    #[cfg(all(feature = "origin-thread", feature = "thread"))]
+    #[cfg(feature = "thread")]
     thread::initialize_startup_info();
 
     // Initialize the main thread.
-    #[cfg(all(feature = "origin-thread", feature = "thread"))]
+    #[cfg(feature = "thread")]
     thread::initialize_main(mem.cast());
 }
 
@@ -223,7 +223,7 @@ static DTORS: Mutex<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>> =
 #[cfg(all(feature = "alloc", not(feature = "thread")))]
 struct Dtors(smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>);
 
-/// SAFETY: With `feature = "origin-program"`, we can assume that Origin is
+/// SAFETY: With `feature = "take-charge"`, we can assume that Origin is
 /// responsible for creating all threads in the program, and with
 /// `not(feature = "thread")` mode, Origin can't create any new threads, so we
 /// don't need to synchronize.

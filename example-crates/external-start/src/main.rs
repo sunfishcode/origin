@@ -59,7 +59,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     eprintln!("Hello from main thread");
 
     program::at_exit(Box::new(|| {
-        eprintln!("Hello from an `program::at_exit` handler")
+        eprintln!("Hello from a `program::at_exit` handler")
     }));
     thread::at_exit(Box::new(|| {
         eprintln!("Hello from a main-thread `thread::at_exit` handler")

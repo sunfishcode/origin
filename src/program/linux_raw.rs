@@ -236,11 +236,6 @@ unsafe impl Sync for Dtors {}
 static mut DTORS: Dtors = Dtors(smallvec::SmallVec::new_const());
 
 /// Register a function to be called when [`exit`] is called.
-///
-/// # Safety
-///
-/// This arranges for `func` to be called, and passed `obj`, when the program
-/// exits.
 #[cfg(feature = "alloc")]
 #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {

@@ -22,12 +22,12 @@ fn init() {
     // Log the first message, announcing that it is us that started the
     // process. We started the program earlier than this, but we couldn't
     // initialize the logger until we initialized the main thread.
-    #[cfg(feature = "origin-program")]
+    #[cfg(feature = "take-charge")]
     log::trace!(target: "origin::program", "Program started");
 
     // Log the main thread id. Similarly, we initialized the main thread
     // earlier than this, but we couldn't log until now.
-    #[cfg(feature = "origin-thread")]
+    #[cfg(all(feature = "take-charge", feature = "thread"))]
     log::trace!(
         target: "origin::thread",
         "Main Thread[{:?}] initialized",

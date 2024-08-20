@@ -62,14 +62,13 @@ pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
             "3:",
             // Use "2" and "3" instead of "0" and "1" because "0b" and "1b" are
             // parsed as binary literals rather than as label references. And,
-            // use a `.set` here because the assembler doesn't seem to support
+            // hard-code the value `1` here because the assembler doesn't support
             // the symbol difference expression in an instruction operand
-            // context. Then, using a `.set` requires a symbol name, and there
-            // appears to be no syntax or convention for temporary labels that
-            // can be used with `.set`, so we use a prefix of "usercode_" to
-            // hopefully avoid colliding with any compiler symbols.
-            ".set usercode_offset, _GLOBAL_OFFSET_TABLE_+(3b-2b)",
-            "add {0}, offset usercode_offset",
+            // context. Then, check that the hard-coded value is what we expect.
+            ".ifne (3b-2b)-1",
+            ".error \"The pop opcode is expected to be 1 byte long.\"",
+            ".endif",
+            "add {0}, offset _GLOBAL_OFFSET_TABLE_+1",
             "lea {0}, [{0} + _DYNAMIC@GOTOFF]",
             out(reg) addr
         )
@@ -90,9 +89,11 @@ pub(super) fn ehdr_addr() -> *const Elf_Ehdr {
             "pop {0}",
             ".cfi_adjust_cfa_offset -4",
             "3:",
-            // See above for an explanation of `usercode_offset`.
-            ".set usercode_offset, _GLOBAL_OFFSET_TABLE_+(3b-2b)",
-            "add {0}, offset usercode_offset",
+            // See the comment by similar code in `dynamic_table_addr`.
+            ".ifne (3b-2b)-1",
+            ".error \"The pop opcode is expected to be 1 byte long.\"",
+            ".endif",
+            "add {0}, offset _GLOBAL_OFFSET_TABLE_+1",
             "lea {0}, [{0} + __ehdr_start@GOTOFF]",
             out(reg) addr
         )

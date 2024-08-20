@@ -4,7 +4,7 @@ fn main() {
     eprintln!("Hello from main thread");
 
     program::at_exit(Box::new(|| {
-        eprintln!("Hello from an `program::at_exit` handler")
+        eprintln!("Hello from a `program::at_exit` handler")
     }));
     thread::at_exit(Box::new(|| {
         eprintln!("Hello from a main-thread `thread::at_exit` handler")

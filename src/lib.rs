@@ -2,7 +2,6 @@
 #![deny(missing_docs)]
 #![cfg_attr(debug_assertions, allow(internal_features))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![feature(asm_const)]
 #![feature(naked_functions)]
 #![cfg_attr(debug_assertions, feature(link_llvm_intrinsics))]
 #![cfg_attr(feature = "experimental-relocate", feature(cfg_relocation_model))]

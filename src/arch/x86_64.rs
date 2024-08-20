@@ -188,7 +188,7 @@ pub(super) unsafe fn clone(
     asm!(
         "syscall",            // Do the `clone` system call.
         "test eax, eax",      // Branch if we're in the parent thread.
-        "jnz 0f",
+        "jnz 2f",
 
         // Child thread.
         "mov rdi, r9",        // Pass `fn_` as the first argument.
@@ -199,7 +199,7 @@ pub(super) unsafe fn clone(
         "jmp {entry}",        // Call `entry`.
 
         // Parent thread.
-        "0:",
+        "2:",
 
         entry = sym super::thread::entry,
         inlateout("rax") __NR_clone as usize => r0,

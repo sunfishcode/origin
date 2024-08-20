@@ -29,7 +29,7 @@ fn start(_argc: isize, _argv: *const *const u8) -> isize {
     eprintln!("Hello from main thread");
 
     program::at_exit(Box::new(|| {
-        eprintln!("Hello from an `program::at_exit` handler")
+        eprintln!("Hello from a `program::at_exit` handler")
     }));
     thread::at_exit(Box::new(|| {
         eprintln!("Hello from a main-thread `thread::at_exit` handler")

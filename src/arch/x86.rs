@@ -54,13 +54,13 @@ pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
         asm!(
             ".weak _DYNAMIC",
             ".hidden _DYNAMIC",
-            "call 0f",
+            "call 2f",
             ".cfi_adjust_cfa_offset 4",
-            "0:",
+            "2:",
             "pop {0}",
             ".cfi_adjust_cfa_offset -4",
-            "1:",
-            "add {0}, offset _GLOBAL_OFFSET_TABLE_+(1b-0b)",
+            "3:",
+            "add {0}, offset _GLOBAL_OFFSET_TABLE_+(3b-2b)",
             "lea {0}, [{0} + _DYNAMIC@GOTOFF]",
             out(reg) addr
         )
@@ -75,13 +75,13 @@ pub(super) fn ehdr_addr() -> *const Elf_Ehdr {
     let addr;
     unsafe {
         asm!(
-            "call 0f",
+            "call 2f",
             ".cfi_adjust_cfa_offset 4",
-            "0:",
+            "2:",
             "pop {0}",
             ".cfi_adjust_cfa_offset -4",
-            "1:",
-            "add {0}, offset _GLOBAL_OFFSET_TABLE_+(1b-0b)",
+            "3:",
+            "add {0}, offset _GLOBAL_OFFSET_TABLE_+(3b-2b)",
             "lea {0}, [{0} + __ehdr_start@GOTOFF]",
             out(reg) addr
         )
@@ -245,7 +245,7 @@ pub(super) unsafe fn clone(
         // in the child.
         "int 0x80",           // Do the `clone` system call.
         "test eax, eax",      // Branch if we're in the parent.
-        "jnz 0f",
+        "jnz 2f",
 
         // Child thread.
         "pop edi",            // Load `fn_` from the child stack.
@@ -259,7 +259,7 @@ pub(super) unsafe fn clone(
         "jmp {entry}",        // Call `entry`.
 
         // Parent thread.
-        "0:",
+        "2:",
         "pop ebp",            // Restore incoming register value.
         "pop esi",            // Restore incoming register value.
 

@@ -1,7 +1,7 @@
 //! Program startup and shutdown.
 //!
-//! To use origin's program startup, define a function named `origin_main` like
-//! this:
+//! To use origin's program startup enable the `take-charge` feature and define
+//! a function named `origin_main` like this:
 //!
 //! ```no_run
 //! /// This function is called by Origin.
@@ -15,13 +15,14 @@
 //! ```
 //!
 //! Origin will call this function after starting up the program and running
-//! the constructors. `argc` is the number of command-line arguments with a
-//! value of at most `c_int::MAX`, and `argv` is a pointer to a NULL-terminated
-//! array of pointers to NUL-terminated C strings. `argc` and `argv` describe
-//! the command-line arguments. `envp` is a pointer to a NULL-terminated array
-//! of pointers to NUL-terminated C strings containing a key followed by `b'='`
-//! followed by a value. It describes the environment variables. The function
-//! should return a value for the program exit status.
+//! the constructors when `take-charge` is enabled. `argc` is the number of
+//! command-line arguments with a value of at most `c_int::MAX`, and `argv` is
+//! a pointer to a NULL-terminated array of pointers to NUL-terminated C
+//! strings. `argc` and `argv` describe the command-line arguments. `envp` is a
+//! pointer to a NULL-terminated array of pointers to NUL-terminated C strings
+//! containing a key followed by `b'='` followed by a value. It describes the
+//! environment variables. The function should return a value for the program
+//! exit status.
 //!
 //! This is a low-level and somewhat C-flavored interface, which is in tension
 //! with origin's goal of providing Rust-idiomatic interfaces, however it does

@@ -27,6 +27,8 @@ use rustix::mm::{mmap_anonymous, mprotect, MapFlags, MprotectFlags, ProtFlags};
 use rustix::param::{linux_execfn, page_size};
 use rustix::process::{getrlimit, Resource};
 use rustix::runtime::{exe_phdrs, set_tid_address};
+#[cfg(feature = "signal")]
+use rustix::runtime::{sigprocmask, How, Sigset};
 use rustix::thread::gettid;
 
 /// An opaque pointer to a thread.
@@ -712,6 +714,14 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
             // Null out the tid address so that the kernel doesn't write to
             // memory that we've freed trying to clear our tid when we exit.
             let _ = set_tid_address(null_mut());
+
+            // In preparation for freeing the stack, block all signals, so that
+            // no signals for the process are delivered to this thread.
+            #[cfg(feature = "signal")]
+            {
+                let all = Sigset { sig: [!0] };
+                sigprocmask(How::BLOCK, Some(&all)).ok();
+            }
 
             // `munmap` the memory, which also frees the stack we're currently
             // on, and do an `exit` carefully without touching the stack.

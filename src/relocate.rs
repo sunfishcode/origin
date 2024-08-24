@@ -30,9 +30,18 @@ use crate::arch::{
     dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
 };
 use core::ffi::c_void;
+use core::mem;
 use core::ptr::{null, null_mut, with_exposed_provenance};
 use linux_raw_sys::elf::*;
 use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
+
+// The Linux UAPI headers don't define the .relr types and consts yet.
+#[allow(non_camel_case_types)]
+type Elf_Relr = usize;
+
+const DT_RELRSZ: usize = 35;
+const DT_RELR: usize = 36;
+const DT_RELRENT: usize = 37;
 
 /// Locate the dynamic (startup-time) relocations and perform them.
 ///
@@ -140,6 +149,12 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let mut rel_total_size = 0;
     let mut rel_entry_size = 0;
 
+    // Relr tables contain `Elf_Relr` elements which are a compact
+    // way of representing relative relocations.
+    let mut relr_ptr: *const Elf_Relr = null();
+    let mut relr_total_size = 0;
+    let mut relr_entry_size = 0;
+
     // Look through the `Elf_Dyn` entries to find the location and
     // size of the relocation table(s).
     let mut current_dyn: *const Elf_Dyn = dynv;
@@ -159,6 +174,12 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
             DT_REL => rel_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
             DT_RELSZ => rel_total_size = d_un.d_val as usize,
             DT_RELENT => rel_entry_size = d_un.d_val as usize,
+
+            // We found a relr table. As above, model this as
+            // `with_exposed_provenance`.
+            DT_RELR => relr_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
+            DT_RELRSZ => relr_total_size = d_un.d_val as usize,
+            DT_RELRENT => relr_entry_size = d_un.d_val as usize,
 
             // End of the Dynamic section
             DT_NULL => break,
@@ -206,6 +227,53 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
                 relocation_store(reloc_addr, reloc_value);
             }
             _ => unimplemented!(),
+        }
+    }
+
+    // Perform the relr relocations.
+    let mut current_relr = relr_ptr;
+    let relr_end = current_relr.byte_add(relr_total_size);
+    let mut reloc_addr = 0;
+    while current_relr != relr_end {
+        let mut entry = *current_relr;
+        current_relr = current_relr.byte_add(relr_entry_size);
+
+        if entry & 1 == 0 {
+            // Entry encodes offset to relocate; calculate the location
+            // the relocation will apply at.
+            reloc_addr = offset + entry;
+
+            // Perform the relr relocation.
+            let addend = relocation_load(reloc_addr);
+            let reloc_value = addend.wrapping_add(offset);
+            relocation_store(reloc_addr, reloc_value);
+
+            // Advance relocation location.
+            reloc_addr += mem::size_of::<usize>();
+        } else {
+            // Entry encodes bitmask with locations to relocate; apply each entry.
+
+            let mut i = 0;
+            loop {
+                // Shift to next item in the bitmask.
+                entry >>= 1;
+                if entry == 0 {
+                    // No more entries left in the bitmask; early exit.
+                    break;
+                }
+
+                if entry & 1 != 0 {
+                    // Perform the relr relocation.
+                    let addend = relocation_load(reloc_addr + i * mem::size_of::<usize>());
+                    let reloc_value = addend.wrapping_add(offset);
+                    relocation_store(reloc_addr + i * mem::size_of::<usize>(), reloc_value);
+                }
+
+                i += 1;
+            }
+
+            // Advance relocation location.
+            reloc_addr += (mem::size_of::<usize>() * 8 - 1) * mem::size_of::<usize>();
         }
     }
 

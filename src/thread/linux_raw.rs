@@ -246,10 +246,10 @@ pub(super) fn initialize_startup_info() {
     // no other threads running so we can store to `STARTUP_TLS_INFO` and
     // `STARTUP_STACK_SIZE` without synchronization.
     unsafe {
-        let phdrs_end = current_phdr.cast::<u8>().add(phnum * phent).cast();
+        let phdrs_end = current_phdr.byte_add(phnum * phent);
         while current_phdr != phdrs_end {
             let phdr = &*current_phdr;
-            current_phdr = current_phdr.cast::<u8>().add(phent).cast();
+            current_phdr = current_phdr.byte_add(phent);
 
             match phdr.p_type {
                 // Compute the offset from the static virtual addresses in the
@@ -732,8 +732,8 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
 
             // `munmap` the memory, which also frees the stack we're currently
             // on, and do an `exit` carefully without touching the stack.
-            let map = current_stack_addr.cast::<u8>().sub(current_guard_size);
-            munmap_and_exit_thread(map.cast(), map_size);
+            let map = current_stack_addr.byte_sub(current_guard_size);
+            munmap_and_exit_thread(map, map_size);
         }
     } else {
         // The thread was not detached, so its memory will be freed when it's
@@ -916,8 +916,8 @@ unsafe fn free_memory(thread: Thread) {
 
     // Free the thread's `mmap` region, if we allocated it.
     if map_size != 0 {
-        let map = stack_addr.cast::<u8>().sub(guard_size);
-        munmap(map.cast(), map_size).unwrap();
+        let map = stack_addr.byte_sub(guard_size);
+        munmap(map, map_size).unwrap();
     }
 }
 
@@ -935,8 +935,7 @@ pub fn at_exit(func: Box<dyn FnOnce()>) {
 #[must_use]
 fn current_metadata() -> *mut Metadata {
     thread_pointer()
-        .cast::<u8>()
-        .wrapping_sub(offset_of!(Metadata, abi) + offset_of!(Abi, thread_pointee))
+        .wrapping_byte_sub(offset_of!(Metadata, abi) + offset_of!(Abi, thread_pointee))
         .cast()
 }
 
@@ -1018,11 +1017,9 @@ pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
     #[cfg(any(target_arch = "aarch64", target_arch = "arm", target_arch = "riscv64"))]
     {
         thread_pointer()
-            .cast::<u8>()
-            .wrapping_add(size_of::<Abi>() - offset_of!(Abi, thread_pointee))
-            .wrapping_add(TLS_OFFSET)
-            .wrapping_add(offset)
-            .cast()
+            .wrapping_byte_add(size_of::<Abi>() - offset_of!(Abi, thread_pointee))
+            .wrapping_byte_add(TLS_OFFSET)
+            .wrapping_byte_add(offset)
     }
 
     // Platforms where TLS data goes before the ABI-exposed fields.
@@ -1032,11 +1029,9 @@ pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     unsafe {
         thread_pointer()
-            .cast::<u8>()
-            .wrapping_sub(STARTUP_TLS_INFO.mem_size)
-            .wrapping_add(TLS_OFFSET)
-            .wrapping_add(offset)
-            .cast()
+            .wrapping_byte_sub(STARTUP_TLS_INFO.mem_size)
+            .wrapping_byte_add(TLS_OFFSET)
+            .wrapping_byte_add(offset)
     }
 }
 

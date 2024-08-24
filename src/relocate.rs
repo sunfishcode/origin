@@ -190,10 +190,10 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
 
     // Perform the rela relocations.
     let mut current_rela = rela_ptr;
-    let rela_end = current_rela.cast::<u8>().add(rela_total_size).cast();
+    let rela_end = current_rela.byte_add(rela_total_size);
     while current_rela != rela_end {
         let rela = &*current_rela;
-        current_rela = current_rela.cast::<u8>().add(rela_entry_size).cast();
+        current_rela = current_rela.byte_add(rela_entry_size);
 
         // Calculate the location the relocation will apply at.
         let reloc_addr = rela.r_offset.wrapping_add(offset);
@@ -211,10 +211,10 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
 
     // Perform the rel relocations.
     let mut current_rel = rel_ptr;
-    let rel_end = current_rel.cast::<u8>().add(rel_total_size).cast();
+    let rel_end = current_rel.byte_add(rel_total_size);
     while current_rel != rel_end {
         let rel = &*current_rel;
-        current_rel = current_rel.cast::<u8>().add(rel_entry_size).cast();
+        current_rel = current_rel.byte_add(rel_entry_size);
 
         // Calculate the location the relocation will apply at.
         let reloc_addr = rel.r_offset.wrapping_add(offset);
@@ -315,13 +315,10 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
 
     let phentsize = EHDR.e_phentsize as usize;
     let mut current_phdr = with_exposed_provenance::<Elf_Phdr>(offset + EHDR.e_phoff);
-    let phdrs_end = current_phdr
-        .cast::<u8>()
-        .add(EHDR.e_phnum as usize * phentsize)
-        .cast();
+    let phdrs_end = current_phdr.byte_add(EHDR.e_phnum as usize * phentsize);
     while current_phdr != phdrs_end {
         let phdr = &*current_phdr;
-        current_phdr = current_phdr.cast::<u8>().add(phentsize).cast();
+        current_phdr = current_phdr.byte_add(phentsize);
 
         match phdr.p_type {
             #[cfg(debug_assertions)]

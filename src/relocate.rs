@@ -41,6 +41,7 @@ type Elf_Relr = usize;
 
 const DT_RELRSZ: usize = 35;
 const DT_RELR: usize = 36;
+#[cfg(debug_assertions)]
 const DT_RELRENT: usize = 37;
 
 /// Locate the dynamic (startup-time) relocations and perform them.
@@ -140,20 +141,17 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     // `r_addend` field.
     let mut rela_ptr: *const Elf_Rela = null();
     let mut rela_total_size = 0;
-    let mut rela_entry_size = 0;
 
     // Rel tables contain `Elf_Rel` elements which lack an
     // `r_addend` field and store the addend in the memory to be
     // relocated.
     let mut rel_ptr: *const Elf_Rel = null();
     let mut rel_total_size = 0;
-    let mut rel_entry_size = 0;
 
     // Relr tables contain `Elf_Relr` elements which are a compact
     // way of representing relative relocations.
     let mut relr_ptr: *const Elf_Relr = null();
     let mut relr_total_size = 0;
-    let mut relr_entry_size = 0;
 
     // Look through the `Elf_Dyn` entries to find the location and
     // size of the relocation table(s).
@@ -167,19 +165,22 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
             // `with_exposed_provenance`.
             DT_RELA => rela_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
             DT_RELASZ => rela_total_size = d_un.d_val as usize,
-            DT_RELAENT => rela_entry_size = d_un.d_val as usize,
+            #[cfg(debug_assertions)]
+            DT_RELAENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Rela>()),
 
             // We found a rel table. As above, model this as
             // `with_exposed_provenance`.
             DT_REL => rel_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
             DT_RELSZ => rel_total_size = d_un.d_val as usize,
-            DT_RELENT => rel_entry_size = d_un.d_val as usize,
+            #[cfg(debug_assertions)]
+            DT_RELENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Rel>()),
 
             // We found a relr table. As above, model this as
             // `with_exposed_provenance`.
             DT_RELR => relr_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
             DT_RELRSZ => relr_total_size = d_un.d_val as usize,
-            DT_RELRENT => relr_entry_size = d_un.d_val as usize,
+            #[cfg(debug_assertions)]
+            DT_RELRENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Relr>()),
 
             // End of the Dynamic section
             DT_NULL => break,
@@ -193,7 +194,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let rela_end = current_rela.byte_add(rela_total_size);
     while current_rela != rela_end {
         let rela = &*current_rela;
-        current_rela = current_rela.byte_add(rela_entry_size);
+        current_rela = current_rela.add(1);
 
         // Calculate the location the relocation will apply at.
         let reloc_addr = rela.r_offset.wrapping_add(offset);
@@ -214,7 +215,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let rel_end = current_rel.byte_add(rel_total_size);
     while current_rel != rel_end {
         let rel = &*current_rel;
-        current_rel = current_rel.byte_add(rel_entry_size);
+        current_rel = current_rel.add(1);
 
         // Calculate the location the relocation will apply at.
         let reloc_addr = rel.r_offset.wrapping_add(offset);
@@ -236,7 +237,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let mut reloc_addr = 0;
     while current_relr != relr_end {
         let mut entry = *current_relr;
-        current_relr = current_relr.byte_add(relr_entry_size);
+        current_relr = current_relr.add(1);
 
         if entry & 1 == 0 {
             // Entry encodes offset to relocate; calculate the location

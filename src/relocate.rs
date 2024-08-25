@@ -31,7 +31,7 @@ use crate::arch::{
 };
 use core::ffi::c_void;
 use core::mem;
-use core::ptr::{null, null_mut, with_exposed_provenance};
+use core::ptr::{null, null_mut};
 use linux_raw_sys::elf::*;
 use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
 
@@ -69,9 +69,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let auxp = compute_auxp(envp);
 
     // The page size, segment headers info, and runtime entry address.
-    let mut auxv_base = 0;
+    let mut auxv_base = null_mut();
     let mut auxv_page_size = 0;
-    let mut auxv_entry = 0;
+    let mut auxv_entry = null_mut();
 
     // Look through the AUX records to find the segment headers, page size,
     // and runtime entry address.
@@ -81,9 +81,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         current_aux = current_aux.add(1);
 
         match a_type as _ {
-            AT_BASE => auxv_base = a_val.addr(),
+            AT_BASE => auxv_base = a_val,
             AT_PAGESZ => auxv_page_size = a_val.addr(),
-            AT_ENTRY => auxv_entry = a_val.addr(),
+            AT_ENTRY => auxv_entry = a_val,
             AT_NULL => break,
             _ => (),
         }
@@ -106,7 +106,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     //    program headers and `AT_ENTRY` doesn't point to our own entry point.
     //    `AT_BASE` contains our own relocation offset.
 
-    if load_static_start() == auxv_entry {
+    if load_static_start() == auxv_entry.addr() {
         // This is case 1) or case 3). If `AT_BASE` doesn't exist, then we are
         // already loaded at our static address despite the lack of any dynamic
         // linker. As such it would be case 1). If `AT_BASE` does exist, we have
@@ -115,7 +115,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         return;
     }
 
-    let offset = if auxv_base == 0 {
+    let base = if auxv_base == null_mut() {
         // Obtain the static address of `_start`, which is recorded in the
         // entry field of the ELF header.
         let static_start = (*ehdr_addr()).e_entry;
@@ -129,6 +129,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         // `AT_BASE` contains the relocation offset of the dynamic linker.
         auxv_base
     };
+    let offset = base.addr();
 
     // This is case 2) or 4). We need to do all `R_RELATIVE` relocations.
     // There should be no other kind of relocation because we are either a
@@ -163,21 +164,21 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         match *d_tag {
             // We found a rela table. As above, model this as
             // `with_exposed_provenance`.
-            DT_RELA => rela_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
+            DT_RELA => rela_ptr = base.byte_add(d_un.d_ptr).cast::<Elf_Rela>(),
             DT_RELASZ => rela_total_size = d_un.d_val as usize,
             #[cfg(debug_assertions)]
             DT_RELAENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Rela>()),
 
             // We found a rel table. As above, model this as
             // `with_exposed_provenance`.
-            DT_REL => rel_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
+            DT_REL => rel_ptr = base.byte_add(d_un.d_ptr).cast::<Elf_Rel>(),
             DT_RELSZ => rel_total_size = d_un.d_val as usize,
             #[cfg(debug_assertions)]
             DT_RELENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Rel>()),
 
             // We found a relr table. As above, model this as
             // `with_exposed_provenance`.
-            DT_RELR => relr_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
+            DT_RELR => relr_ptr = base.byte_add(d_un.d_ptr).cast::<Elf_Relr>(),
             DT_RELRSZ => relr_total_size = d_un.d_val as usize,
             #[cfg(debug_assertions)]
             DT_RELRENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Relr>()),
@@ -297,8 +298,8 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         // AT_ENTRY points to the main executable's entry point rather than our
         // entry point when AT_BASE is not zero and thus a dynamic linker is in
         // use. In this case the assertion would fail.
-        if auxv_base == 0 {
-            assert_eq!(load_static_start(), auxv_entry);
+        if auxv_base == null_mut() {
+            assert_eq!(load_static_start(), auxv_entry.addr());
         }
     }
 
@@ -315,7 +316,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let mut relro_size = 0;
 
     let phentsize = EHDR.e_phentsize as usize;
-    let mut current_phdr = with_exposed_provenance::<Elf_Phdr>(offset + EHDR.e_phoff);
+    let mut current_phdr = base.byte_add(EHDR.e_phoff).cast::<Elf_Phdr>();
     let phdrs_end = current_phdr.byte_add(EHDR.e_phnum as usize * phentsize);
     while current_phdr != phdrs_end {
         let phdr = &*current_phdr;
@@ -324,7 +325,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         match phdr.p_type {
             #[cfg(debug_assertions)]
             PT_DYNAMIC => {
-                assert_eq!(dynv.addr(), phdr.p_vaddr.wrapping_add(offset));
+                assert_eq!(dynv, base.byte_add(phdr.p_vaddr).cast::<Elf_Dyn>());
             }
             PT_GNU_RELRO => {
                 // A relro description is present. Make a note of it so that we

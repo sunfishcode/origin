@@ -27,7 +27,8 @@
 #![allow(clippy::cmp_null)]
 
 use crate::arch::{
-    dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
+    abort, dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly,
+    relocation_store,
 };
 use core::ffi::c_void;
 use core::mem;
@@ -44,6 +45,18 @@ const DT_RELR: usize = 36;
 #[cfg(debug_assertions)]
 const DT_RELRENT: usize = 37;
 
+// We have to override the debug_assert! family of macros to abort rather than
+// panic as panicking doesn't work this early on. See the docs of [relocate]
+// for more info.
+#[cfg(debug_assertions)]
+macro_rules! debug_assert_eq {
+    ($l:expr, $r:expr) => {
+        if !($l == $r) {
+            abort();
+        }
+    };
+}
+
 /// Locate the dynamic (startup-time) relocations and perform them.
 ///
 /// This is unsafer than unsafe. It's meant to be called at a time when Rust
@@ -59,8 +72,10 @@ const DT_RELRENT: usize = 37;
 /// outside the Rust memory model. They read and write and `mprotect` memory
 /// that Rust wouldn't think could be accessed.
 ///
-/// And if this code panics, the panic code will probably segfault, because
-/// `core::fmt` is known to use an address that needs relocation.
+/// We also need to take care to avoid panics as panicking will segfault due to
+/// `core::fmt` making use of statics that need relocation. Even after all
+/// relocations are done we still need to avoid panicking as libstd's panic
+/// handler makes use of TLS, which won't be initialized until much later.
 ///
 /// So yes, there's a reason this code is behind a feature flag.
 #[cold]
@@ -207,7 +222,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
                 let reloc_value = addend.wrapping_add(offset);
                 relocation_store(reloc_addr, reloc_value);
             }
-            _ => unimplemented!(),
+            // Abort the process without panicking as panicking requires
+            // relocations to be performed first.
+            _ => abort(),
         }
     }
 
@@ -228,7 +245,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
                 let reloc_value = addend.wrapping_add(offset);
                 relocation_store(reloc_addr, reloc_value);
             }
-            _ => unimplemented!(),
+            // Abort the process without panicking as panicking requires
+            // relocations to be performed first.
+            _ => abort(),
         }
     }
 
@@ -283,24 +302,21 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     // function pointer to prevent the compiler from moving code between the
     // functions.
 
-    #[cfg(debug_assertions)]
-    {
-        // Check that the page size is a power of two.
-        assert!(auxv_page_size.is_power_of_two());
+    // Check that the page size is a power of two.
+    debug_assert!(auxv_page_size.is_power_of_two());
 
-        // This code doesn't rely on the offset being page aligned, but it is
-        // useful to check to make sure we computed it correctly.
-        assert_eq!(offset & (auxv_page_size - 1), 0);
+    // This code doesn't rely on the offset being page aligned, but it is
+    // useful to check to make sure we computed it correctly.
+    debug_assert_eq!(offset & (auxv_page_size - 1), 0);
 
-        // Check that relocation did its job. Do the same static start
-        // computation we did earlier; this time it should match the dynamic
-        // address.
-        // AT_ENTRY points to the main executable's entry point rather than our
-        // entry point when AT_BASE is not zero and thus a dynamic linker is in
-        // use. In this case the assertion would fail.
-        if auxv_base == null_mut() {
-            assert_eq!(load_static_start(), auxv_entry.addr());
-        }
+    // Check that relocation did its job. Do the same static start
+    // computation we did earlier; this time it should match the dynamic
+    // address.
+    // AT_ENTRY points to the main executable's entry point rather than our
+    // entry point when AT_BASE is not zero and thus a dynamic linker is in
+    // use. In this case the assertion would fail.
+    if auxv_base == null_mut() {
+        debug_assert_eq!(load_static_start(), auxv_entry.addr());
     }
 
     // Finally, look through the static segment headers (phdrs) to find the

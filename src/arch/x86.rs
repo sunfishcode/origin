@@ -45,6 +45,17 @@ pub(super) unsafe extern "C" fn _start() -> ! {
     )
 }
 
+/// Abort the process without involving any panic handling code.
+///
+/// This is a stable equivalent to `core::intrinsics::abort()`.
+#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+#[cfg(relocation_model = "pic")]
+pub(super) fn abort() -> ! {
+    unsafe {
+        asm!("ud2", options(noreturn));
+    }
+}
+
 /// Compute the dynamic address of `_DYNAMIC`.
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
@@ -190,7 +201,11 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
         options(nostack, preserves_flags),
     );
 
-    assert_eq!(r0, 0);
+    if r0 != 0 {
+        // Do not panic here as libstd's panic handler needs TLS, which is not
+        // yet initialized at this point.
+        abort();
+    }
 }
 
 /// The required alignment for the stack pointer.

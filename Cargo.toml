@@ -15,7 +15,7 @@ include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
 
 [dependencies]
 linux-raw-sys = { version = "0.4.9", default-features = false, features = ["general", "no_std", "elf"] }
-rustix = { version = "0.38.34", default-features = false }
+rustix = { version = "0.38.35", default-features = false }
 bitflags = { version = "2.4.0", default-features = false }
 log = { version = "0.4.14", default-features = false, optional = true }
 rustix-futex-sync = { version = "0.2.1", optional = true }

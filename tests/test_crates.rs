@@ -39,6 +39,23 @@ fn test_tls_crt_static() {
 }
 
 #[test]
+fn test_tls_crt_static_relr() {
+    test_crate(
+        "origin-start",
+        &["--bin=tls", "--features=origin/experimental-relocate"],
+        // This works with ld.bfd. ld.lld uses --pack-dyn-relocs=relr instead.
+        // FIXME detect which linker is used and pick the appropriate flag.
+        &[(
+            "RUSTFLAGS",
+            "-C target-feature=+crt-static -C link-arg=-Wl,-z,pack-relative-relocs",
+        )],
+        "",
+        "",
+        Some(200),
+    );
+}
+
+#[test]
 fn test_tls_crt_static_relocation_static() {
     test_crate(
         "origin-start",

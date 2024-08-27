@@ -284,7 +284,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     #[cfg(debug_assertions)]
     {
         // Check that the page size is a power of two.
-        assert_eq!(auxv_page_size.count_ones(), 1);
+        assert!(auxv_page_size.is_power_of_two());
 
         // This code doesn't rely on the offset being page aligned, but it is
         // useful to check to make sure we computed it correctly.

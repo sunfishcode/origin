@@ -20,7 +20,7 @@ use core::mem::{align_of, offset_of, size_of};
 use core::ptr::{copy_nonoverlapping, drop_in_place, null, null_mut, NonNull};
 use core::slice;
 use core::sync::atomic::Ordering::SeqCst;
-use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU8};
+use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU32, AtomicU8};
 use linux_raw_sys::elf::*;
 use rustix::io;
 use rustix::mm::{mmap_anonymous, mprotect, MapFlags, MprotectFlags, ProtFlags};
@@ -457,7 +457,7 @@ unsafe fn initialize_tls(
     )
     .fill(0);
 
-    let thread_id_ptr = (*metadata).thread.thread_id.as_ptr();
+    let thread_id_ptr = (*metadata).thread.thread_id.as_ptr().cast::<i32>();
 
     (newtls, thread_id_ptr)
 }
@@ -719,6 +719,13 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
             // no signals for the process are delivered to this thread.
             #[cfg(feature = "signal")]
             {
+                #[cfg(any(target_arch = "arm", target_arch = "x86"))]
+                let all = Sigset { sig: [!0, !0] };
+                #[cfg(any(
+                    target_arch = "aarch64",
+                    target_arch = "riscv64",
+                    target_arch = "x86_64"
+                ))]
                 let all = Sigset { sig: [!0] };
                 sigprocmask(How::BLOCK, Some(&all)).ok();
             }
@@ -857,7 +864,7 @@ pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
 unsafe fn wait_for_exit(thread: Thread) {
-    use rustix::thread::{futex, FutexFlags, FutexOperation};
+    use rustix::thread::futex;
 
     // Check whether the thread has exited already; we set the
     // `CloneFlags::CHILD_CLEARTID` flag on the clone syscall, so we can test
@@ -869,14 +876,11 @@ unsafe fn wait_for_exit(thread: Thread) {
         // `FutexFlags::PRIVATE` because the wake comes from Linux
         // as arranged by the `CloneFlags::CHILD_CLEARTID` flag,
         // and Linux doesn't use the private flag for the wake.
-        match futex(
-            thread_id.as_ptr().cast::<u32>(),
-            FutexOperation::Wait,
-            FutexFlags::empty(),
+        match futex::wait(
+            AtomicU32::from_ptr(thread_id.as_ptr().cast()),
+            futex::Flags::empty(),
             id_value.as_raw_nonzero().get() as u32,
-            null(),
-            null_mut(),
-            0,
+            None,
         ) {
             Ok(_) => break,
             Err(io::Errno::INTR) => continue,

@@ -104,9 +104,10 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
 /// Perform a single store operation, outside the Rust memory model.
 ///
 /// This function conceptually casts `ptr` to a `*mut *mut c_void` and stores
-/// a `*mut c_void` value to it. However, it does this using `asm`, and `usize`
-/// types which don't carry provenance, as it's used by `relocate` to perform
-/// relocations which cannot be expressed in the Rust memory model.
+/// `value` casted to `*mut c_void` through it. However, it does this using
+/// `asm`, and `usize` types which don't carry provenance, as it's used by
+/// `relocate` to perform relocations which cannot be expressed in the Rust
+/// memory model.
 ///
 /// # Safety
 ///

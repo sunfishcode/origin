@@ -27,11 +27,12 @@
 #![allow(clippy::cmp_null)]
 
 use crate::arch::{
-    dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
+    abort, dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly,
+    relocation_store,
 };
 use core::ffi::c_void;
 use core::mem;
-use core::ptr::{null, null_mut, with_exposed_provenance};
+use core::ptr::{null, null_mut};
 use linux_raw_sys::elf::*;
 use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
 
@@ -41,7 +42,20 @@ type Elf_Relr = usize;
 
 const DT_RELRSZ: usize = 35;
 const DT_RELR: usize = 36;
+#[cfg(debug_assertions)]
 const DT_RELRENT: usize = 37;
+
+// We have to override the debug_assert! family of macros to abort rather than
+// panic as panicking doesn't work this early on. See the docs of [relocate]
+// for more info.
+#[cfg(debug_assertions)]
+macro_rules! debug_assert_eq {
+    ($l:expr, $r:expr) => {
+        if !($l == $r) {
+            abort();
+        }
+    };
+}
 
 /// Locate the dynamic (startup-time) relocations and perform them.
 ///
@@ -58,8 +72,10 @@ const DT_RELRENT: usize = 37;
 /// outside the Rust memory model. They read and write and `mprotect` memory
 /// that Rust wouldn't think could be accessed.
 ///
-/// And if this code panics, the panic code will probably segfault, because
-/// `core::fmt` is known to use an address that needs relocation.
+/// We also need to take care to avoid panics as panicking will segfault due to
+/// `core::fmt` making use of statics that need relocation. Even after all
+/// relocations are done we still need to avoid panicking as libstd's panic
+/// handler makes use of TLS, which won't be initialized until much later.
 ///
 /// So yes, there's a reason this code is behind a feature flag.
 #[cold]
@@ -68,9 +84,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let auxp = compute_auxp(envp);
 
     // The page size, segment headers info, and runtime entry address.
-    let mut auxv_base = 0;
+    let mut auxv_base = null_mut();
     let mut auxv_page_size = 0;
-    let mut auxv_entry = 0;
+    let mut auxv_entry = null_mut();
 
     // Look through the AUX records to find the segment headers, page size,
     // and runtime entry address.
@@ -80,9 +96,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         current_aux = current_aux.add(1);
 
         match a_type as _ {
-            AT_BASE => auxv_base = a_val.addr(),
+            AT_BASE => auxv_base = a_val,
             AT_PAGESZ => auxv_page_size = a_val.addr(),
-            AT_ENTRY => auxv_entry = a_val.addr(),
+            AT_ENTRY => auxv_entry = a_val,
             AT_NULL => break,
             _ => (),
         }
@@ -105,7 +121,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     //    program headers and `AT_ENTRY` doesn't point to our own entry point.
     //    `AT_BASE` contains our own relocation offset.
 
-    if load_static_start() == auxv_entry {
+    if load_static_start() == auxv_entry.addr() {
         // This is case 1) or case 3). If `AT_BASE` doesn't exist, then we are
         // already loaded at our static address despite the lack of any dynamic
         // linker. As such it would be case 1). If `AT_BASE` does exist, we have
@@ -114,7 +130,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         return;
     }
 
-    let offset = if auxv_base == 0 {
+    let base = if auxv_base == null_mut() {
         // Obtain the static address of `_start`, which is recorded in the
         // entry field of the ELF header.
         let static_start = (*ehdr_addr()).e_entry;
@@ -128,6 +144,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         // `AT_BASE` contains the relocation offset of the dynamic linker.
         auxv_base
     };
+    let offset = base.addr();
 
     // This is case 2) or 4). We need to do all `R_RELATIVE` relocations.
     // There should be no other kind of relocation because we are either a
@@ -140,20 +157,17 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     // `r_addend` field.
     let mut rela_ptr: *const Elf_Rela = null();
     let mut rela_total_size = 0;
-    let mut rela_entry_size = 0;
 
     // Rel tables contain `Elf_Rel` elements which lack an
     // `r_addend` field and store the addend in the memory to be
     // relocated.
     let mut rel_ptr: *const Elf_Rel = null();
     let mut rel_total_size = 0;
-    let mut rel_entry_size = 0;
 
     // Relr tables contain `Elf_Relr` elements which are a compact
     // way of representing relative relocations.
     let mut relr_ptr: *const Elf_Relr = null();
     let mut relr_total_size = 0;
-    let mut relr_entry_size = 0;
 
     // Look through the `Elf_Dyn` entries to find the location and
     // size of the relocation table(s).
@@ -165,21 +179,24 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         match *d_tag {
             // We found a rela table. As above, model this as
             // `with_exposed_provenance`.
-            DT_RELA => rela_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
+            DT_RELA => rela_ptr = base.byte_add(d_un.d_ptr).cast::<Elf_Rela>(),
             DT_RELASZ => rela_total_size = d_un.d_val as usize,
-            DT_RELAENT => rela_entry_size = d_un.d_val as usize,
+            #[cfg(debug_assertions)]
+            DT_RELAENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Rela>()),
 
             // We found a rel table. As above, model this as
             // `with_exposed_provenance`.
-            DT_REL => rel_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
+            DT_REL => rel_ptr = base.byte_add(d_un.d_ptr).cast::<Elf_Rel>(),
             DT_RELSZ => rel_total_size = d_un.d_val as usize,
-            DT_RELENT => rel_entry_size = d_un.d_val as usize,
+            #[cfg(debug_assertions)]
+            DT_RELENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Rel>()),
 
             // We found a relr table. As above, model this as
             // `with_exposed_provenance`.
-            DT_RELR => relr_ptr = with_exposed_provenance(d_un.d_ptr.wrapping_add(offset)),
+            DT_RELR => relr_ptr = base.byte_add(d_un.d_ptr).cast::<Elf_Relr>(),
             DT_RELRSZ => relr_total_size = d_un.d_val as usize,
-            DT_RELRENT => relr_entry_size = d_un.d_val as usize,
+            #[cfg(debug_assertions)]
+            DT_RELRENT => debug_assert_eq!(d_un.d_val as usize, size_of::<Elf_Relr>()),
 
             // End of the Dynamic section
             DT_NULL => break,
@@ -190,10 +207,10 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
 
     // Perform the rela relocations.
     let mut current_rela = rela_ptr;
-    let rela_end = current_rela.cast::<u8>().add(rela_total_size).cast();
+    let rela_end = current_rela.byte_add(rela_total_size);
     while current_rela != rela_end {
         let rela = &*current_rela;
-        current_rela = current_rela.cast::<u8>().add(rela_entry_size).cast();
+        current_rela = current_rela.add(1);
 
         // Calculate the location the relocation will apply at.
         let reloc_addr = rela.r_offset.wrapping_add(offset);
@@ -205,16 +222,18 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
                 let reloc_value = addend.wrapping_add(offset);
                 relocation_store(reloc_addr, reloc_value);
             }
-            _ => unimplemented!(),
+            // Abort the process without panicking as panicking requires
+            // relocations to be performed first.
+            _ => abort(),
         }
     }
 
     // Perform the rel relocations.
     let mut current_rel = rel_ptr;
-    let rel_end = current_rel.cast::<u8>().add(rel_total_size).cast();
+    let rel_end = current_rel.byte_add(rel_total_size);
     while current_rel != rel_end {
         let rel = &*current_rel;
-        current_rel = current_rel.cast::<u8>().add(rel_entry_size).cast();
+        current_rel = current_rel.add(1);
 
         // Calculate the location the relocation will apply at.
         let reloc_addr = rel.r_offset.wrapping_add(offset);
@@ -226,7 +245,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
                 let reloc_value = addend.wrapping_add(offset);
                 relocation_store(reloc_addr, reloc_value);
             }
-            _ => unimplemented!(),
+            // Abort the process without panicking as panicking requires
+            // relocations to be performed first.
+            _ => abort(),
         }
     }
 
@@ -236,7 +257,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let mut reloc_addr = 0;
     while current_relr != relr_end {
         let mut entry = *current_relr;
-        current_relr = current_relr.byte_add(relr_entry_size);
+        current_relr = current_relr.add(1);
 
         if entry & 1 == 0 {
             // Entry encodes offset to relocate; calculate the location
@@ -281,24 +302,21 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     // function pointer to prevent the compiler from moving code between the
     // functions.
 
-    #[cfg(debug_assertions)]
-    {
-        // Check that the page size is a power of two.
-        assert!(auxv_page_size.is_power_of_two());
+    // Check that the page size is a power of two.
+    debug_assert!(auxv_page_size.is_power_of_two());
 
-        // This code doesn't rely on the offset being page aligned, but it is
-        // useful to check to make sure we computed it correctly.
-        assert_eq!(offset & (auxv_page_size - 1), 0);
+    // This code doesn't rely on the offset being page aligned, but it is
+    // useful to check to make sure we computed it correctly.
+    debug_assert_eq!(offset & (auxv_page_size - 1), 0);
 
-        // Check that relocation did its job. Do the same static start
-        // computation we did earlier; this time it should match the dynamic
-        // address.
-        // AT_ENTRY points to the main executable's entry point rather than our
-        // entry point when AT_BASE is not zero and thus a dynamic linker is in
-        // use. In this case the assertion would fail.
-        if auxv_base == 0 {
-            assert_eq!(load_static_start(), auxv_entry);
-        }
+    // Check that relocation did its job. Do the same static start
+    // computation we did earlier; this time it should match the dynamic
+    // address.
+    // AT_ENTRY points to the main executable's entry point rather than our
+    // entry point when AT_BASE is not zero and thus a dynamic linker is in
+    // use. In this case the assertion would fail.
+    if auxv_base == null_mut() {
+        debug_assert_eq!(load_static_start(), auxv_entry.addr());
     }
 
     // Finally, look through the static segment headers (phdrs) to find the
@@ -314,19 +332,16 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     let mut relro_size = 0;
 
     let phentsize = EHDR.e_phentsize as usize;
-    let mut current_phdr = with_exposed_provenance::<Elf_Phdr>(offset + EHDR.e_phoff);
-    let phdrs_end = current_phdr
-        .cast::<u8>()
-        .add(EHDR.e_phnum as usize * phentsize)
-        .cast();
+    let mut current_phdr = base.byte_add(EHDR.e_phoff).cast::<Elf_Phdr>();
+    let phdrs_end = current_phdr.byte_add(EHDR.e_phnum as usize * phentsize);
     while current_phdr != phdrs_end {
         let phdr = &*current_phdr;
-        current_phdr = current_phdr.cast::<u8>().add(phentsize).cast();
+        current_phdr = current_phdr.byte_add(phentsize);
 
         match phdr.p_type {
             #[cfg(debug_assertions)]
             PT_DYNAMIC => {
-                assert_eq!(dynv.addr(), phdr.p_vaddr.wrapping_add(offset));
+                assert_eq!(dynv, base.byte_add(phdr.p_vaddr).cast::<Elf_Dyn>());
             }
             PT_GNU_RELRO => {
                 // A relro description is present. Make a note of it so that we

@@ -20,7 +20,7 @@ use core::mem::{align_of, offset_of, size_of};
 use core::ptr::{copy_nonoverlapping, drop_in_place, null, null_mut, NonNull};
 use core::slice;
 use core::sync::atomic::Ordering::SeqCst;
-use core::sync::atomic::{AtomicI32, AtomicU32, AtomicPtr, AtomicU8};
+use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU32, AtomicU8};
 use linux_raw_sys::elf::*;
 use rustix::io;
 use rustix::mm::{mmap_anonymous, mprotect, MapFlags, MprotectFlags, ProtFlags};
@@ -721,7 +721,11 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
             {
                 #[cfg(any(target_arch = "arm", target_arch = "x86"))]
                 let all = Sigset { sig: [!0, !0] };
-                #[cfg(any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64"))]
+                #[cfg(any(
+                    target_arch = "aarch64",
+                    target_arch = "riscv64",
+                    target_arch = "x86_64"
+                ))]
                 let all = Sigset { sig: [!0] };
                 sigprocmask(How::BLOCK, Some(&all)).ok();
             }

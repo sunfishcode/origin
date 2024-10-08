@@ -47,7 +47,7 @@ pub(super) unsafe extern "C" fn _start() -> ! {
 #[cfg(relocation_model = "pic")]
 pub(super) fn abort() -> ! {
     unsafe {
-        asm!("ud2", options(noreturn));
+        asm!("ud2", options(noreturn, nostack));
     }
 }
 

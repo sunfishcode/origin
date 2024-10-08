@@ -76,3 +76,10 @@ pub fn exit_immediately(status: c_int) -> ! {
         libc::_exit(status)
     }
 }
+
+/// Immediately abort the program due to the detection of an unrecoverable bug.
+#[inline]
+#[cold]
+pub fn abort() -> ! {
+    unsafe { libc::abort() }
+}

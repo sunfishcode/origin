@@ -2,27 +2,14 @@
 
 #![no_std]
 #![no_main]
-#![allow(internal_features)]
-#![feature(lang_items)]
-#![feature(core_intrinsics)]
 
 extern crate alloc;
-extern crate compiler_builtins;
 extern crate libc;
 
 use alloc::boxed::Box;
-use atomic_dbg::{dbg, eprintln};
+use atomic_dbg::eprintln;
 use core::sync::atomic::{AtomicBool, Ordering};
 use origin::{program, thread};
-
-#[panic_handler]
-fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
-    dbg!(panic);
-    core::intrinsics::abort();
-}
-
-#[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
 
 #[global_allocator]
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;
@@ -90,5 +77,5 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
 #[no_mangle]
 unsafe fn main(_argc: i32, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
     eprintln!("Main was not supposed to be called!");
-    core::intrinsics::abort();
+    program::abort();
 }

@@ -1,9 +1,13 @@
 //! Thread startup and shutdown.
 
+#[cfg(not(feature = "nightly"))]
+use crate::ptr::{with_exposed_provenance_mut, without_provenance_mut, Polyfill as _};
 use alloc::boxed::Box;
 use core::ffi::{c_int, c_void};
 use core::mem::{size_of, transmute, zeroed};
-use core::ptr::{null_mut, with_exposed_provenance_mut, without_provenance_mut, NonNull};
+use core::ptr::{null_mut, NonNull};
+#[cfg(feature = "nightly")]
+use core::ptr::{with_exposed_provenance_mut, without_provenance_mut};
 use core::slice;
 use rustix::io;
 

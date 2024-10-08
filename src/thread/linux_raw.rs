@@ -10,6 +10,8 @@
 use crate::arch::{
     clone, munmap_and_exit_thread, set_thread_pointer, thread_pointer, STACK_ALIGNMENT, TLS_OFFSET,
 };
+#[cfg(not(feature = "nightly"))]
+use crate::ptr::Polyfill as _;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(feature = "unstable-errno")]
@@ -639,30 +641,34 @@ pub(super) unsafe extern "C" fn entry(
     // getting started.
     #[cfg(debug_assertions)]
     {
-        extern "C" {
-            #[link_name = "llvm.frameaddress"]
-            fn builtin_frame_address(level: i32) -> *const u8;
-            #[link_name = "llvm.returnaddress"]
-            fn builtin_return_address(level: i32) -> *const u8;
-            #[cfg(target_arch = "aarch64")]
-            #[link_name = "llvm.sponentry"]
-            fn builtin_sponentry() -> *const u8;
-        }
+        // If we have nightly, we can do additional checks.
+        #[cfg(feature = "nightly")]
+        {
+            extern "C" {
+                #[link_name = "llvm.frameaddress"]
+                fn builtin_frame_address(level: i32) -> *const u8;
+                #[link_name = "llvm.returnaddress"]
+                fn builtin_return_address(level: i32) -> *const u8;
+                #[cfg(target_arch = "aarch64")]
+                #[link_name = "llvm.sponentry"]
+                fn builtin_sponentry() -> *const u8;
+            }
 
-        // Check that the incoming stack pointer is where we expect it to be.
-        debug_assert_eq!(builtin_return_address(0), null());
-        debug_assert_ne!(builtin_frame_address(0), null());
-        #[cfg(not(any(target_arch = "x86", target_arch = "arm")))]
-        debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
-        #[cfg(target_arch = "arm")]
-        debug_assert_eq!(builtin_frame_address(0).addr() & 0x3, 0);
-        #[cfg(target_arch = "x86")]
-        debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
-        debug_assert_eq!(builtin_frame_address(1), null());
-        #[cfg(target_arch = "aarch64")]
-        debug_assert_ne!(builtin_sponentry(), null());
-        #[cfg(target_arch = "aarch64")]
-        debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
+            // Check that the incoming stack pointer is where we expect it to be.
+            debug_assert_eq!(builtin_return_address(0), null());
+            debug_assert_ne!(builtin_frame_address(0), null());
+            #[cfg(not(any(target_arch = "x86", target_arch = "arm")))]
+            debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
+            #[cfg(target_arch = "arm")]
+            debug_assert_eq!(builtin_frame_address(0).addr() & 0x3, 0);
+            #[cfg(target_arch = "x86")]
+            debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
+            debug_assert_eq!(builtin_frame_address(1), null());
+            #[cfg(target_arch = "aarch64")]
+            debug_assert_ne!(builtin_sponentry(), null());
+            #[cfg(target_arch = "aarch64")]
+            debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
+        }
 
         // Check that `clone` stored our thread id as we expected.
         debug_assert_eq!(current_id(), gettid());

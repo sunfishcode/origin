@@ -1,6 +1,9 @@
 //! Run the programs in the `test-crates` directory and compare their
 //! outputs with expected outputs.
 
+// Most of the test crates only work with nightly.
+#![cfg(feature = "nightly")]
+
 mod utils;
 
 fn test_crate(

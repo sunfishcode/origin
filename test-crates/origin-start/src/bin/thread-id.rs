@@ -2,29 +2,15 @@
 
 #![no_std]
 #![no_main]
-#![allow(internal_features)]
-#![feature(lang_items)]
-#![feature(core_intrinsics)]
 
 extern crate alloc;
-extern crate compiler_builtins;
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use atomic_dbg::dbg;
 use core::ffi::c_void;
 use core::ptr::{null_mut, NonNull};
 use origin::{program, thread};
 use rustix_futex_sync::{Condvar, Mutex};
-
-#[panic_handler]
-fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
-    dbg!(panic);
-    core::intrinsics::abort();
-}
-
-#[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
 
 #[global_allocator]
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;

@@ -1,3 +1,10 @@
+# origin 0.21
+
+## Changes
+
+Origin now supports stable Rust as well as nightly Rust, and nightly-only
+features such as unwinding are now behind a "nightly" feature.
+
 # origin 0.20
 
 ## Changes

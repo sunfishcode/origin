@@ -51,35 +51,44 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     #[cfg(debug_assertions)]
     #[cfg(feature = "origin-start")]
     {
-        extern "C" {
-            #[link_name = "llvm.frameaddress"]
-            fn builtin_frame_address(level: i32) -> *const u8;
-            #[link_name = "llvm.returnaddress"]
-            fn builtin_return_address(level: i32) -> *const u8;
-            #[cfg(target_arch = "aarch64")]
-            #[link_name = "llvm.sponentry"]
-            fn builtin_sponentry() -> *const u8;
-        }
+        #[cfg(not(feature = "nightly"))]
+        use crate::ptr::Polyfill;
 
         // Check that `mem` is where we expect it to be.
         debug_assert_ne!(mem, core::ptr::null_mut());
         debug_assert_eq!(mem.addr() & 0xf, 0);
-        debug_assert!(builtin_frame_address(0).addr() <= mem.addr());
 
-        // Check that the incoming stack pointer is where we expect it to be.
-        debug_assert_eq!(builtin_return_address(0), core::ptr::null());
-        debug_assert_ne!(builtin_frame_address(0), core::ptr::null());
-        #[cfg(not(any(target_arch = "arm", target_arch = "x86")))]
-        debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
-        #[cfg(target_arch = "arm")]
-        debug_assert_eq!(builtin_frame_address(0).addr() & 0x7, 0);
-        #[cfg(target_arch = "x86")]
-        debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
-        debug_assert_eq!(builtin_frame_address(1), core::ptr::null());
-        #[cfg(target_arch = "aarch64")]
-        debug_assert_ne!(builtin_sponentry(), core::ptr::null());
-        #[cfg(target_arch = "aarch64")]
-        debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
+        // If we have nightly, we can do additional checks.
+        #[cfg(feature = "nightly")]
+        {
+            extern "C" {
+                #[link_name = "llvm.frameaddress"]
+                fn builtin_frame_address(level: i32) -> *const u8;
+                #[link_name = "llvm.returnaddress"]
+                fn builtin_return_address(level: i32) -> *const u8;
+                #[cfg(target_arch = "aarch64")]
+                #[link_name = "llvm.sponentry"]
+                fn builtin_sponentry() -> *const u8;
+            }
+
+            // Check that `mem` is where we expect it to be.
+            debug_assert!(builtin_frame_address(0).addr() <= mem.addr());
+
+            // Check that the incoming stack pointer is where we expect it to be.
+            debug_assert_eq!(builtin_return_address(0), core::ptr::null());
+            debug_assert_ne!(builtin_frame_address(0), core::ptr::null());
+            #[cfg(not(any(target_arch = "arm", target_arch = "x86")))]
+            debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
+            #[cfg(target_arch = "arm")]
+            debug_assert_eq!(builtin_frame_address(0).addr() & 0x7, 0);
+            #[cfg(target_arch = "x86")]
+            debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
+            debug_assert_eq!(builtin_frame_address(1), core::ptr::null());
+            #[cfg(target_arch = "aarch64")]
+            debug_assert_ne!(builtin_sponentry(), core::ptr::null());
+            #[cfg(target_arch = "aarch64")]
+            debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
+        }
     }
 
     // Compute `argc`, `argv`, and `envp`.
@@ -320,4 +329,11 @@ pub fn exit_immediately(status: c_int) -> ! {
 
     // Call `rustix` to exit the program.
     rustix::runtime::exit_group(status)
+}
+
+/// Immediately abort the program due to the detection of an unrecoverable bug.
+#[inline]
+#[cold]
+pub fn abort() -> ! {
+    crate::arch::abort()
 }

@@ -402,25 +402,18 @@ fn test_rt_sigreturn() {
     assert_eq!(__NR_rt_sigreturn, 173);
 }
 
-/// Invoke the appropriate system call to return control from a signal
-/// handler that does not use `SA_SIGINFO`.
-///
-/// # Safety
-///
-/// This function must never be called other than by the `sa_restorer`
-/// mechanism.
 #[cfg(feature = "signal")]
 naked!(
     "
-    Invoke the `__NR_sigreturn` system call to return control from a signal
-    handler.
+    Invoke the appropriate system call to return control from a signal
+    handler that does not use `SA_SIGINFO`.
 
     # Safety
 
     This function must never be called other than by the `sa_restorer`
     mechanism.
     ";
-    pub(super) fn return_from_signal_handler() -> ();
+    pub(super) fn return_from_signal_handler_noinfo() -> ();
 
     "pop eax",
     "mov eax, 119", // TODO: use {__NR_sigreturn}

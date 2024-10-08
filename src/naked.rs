@@ -47,7 +47,7 @@ macro_rules! naked {
         #[naked]
         #[no_mangle]
         $vis unsafe extern "C" fn $name $args -> $ret {
-            asm!(
+            naked_asm!(
                 $($code),*,
                 $($label = $kind $path,)*
                 options($($option),*),

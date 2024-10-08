@@ -1,0 +1,25 @@
+[package]
+name = "tiny-hello"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# Origin can be depended on just like any other crate. For no_std, disable
+# the default features, and add the desired features.
+rustix = { version = "0.38.35", default-features = false, features = ["stdio"] }
+origin = { path = "../..", default-features = false, features = ["origin-start", "eh-personality-continue", "panic-handler-abort", "nightly", "optimize_for_size"] }
+
+# This is just an example crate, and not part of the origin workspace.
+[workspace]
+
+# Let's optimize for small size!
+[profile.release]
+# Give the optimizer more lattitude to optimize and delete unneeded code.
+lto = true
+# "abort" is smaller than "unwind".
+panic = "abort"
+# Tell the optimizer to optimize for size.
+opt-level = "z"
+# Delete the symbol table from the executable.
+strip = true

@@ -5,10 +5,9 @@ edition = "2021"
 publish = false
 
 [dependencies]
-origin = { path = "../..", default-features = false, features = ["take-charge", "origin-start", "thread", "alloc"] }
+origin = { path = "../..", default-features = false, features = ["take-charge", "origin-start", "thread", "alloc", "eh-personality-continue", "panic-handler-abort", "nightly"] }
 atomic-dbg = { version = "0.1.8", default-features = false }
 rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
-compiler_builtins = { version = "0.1.112", features = ["mem", "no-f16-f128"] }
 rustix = { version = "0.38", default-features = false, features = ["thread"] }
 rustix-futex-sync = "0.2.1"
 

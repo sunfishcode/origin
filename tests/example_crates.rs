@@ -1,6 +1,9 @@
 //! Run the programs in the `example-crates` directory and compare their
 //! outputs with expected outputs.
 
+// Most of the example crates only work with nightly.
+#![cfg(feature = "nightly")]
+
 mod utils;
 
 use utils::{COMMON_STDERR, NO_ALLOC_STDERR};

@@ -1,25 +1,13 @@
 //! A simple example using `no_std`.
 
 #![no_std]
-#![feature(lang_items)]
-#![allow(internal_features)]
 #![feature(start)]
-#![feature(core_intrinsics)]
 
 extern crate alloc;
 
 use alloc::boxed::Box;
-use atomic_dbg::{dbg, eprintln};
+use atomic_dbg::eprintln;
 use origin::{program, thread};
-
-#[panic_handler]
-fn panic(panic: &core::panic::PanicInfo<'_>) -> ! {
-    dbg!(panic);
-    core::intrinsics::abort();
-}
-
-#[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
 
 #[global_allocator]
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;

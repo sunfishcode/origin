@@ -12,6 +12,7 @@ edition = "2021"
 keywords = ["linux"]
 categories = ["no-std"]
 include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
+rust-version = "1.78"
 
 [dependencies]
 linux-raw-sys = { version = "0.4.9", default-features = false, features = ["general", "no_std", "elf"] }
@@ -39,13 +40,19 @@ errno = { version = "0.3.3", default-features = false, optional = true }
 # Special dependencies used in rustc-dep-of-std mode.
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
-# Enable "no-f16-f128" for now, to work around lack of support on some targets.
-compiler_builtins = { version = "0.1.112", features = ["no-f16-f128"], optional = true }
 
 [target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
 version = "0.2.0"
 default-features = false
 features = ["unwinder"]
+optional = true
+
+# On aarch64, compiler_builtins depends on `getauxval`, so we need rustix with
+# the "param" feature.
+[target.'cfg(target_arch = "aarch64")'.dependencies.rustix]
+version = "0.38.35"
+default-features = false
+features = ["param"]
 
 [dev-dependencies]
 assert_cmd = "2.0.12"
@@ -59,10 +66,9 @@ rustc-dep-of-std = [
     "linux-raw-sys/rustc-dep-of-std",
     "bitflags/rustc-dep-of-std",
     "rustix/rustc-dep-of-std",
-    "unwinding/rustc-dep-of-std",
+    "unwinding?/rustc-dep-of-std",
     "libc?/rustc-dep-of-std",
     "rustix-futex-sync/rustc-dep-of-std",
-    "dep:compiler_builtins",
 ]
 
 # Use origin's implementation of program and thread startup and shutdown as
@@ -121,5 +127,48 @@ experimental-relocate = ["rustix/mm", "rustix/runtime"]
 # until a dynamic linker is written in Rust.
 unstable-errno = ["thread"]
 
+# If you're using nightly Rust, enable this feature to let origin use
+# nightly-only features, which include proper support for unwinding, better
+# safety checks, and better optimizations.
+nightly = ["unwinding"]
+
+# Enable optimizations that reduce code size (at the cost of performance).
+optimize_for_size = []
+
+# Provide a `#[lang = eh_personality]` function suitable for unwinding (for
+# no-std).
+#
+# If you know your program never unwinds and want smaller code size, use
+# "eh-personality-continue" instead.
+#
+# This is only needed in no-std builds, as std provides a personality. See
+# [the "personality" feature of the unwinding crate] for more details.
+#
+# [the "personality" feature of the unwinding crate]: https://crates.io/crates/unwinding#personality-and-other-utilities
+eh-personality = ["unwinding?/personality"]
+
+# Provide a `#[lang = eh_personality]` function that just returns
+# `CONTINUE_UNWIND` (for no-std). Use this if you know your program will never
+# unwind and don't want any extra code.
+eh-personality-continue = ["unwinding?/personality-dummy"]
+
+# Provide a `#[panic_handler]` function suitable for unwinding (for no-std).
+#
+# If you know your program never panics and want smaller code size, use
+# "panic-handler-abort" instead.
+#
+# This is only needed in no-std builds, as std provides a panic handler. See
+# [the "panic-handler" feature of the unwinding crate] for more details.
+#
+# [the "panic-handler" feature of the unwinding crate]: https://crates.io/crates/unwinding#personality-and-other-utilities
+panic-handler = ["unwinding?/panic-handler"]
+
+# Provide a `#[panic_handler]` function that just aborts (for no-std). Use this
+# if you know your program will never panic and don't want any extra code.
+panic-handler-abort = ["unwinding?/panic-handler-dummy"]
+
+# Enable this to define the `getauxval` function.
+getauxval = ["rustix/param"]
+
 [package.metadata.docs.rs]
-features = ["take-charge", "origin-start", "thread", "signal"]
+features = ["take-charge", "origin-start", "thread", "signal", "nightly"]

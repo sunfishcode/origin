@@ -15,36 +15,34 @@ use {
     rustix::thread::RawPid,
 };
 
-/// The program entry point.
-///
-/// # Safety
-///
-/// This function must never be called explicitly. It is the first thing
-/// executed in the program, and it assumes that memory is laid out according
-/// to the operating system convention for starting a new program.
 #[cfg(feature = "origin-start")]
-#[naked]
-#[no_mangle]
-pub(super) unsafe extern "C" fn _start() -> ! {
+naked!(
+    "
+    The program entry point.
+
+    # Safety
+
+    This function must never be called explicitly. It is the first thing
+    executed in the program, and it assumes that memory is laid out according
+    to the operating system convention for starting a new program.
+    ";
+    pub(super) fn _start() -> !;
+
     // Jump to `entry`, passing it the initial stack pointer value as an
     // argument, a null return address, a null frame pointer, and an aligned
     // stack pointer. On many architectures, the incoming frame pointer is
     // already null.
-    asm!(
-        "mv a0, sp",    // Pass the incoming `sp` as the arg to `entry`.
-        "mv ra, zero",  // Set the return address to zero.
-        "mv fp, zero",  // Set the frame address to zero.
-        "tail {entry}", // Jump to `entry`.
-        entry = sym super::program::entry,
-        options(noreturn),
-    )
-}
+    "mv a0, sp",    // Pass the incoming `sp` as the arg to `entry`.
+    "mv ra, zero",  // Set the return address to zero.
+    "mv fp, zero",  // Set the frame address to zero.
+    "tail {entry}"; // Jump to `entry`.
+    entry = sym super::program::entry;
+    options(noreturn)
+);
 
 /// Abort the process without involving any panic handling code.
 ///
 /// This is a stable equivalent to `core::intrinsics::abort()`.
-#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
-#[cfg(relocation_model = "pic")]
 pub(super) fn abort() -> ! {
     unsafe {
         asm!("unimp", options(noreturn, nostack));
@@ -106,6 +104,29 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
         out(reg) r0,
         in(reg) ptr,
         options(nostack, preserves_flags),
+    );
+
+    r0
+}
+
+/// Perform a raw load operation to memory that Rust may consider out of bounds.
+///
+/// Data loaded from out-of-bounds bytes will have nondeterministic values.
+///
+/// # Safety
+///
+/// `ptr` must be aligned for loading a `usize` and must point to enough readable
+/// memory for loading a `usize`.
+#[cfg(all(feature = "take-charge", not(feature = "optimize_for_size")))]
+#[inline]
+pub(super) unsafe fn oob_load(ptr: *const usize) -> usize {
+    let r0;
+
+    asm!(
+        "ld {}, 0({})",
+        out(reg) r0,
+        in(reg) ptr,
+        options(nostack, preserves_flags, readonly),
     );
 
     r0
@@ -256,13 +277,14 @@ pub(super) const TLS_OFFSET: usize = 0x800;
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
+    assert_eq!(__NR_exit, 93); // TODO: obviate this
     asm!(
         "ecall",
         "mv a0, zero",
-        "li a7, {__NR_exit}",
+        "li a7, 93", // TODO: use {__NR_exit}
         "ecall",
         "unimp",
-        __NR_exit = const __NR_exit,
+        //__NR_exit = const __NR_exit, // TODO: Use this when `asm_const` is stabilized.
         in("a7") __NR_munmap,
         in("a0") map_addr,
         in("a1") map_len,

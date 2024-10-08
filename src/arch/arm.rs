@@ -8,6 +8,7 @@ use linux_raw_sys::elf::{Elf_Dyn, Elf_Ehdr};
 #[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "signal")]
+#[cfg(test)]
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
 #[cfg(feature = "thread")]
 use {
@@ -16,35 +17,33 @@ use {
     rustix::thread::RawPid,
 };
 
-/// The program entry point.
-///
-/// # Safety
-///
-/// This function must never be called explicitly. It is the first thing
-/// executed in the program, and it assumes that memory is laid out according
-/// to the operating system convention for starting a new program.
 #[cfg(feature = "origin-start")]
-#[naked]
-#[no_mangle]
-pub(super) unsafe extern "C" fn _start() -> ! {
+naked!(
+    "
+    The program entry point.
+
+    # Safety
+
+    This function must never be called explicitly. It is the first thing
+    executed in the program, and it assumes that memory is laid out according
+    to the operating system convention for starting a new program.
+    ";
+    pub(super) fn _start() -> !;
+
     // Jump to `entry`, passing it the initial stack pointer value as an
     // argument, a null return address, a null frame pointer, and an aligned
     // stack pointer. On many architectures, the incoming frame pointer is
     // already null.
-    asm!(
-        "mov r0, sp",   // Pass the incoming `sp` as the arg to `entry`.
-        "mov lr, #0",   // Set the return address to zero.
-        "b {entry}",    // Jump to `entry`.
-        entry = sym super::program::entry,
-        options(noreturn),
-    )
-}
+    "mov r0, sp",   // Pass the incoming `sp` as the arg to `entry`.
+    "mov lr, #0",   // Set the return address to zero.
+    "b {entry}";    // Jump to `entry`.
+    entry = sym super::program::entry;
+    options(noreturn)
+);
 
 /// Abort the process without involving any panic handling code.
 ///
 /// This is a stable equivalent to `core::intrinsics::abort()`.
-#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
-#[cfg(relocation_model = "pic")]
 pub(super) fn abort() -> ! {
     unsafe {
         asm!(".inst 0xe7ffdefe", options(noreturn, nostack));
@@ -272,13 +271,14 @@ pub(super) const TLS_OFFSET: usize = 0;
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
+    assert_eq!(__NR_exit, 1); // TODO: obviate this
     asm!(
         "svc 0",
         "mov r0, #0",
-        "mov r7, {__NR_exit}",
+        "mov r7, #1", // TODO: use {__NR_exit}
         "svc 0",
         "udf #16",
-        __NR_exit = const __NR_exit,
+        //__NR_exit = const __NR_exit, // TODO: Use this when `asm_const` is stabilized.
         in("r7") __NR_munmap,
         in("r0") map_addr,
         in("r1") map_len,
@@ -286,23 +286,29 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
     );
 }
 
-/// Invoke the `__NR_rt_sigreturn` system call to return control from a signal
-/// handler.
-///
-/// # Safety
-///
-/// This function must never be called other than by the `sa_restorer`
-/// mechanism.
 #[cfg(feature = "signal")]
-#[naked]
-pub(super) unsafe extern "C" fn return_from_signal_handler() {
-    asm!(
-        "mov r7, {__NR_rt_sigreturn}",
-        "swi 0",
-        "udf #16",
-        __NR_rt_sigreturn = const __NR_rt_sigreturn,
-        options(noreturn)
-    );
+naked!(
+    "
+    Invoke the `__NR_rt_sigreturn` system call to return control from a signal
+    handler.
+
+    # Safety
+
+    This function must never be called other than by the `sa_restorer`
+    mechanism.
+    ";
+    pub(super) fn return_from_signal_handler() -> ();
+
+    "mov r7, 173", // TODO: use {__NR_rt_sigreturn}
+    "swi 0",
+    "udf #16";
+    //__NR_rt_sigreturn = const __NR_rt_sigreturn // TODO: Use this when `asm_const` is stabilized.
+    ;
+    options(noreturn)
+);
+#[cfg(test)] // TODO: obviate this
+fn test_rt_sigreturn() {
+    assert_eq!(__NR_rt_sigreturn, 173);
 }
 
 /// Invoke the appropriate system call to return control from a signal
@@ -313,13 +319,26 @@ pub(super) unsafe extern "C" fn return_from_signal_handler() {
 /// This function must never be called other than by the `sa_restorer`
 /// mechanism.
 #[cfg(feature = "signal")]
-#[naked]
-pub(super) unsafe extern "C" fn return_from_signal_handler_noinfo() {
-    asm!(
-        "mov r7, {__NR_sigreturn}",
-        "swi 0",
-        "udf #16",
-        __NR_sigreturn = const __NR_sigreturn,
-        options(noreturn)
-    );
+naked!(
+    "
+    Invoke the `__NR_sigreturn` system call to return control from a signal
+    handler.
+
+    # Safety
+
+    This function must never be called other than by the `sa_restorer`
+    mechanism.
+    ";
+    pub(super) fn return_from_signal_handler() -> ();
+
+    "mov r7, 119", // TODO: use {__NR_sigreturn}
+    "swi 0",
+    "udf #16";
+    //__NR_sigreturn = const __NR_sigreturn // TODO: Use this when `asm_const` is stabilized.
+    ;
+    options(noreturn)
+);
+#[cfg(test)] // TODO: obviate this
+fn test_sigreturn() {
+    assert_eq!(__NR_sigreturn, 119);
 }

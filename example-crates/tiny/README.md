@@ -100,7 +100,7 @@ instruction, which looks similar:
   4000bd:	b8 e7 00 00 00       	mov    $0xe7,%eax
 ```
 
-Here, the value being loaded is 0xe7, which has the eigth bit set. The x86
+Here, the value being loaded is 0xe7, which has the eighth bit set. The x86
 `push` instructions immediate field is signed, so `push $0xe7` would need a
 4-byte immediate field to zero-extend it. Consequently, using the `push`/`pop`
 trick in this case would be longer.
@@ -110,7 +110,7 @@ Next, we enable several link arguments in build.rs:
 ```rust
     // Tell the linker to exclude the .eh_frame_hdr section.
     println!("cargo:rustc-link-arg=-Wl,--no-eh-frame-hdr");
-    // Tell the linker to make the text and data readable and writeable. This
+    // Tell the linker to make the text and data readable and writable. This
     // allows them to occupy the same page.
     println!("cargo:rustc-link-arg=-Wl,-N");
     // Tell the linker to exclude the `.note.gnu.build-id` section.
@@ -230,7 +230,7 @@ syscall number for `exit` is lower than the number for `exit_group`. For
 example, on x86-64, `exit` is 60 while `exit_group` is 231. That would enable
 the compiler to use the same `push`/`pop` trick it does for the 42 constant,
 saving 2 bytes. In theory origin could have a feature to enable this, however
-it's a very minor optimization, and it would introducue undefined behavior if
+it's a very minor optimization, and it would introduce undefined behavior if
 somehow some thread got created outside of origin, so I chose not to add it.
 
 ## Sources

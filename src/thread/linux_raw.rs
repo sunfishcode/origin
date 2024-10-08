@@ -506,7 +506,7 @@ pub unsafe fn create(
         )?
         .cast::<u8>();
 
-        // Make the thread metadata and stack readable and writeable, leaving
+        // Make the thread metadata and stack readable and writable, leaving
         // the guard region inaccessible.
         mprotect(
             map.add(stack_bottom).cast(),

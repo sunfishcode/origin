@@ -7,7 +7,7 @@ fn main() {
 
     // Tell the linker to exclude the .eh_frame_hdr section.
     println!("cargo:rustc-link-arg=-Wl,--no-eh-frame-hdr");
-    // Tell the linker to make the text and data readable and writeable. This
+    // Tell the linker to make the text and data readable and writable. This
     // allows them to occupy the same page.
     println!("cargo:rustc-link-arg=-Wl,-N");
     // Tell the linker to exclude the `.note.gnu.build-id` section.

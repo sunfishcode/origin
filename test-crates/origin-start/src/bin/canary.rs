@@ -48,7 +48,7 @@ fn tls_guard() -> usize {
 
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     unsafe {
-        ret = __stack_chk_guard;
+        ret = *__stack_chk_guard.get();
     }
 
     ret

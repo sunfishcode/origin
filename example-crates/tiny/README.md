@@ -10,7 +10,7 @@ and `.comment` sections:
 objcopy -R .eh_frame -R .comment target/release/tiny even-smaller
 ```
 
-On x86-64, this produces a executable with size 408 bytes.
+On x86-64, this produces an executable with size 408 bytes.
 
 How is this achieved?
 
@@ -29,7 +29,7 @@ needed for our minimal test program:
 origin = { path = "../..", default-features = false, features = ["origin-start"] }
 ```
 
-Then, we add a `#[profile.release]` section to our Cargo.toml, to enable
+Then, we add a `[profile.release]` section to our Cargo.toml, to enable
 several optimizations:
 
 ```toml

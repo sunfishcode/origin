@@ -89,5 +89,6 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
 // linker, however origin gains control before libc can call this `main`.
 #[no_mangle]
 unsafe fn main(_argc: i32, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
+    eprintln!("Main was not supposed to be called!");
     core::intrinsics::abort();
 }

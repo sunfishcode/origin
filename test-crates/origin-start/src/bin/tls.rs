@@ -8,13 +8,13 @@
 #![feature(core_intrinsics)]
 #![feature(thread_local)]
 #![feature(strict_provenance)]
-#![feature(const_mut_refs)]
 
 extern crate alloc;
 extern crate compiler_builtins;
 
 use alloc::boxed::Box;
 use atomic_dbg::dbg;
+use core::cell::UnsafeCell;
 use core::arch::asm;
 use core::ptr::{addr_of_mut, without_provenance_mut};
 use origin::{program, thread};
@@ -37,7 +37,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     check_eq(TEST_DATA.0);
 
     // Mutate one of the TLS fields.
-    THREAD_LOCAL[1] = without_provenance_mut(77);
+    (*THREAD_LOCAL.get())[1] = without_provenance_mut(77);
 
     // Assert that the mutation happened properly.
     check_eq([TEST_DATA.0[0], without_provenance_mut(77), TEST_DATA.0[2]]);
@@ -48,14 +48,14 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
         check_eq([TEST_DATA.0[0], without_provenance_mut(79), TEST_DATA.0[2]]);
 
         // Mutate one of the TLS fields.
-        THREAD_LOCAL[1] = without_provenance_mut(80);
+        (*THREAD_LOCAL.get())[1] = without_provenance_mut(80);
     }));
     thread::at_exit(Box::new(|| {
         // Assert that we see the value stored at the end of `main`.
         check_eq([TEST_DATA.0[0], without_provenance_mut(78), TEST_DATA.0[2]]);
 
         // Mutate one of the TLS fields.
-        THREAD_LOCAL[1] = without_provenance_mut(79);
+        (*THREAD_LOCAL.get())[1] = without_provenance_mut(79);
     }));
 
     let thread = thread::create(
@@ -64,7 +64,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
             check_eq(TEST_DATA.0);
 
             // Mutate one of the TLS fields.
-            THREAD_LOCAL[1] = without_provenance_mut(175);
+            (*THREAD_LOCAL.get())[1] = without_provenance_mut(175);
 
             // Assert that the mutation happened properly.
             check_eq([TEST_DATA.0[0], without_provenance_mut(175), TEST_DATA.0[2]]);
@@ -88,7 +88,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     check_eq([TEST_DATA.0[0], without_provenance_mut(77), TEST_DATA.0[2]]);
 
     // Mutate one of the TLS fields.
-    THREAD_LOCAL[1] = without_provenance_mut(78);
+    (*THREAD_LOCAL.get())[1] = without_provenance_mut(78);
 
     // Assert that the mutation happened properly.
     check_eq([TEST_DATA.0[0], without_provenance_mut(78), TEST_DATA.0[2]]);
@@ -107,7 +107,7 @@ static TEST_DATA: SyncTestData = {
 };
 
 #[thread_local]
-static mut THREAD_LOCAL: [*const u32; 3] = TEST_DATA.0;
+static THREAD_LOCAL: UnsafeCell<[*const u32; 3]> = UnsafeCell::new(TEST_DATA.0);
 
 // Some variables to point to.
 static mut SOME_REGULAR_DATA: u32 = 909;
@@ -116,11 +116,11 @@ static mut SOME_ZERO_DATA: u32 = 0;
 fn check_eq(data: [*const u32; 3]) {
     unsafe {
         // Check `THREAD_LOCAL` using a static address.
-        asm!("# {}", in(reg) THREAD_LOCAL.as_mut_ptr(), options(nostack, preserves_flags));
-        assert_eq!(THREAD_LOCAL, data);
+        asm!("# {}", in(reg) (*THREAD_LOCAL.get()).as_mut_ptr(), options(nostack, preserves_flags));
+        assert_eq!(*THREAD_LOCAL.get(), data);
 
         // Check `THREAD_LOCAL` using a dynamic address.
-        let mut thread_local_addr: *mut [*const u32; 3] = addr_of_mut!(THREAD_LOCAL);
+        let mut thread_local_addr: *mut [*const u32; 3] = THREAD_LOCAL.get();
         asm!("# {}", inout(reg) thread_local_addr, options(pure, nomem, nostack, preserves_flags));
         assert_eq!(*thread_local_addr, data);
     }

@@ -5,6 +5,10 @@
 Origin now supports stable Rust as well as nightly Rust, and nightly-only
 features such as unwinding are now behind a "nightly" feature.
 
+In "take-charge" mode, origin now defines `memcpy`, `memset` and other
+functions needed by rustc and internal Rust libraries, so it's no longer
+necessary to use `compiler_builtins` to provide these.
+
 # origin 0.20
 
 ## Changes

@@ -30,12 +30,12 @@
 
 #[cfg(feature = "thread")]
 use crate::thread;
-#[cfg(feature = "alloc")]
+#[cfg(feature = "program-at-exit")]
 use alloc::boxed::Box;
-#[cfg(all(feature = "alloc", not(feature = "thread")))]
+#[cfg(all(feature = "program-at-exit", not(feature = "thread")))]
 use core::cell::UnsafeCell;
 use linux_raw_sys::ctypes::c_int;
-#[cfg(all(feature = "alloc", feature = "thread"))]
+#[cfg(all(feature = "program-at-exit", feature = "thread"))]
 use rustix_futex_sync::Mutex;
 
 #[cfg(not(any(feature = "origin-start", feature = "external-start")))]
@@ -227,28 +227,28 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 /// `SmallVec` to ensure we can register that many without allocating.
 ///
 /// [POSIX guarantees]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/atexit.html
-#[cfg(all(feature = "alloc", feature = "thread"))]
+#[cfg(all(feature = "program-at-exit", feature = "thread"))]
 static DTORS: Mutex<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>> =
     Mutex::new(smallvec::SmallVec::new_const());
 
 /// A type for `DTORS` in the single-threaded case that we can mark as `Sync`.
-#[cfg(all(feature = "alloc", not(feature = "thread")))]
+#[cfg(all(feature = "program-at-exit", not(feature = "thread")))]
 struct Dtors(UnsafeCell<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>>);
 
 /// SAFETY: With `feature = "take-charge"`, we can assume that Origin is
 /// responsible for creating all threads in the program, and with
 /// `not(feature = "thread")` mode, Origin can't create any new threads, so we
 /// don't need to synchronize.
-#[cfg(all(feature = "alloc", not(feature = "thread")))]
+#[cfg(all(feature = "program-at-exit", not(feature = "thread")))]
 unsafe impl Sync for Dtors {}
 
 /// The single-threaded version of `DTORS`.
-#[cfg(all(feature = "alloc", not(feature = "thread")))]
+#[cfg(all(feature = "program-at-exit", not(feature = "thread")))]
 static DTORS: Dtors = Dtors(UnsafeCell::new(smallvec::SmallVec::new_const()));
 
 /// Register a function to be called when [`exit`] is called.
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
+#[cfg(feature = "program-at-exit")]
+#[cfg_attr(docsrs, doc(cfg(feature = "program-at-exit")))]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     #[cfg(feature = "thread")]
     let mut dtors = DTORS.lock();
@@ -263,13 +263,13 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
 /// `.fini_array` section, and exit the program.
 pub fn exit(status: c_int) -> ! {
     // Call functions registered with `at_thread_exit`.
-    #[cfg(all(feature = "alloc", feature = "thread"))]
+    #[cfg(feature = "thread-at-exit")]
     crate::thread::call_dtors(crate::thread::current());
 
     // Call all the registered functions, in reverse order. Leave `DTORS`
     // unlocked while making the call so that functions can add more functions
     // to the end of the list.
-    #[cfg(feature = "alloc")]
+    #[cfg(feature = "program-at-exit")]
     loop {
         #[cfg(feature = "thread")]
         let mut dtors = DTORS.lock();

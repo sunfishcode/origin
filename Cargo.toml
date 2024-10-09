@@ -58,7 +58,7 @@ features = ["param"]
 assert_cmd = "2.0.12"
 
 [features]
-default = ["std", "log", "libc", "errno", "thread", "init-fini-arrays"]
+default = ["std", "log", "libc", "errno", "thread", "init-fini-arrays", "program-at-exit", "thread-at-exit"]
 std = ["rustix/std", "bitflags/std", "alloc"]
 rustc-dep-of-std = [
     "dep:core",
@@ -89,8 +89,8 @@ external-start = ["take-charge"]
 # The loggers depend on a `.init_array` entry to initialize themselves, and
 # `env_logger` needs it so that `c-scape` can initialize environment variables
 # and make `RUST_LOG` available.
-atomic-dbg-logger = ["atomic-dbg/log", "init-fini-arrays"]
-env_logger = ["dep:env_logger", "init-fini-arrays"]
+atomic-dbg-logger = ["atomic-dbg/log", "init-array"]
+env_logger = ["dep:env_logger", "init-array"]
 
 # Disable logging.
 max_level_off = ["log/max_level_off"]
@@ -105,7 +105,7 @@ thread = ["rustix/thread", "rustix/mm", "param", "rustix/process", "rustix/runti
 # Enable support for signal handlers.
 signal = ["rustix/runtime"]
 
-# Enable support for `rustix::param`.
+# Have origin call `rustix::param::init`.
 param = ["rustix/param"]
 
 # Enable support for ELF `.init_array` and `.fini_array`.
@@ -116,6 +116,12 @@ init-array = []
 
 # Enable support for ELF `.fini_array`.
 fini-array = []
+
+# Enable support for `origin::program::at_exit`.
+program-at-exit = ["alloc"]
+
+# Enable support for `origin::thread::at_exit`.
+thread-at-exit = ["alloc", "thread"]
 
 # Enable highly experimental support for performing startup-time relocations,
 # needed to support statically-linked PIE executables.
@@ -171,4 +177,4 @@ panic-handler-abort = ["unwinding?/panic-handler-dummy"]
 getauxval = ["rustix/param"]
 
 [package.metadata.docs.rs]
-features = ["take-charge", "origin-start", "thread", "signal", "nightly"]
+features = ["origin-start", "thread", "signal", "program-at-exit", "thread-at-exit", "nightly"]

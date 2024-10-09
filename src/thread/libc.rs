@@ -2,6 +2,7 @@
 
 #[cfg(not(feature = "nightly"))]
 use crate::ptr::{with_exposed_provenance_mut, without_provenance_mut, Polyfill as _};
+#[cfg(feature = "thread-at-exit")]
 use alloc::boxed::Box;
 use core::ffi::{c_int, c_void};
 use core::mem::{size_of, transmute, zeroed};
@@ -23,6 +24,7 @@ extern "C" {
     fn __errno_location() -> *mut c_int;
     fn __tls_get_addr(p: &[usize; 2]) -> *mut c_void;
 
+    #[cfg(feature = "thread-at-exit")]
     static __dso_handle: *const c_void;
 }
 
@@ -154,6 +156,7 @@ pub unsafe fn create(
 }
 
 /// Registers a function to call when the current thread exits.
+#[cfg(feature = "thread-at-exit")]
 pub fn at_exit(func: Box<dyn FnOnce()>) {
     extern "C" fn call(arg: *mut c_void) {
         unsafe {
@@ -322,6 +325,7 @@ pub fn yield_current() {
 }
 
 /// Return the address of `__dso_handle`, appropriately casted.
+#[cfg(feature = "thread-at-exit")]
 unsafe fn dso_handle() -> *mut c_void {
     let dso_handle: *const *const c_void = &__dso_handle;
     dso_handle.cast::<c_void>().cast_mut()

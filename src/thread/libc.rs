@@ -114,7 +114,7 @@ pub unsafe fn create(
             // Unpack the thread arguments.
             let thread_arg_ptr = thread_arg_ptr.cast::<Option<NonNull<c_void>>>();
             let num_args = match thread_arg_ptr.read() {
-                Some(ptr) => ptr.addr().get(),
+                Some(ptr) => ptr.as_ptr().addr(),
                 None => 0,
             };
             let thread_args = slice::from_raw_parts_mut(thread_arg_ptr, num_args + 2);

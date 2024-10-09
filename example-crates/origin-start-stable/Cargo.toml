@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 # Origin can be depended on just like any other crate. For no_std, disable
 # the default features, and the desired features.
-origin = { path = "../..", default-features = false, features = ["origin-start", "thread", "alloc", "program-at-exit", "thread-at-exit", "eh-personality-continue", "panic-handler-abort"] }
+origin = { path = "../..", default-features = false, features = ["origin-start", "program-at-exit", "thread-at-exit", "eh-personality-continue", "panic-handler-abort"] }
 
 # Crates to help writing no_std code.
 atomic-dbg = { version = "0.1.8", default-features = false }

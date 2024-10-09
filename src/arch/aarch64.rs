@@ -18,7 +18,7 @@ use {
 };
 
 #[cfg(feature = "origin-start")]
-naked!(
+naked_fn!(
     "
     The program entry point.
 
@@ -273,7 +273,7 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
 }
 
 #[cfg(feature = "signal")]
-naked!(
+naked_fn!(
     "
     Invoke the `__NR_rt_sigreturn` system call to return control from a signal
     handler.

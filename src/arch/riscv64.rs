@@ -16,7 +16,7 @@ use {
 };
 
 #[cfg(feature = "origin-start")]
-naked!(
+naked_fn!(
     "
     The program entry point.
 

@@ -1,4 +1,11 @@
 //! Thread startup and shutdown.
+//!
+//! Why does this api look like `thread::join(t)` instead of `t.join()`? Either
+//! way could work, but free functions help emphasize that this API's
+//! [`Thread`] differs from `std::thread::Thread`. It does not detach or free
+//! its resources on drop, and does not guarantee validity. That gives users
+//! more control when creating efficient higher-level abstractions like
+//! pthreads or `std::thread::Thread`.
 
 #[cfg(not(feature = "nightly"))]
 use crate::ptr::{with_exposed_provenance_mut, without_provenance_mut, Polyfill as _};
@@ -48,6 +55,16 @@ impl Thread {
         Self(raw.expose_provenance() as libc::pthread_t)
     }
 
+    /// Convert to `Self` from a raw non-null pointer.
+    ///
+    /// # Safety
+    ///
+    /// `raw` must be a valid non-null thread pointer.
+    #[inline]
+    pub unsafe fn from_raw_unchecked(raw: *mut c_void) -> Self {
+        Self::from_raw(raw)
+    }
+
     /// Convert to `Self` from a raw non-null pointer that was returned from
     /// `Thread::to_raw_non_null`.
     #[inline]
@@ -83,10 +100,11 @@ impl Thread {
 ///
 /// # Safety
 ///
-/// `fn_(arg)` on the new thread must have defined behavior, and the return
-/// value must be valid to use on the eventual joining thread.
+/// The values of `args` must be valid to send to the new thread, `fn_(args)`
+/// on the new thread must have defined behavior, and the return value must be
+/// valid to send to other threads.
 pub unsafe fn create(
-    fn_: unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>>,
+    fn_: unsafe fn(&mut [Option<NonNull<c_void>>]) -> Option<NonNull<c_void>>,
     args: &[Option<NonNull<c_void>>],
     stack_size: usize,
     guard_size: usize,
@@ -94,10 +112,13 @@ pub unsafe fn create(
     extern "C" fn start(thread_arg_ptr: *mut c_void) -> *mut c_void {
         unsafe {
             // Unpack the thread arguments.
-            let num_args = thread_arg_ptr.cast::<*mut c_void>().read().addr();
-            let thread_args =
-                slice::from_raw_parts_mut(thread_arg_ptr.cast::<*mut c_void>(), num_args + 2);
-            let fn_: unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>> =
+            let thread_arg_ptr = thread_arg_ptr.cast::<Option<NonNull<c_void>>>();
+            let num_args = match thread_arg_ptr.read() {
+                Some(ptr) => ptr.as_ptr().addr(),
+                None => 0,
+            };
+            let thread_args = slice::from_raw_parts_mut(thread_arg_ptr, num_args + 2);
+            let fn_: unsafe fn(&mut [Option<NonNull<c_void>>]) -> Option<NonNull<c_void>> =
                 transmute(thread_args[1]);
             let args = &mut thread_args[2..];
 
@@ -105,7 +126,7 @@ pub unsafe fn create(
             let return_value = fn_(args);
 
             // Free the thread argument memory.
-            libc::free(thread_arg_ptr);
+            libc::free(thread_arg_ptr.cast::<c_void>());
 
             // Return the return value.
             match return_value {
@@ -153,6 +174,40 @@ pub unsafe fn create(
 
         Ok(Thread(new_thread))
     }
+}
+
+/// Marks a thread as “detached”.
+///
+/// Detached threads free their own resources automatically when they
+/// exit, rather than when they are joined.
+///
+/// # Safety
+///
+/// `thread` must point to a valid thread record that has not yet been detached
+/// and will not be joined.
+#[inline]
+pub unsafe fn detach(thread: Thread) {
+    let thread = thread.0;
+
+    assert_eq!(libc::pthread_detach(thread), 0);
+}
+
+/// Waits for a thread to finish.
+///
+/// The return value is the value returned from the call to the `fn_` passed to
+/// `create_thread`.
+///
+/// # Safety
+///
+/// `thread` must point to a valid thread record that has not already been
+/// detached or joined.
+pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
+    let thread = thread.0;
+
+    let mut return_value: *mut c_void = null_mut();
+    assert_eq!(libc::pthread_join(thread, &mut return_value), 0);
+
+    NonNull::new(return_value)
 }
 
 /// Registers a function to call when the current thread exits.
@@ -235,7 +290,8 @@ pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
 ///
 /// `thread` must point to a valid thread record.
 #[inline]
-pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
+#[must_use]
+pub unsafe fn stack(thread: Thread) -> (*mut c_void, usize, usize) {
     let thread = thread.0;
 
     let mut attr: libc::pthread_attr_t = zeroed();
@@ -252,40 +308,6 @@ pub unsafe fn thread_stack(thread: Thread) -> (*mut c_void, usize, usize) {
     assert_eq!(libc::pthread_attr_getguardsize(&attr, &mut guard_size), 0);
 
     (stack_addr, stack_size, guard_size)
-}
-
-/// Marks a thread as “detached”.
-///
-/// Detached threads free their own resources automatically when they
-/// exit, rather than when they are joined.
-///
-/// # Safety
-///
-/// `thread` must point to a valid thread record that has not yet been detached
-/// and will not be joined.
-#[inline]
-pub unsafe fn detach(thread: Thread) {
-    let thread = thread.0;
-
-    assert_eq!(libc::pthread_detach(thread), 0);
-}
-
-/// Waits for a thread to finish.
-///
-/// The return value is the value returned from the call to the `fn_` passed to
-/// `create_thread`.
-///
-/// # Safety
-///
-/// `thread` must point to a valid thread record that has not already been
-/// detached or joined.
-pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
-    let thread = thread.0;
-
-    let mut return_value: *mut c_void = null_mut();
-    assert_eq!(libc::pthread_join(thread, &mut return_value), 0);
-
-    NonNull::new(return_value)
 }
 
 /// Return the default stack size for new threads.

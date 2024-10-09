@@ -3,7 +3,7 @@
 //! # Example
 //!
 //! ```no_compile
-//! naked!(
+//! naked_fn!(
 //!     "
 //!     A documentation comment.
 //!
@@ -35,7 +35,7 @@
 /// `global_asm` otherwise. This macro supports a limited subset of the
 /// features of `#[naked]`.
 #[cfg(feature = "nightly")]
-macro_rules! naked {
+macro_rules! naked_fn {
     (
         $doc:literal;
         $vis:vis fn $name:ident $args:tt -> $ret:ty;
@@ -60,7 +60,7 @@ macro_rules! naked {
 /// `global_asm` otherwise. This macro supports a limited subset of the
 /// features of `#[naked]`.
 #[cfg(not(feature = "nightly"))]
-macro_rules! naked {
+macro_rules! naked_fn {
     (
         $doc:literal;
         $vis:vis fn $name:ident $args:tt -> $ret:ty;

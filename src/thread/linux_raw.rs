@@ -33,6 +33,8 @@ use rustix::runtime::{exe_phdrs, set_tid_address};
 use rustix::runtime::{sigprocmask, How, Sigset};
 use rustix::thread::gettid;
 
+pub use rustix::thread::Pid as ThreadId;
+
 /// An opaque pointer to a thread.
 ///
 /// This type does not detach or free resources on drop. It just leaks the
@@ -309,9 +311,6 @@ extern "C" {
 }
 // Rust has `extern_weak` but it isn't stable, so use a `global_asm`.
 core::arch::global_asm!(".weak _DYNAMIC");
-
-/// A numerical thread identifier.
-pub use rustix::thread::Pid as ThreadId;
 
 /// Initialize the main thread.
 ///
@@ -807,8 +806,8 @@ pub(crate) fn call_dtors(current: Thread) {
 ///
 /// # Safety
 ///
-/// `thread` must point to a valid thread record that has not yet been
-/// detached and will not be joined.
+/// `thread` must point to a valid thread record that has not yet been detached
+/// and will not be joined.
 #[inline]
 pub unsafe fn detach(thread: Thread) {
     #[cfg(feature = "log")]
@@ -1053,13 +1052,11 @@ pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
 
 /// Return the id of a thread, or `None` if the thread has exited.
 ///
-/// This is the same as [`rustix::thread::gettid`], but loads the value from a
-/// field in the runtime rather than making a system call.
-///
 /// # Safety
 ///
 /// `thread` must point to a valid thread record.
 #[inline]
+#[cfg_attr(docsrs, doc(cfg(feature = "take-charge")))]
 pub unsafe fn id(thread: Thread) -> Option<ThreadId> {
     let raw = thread.0.as_ref().thread_id.load(SeqCst);
     ThreadId::from_raw(raw)

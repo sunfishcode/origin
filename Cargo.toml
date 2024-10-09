@@ -58,55 +58,39 @@ features = ["param"]
 assert_cmd = "2.0.12"
 
 [features]
-default = ["std", "log", "libc", "errno", "thread", "init-fini-arrays", "program-at-exit", "thread-at-exit"]
-std = ["rustix/std", "bitflags/std", "alloc"]
-rustc-dep-of-std = [
-    "dep:core",
-    "dep:alloc",
-    "linux-raw-sys/rustc-dep-of-std",
-    "bitflags/rustc-dep-of-std",
-    "rustix/rustc-dep-of-std",
-    "unwinding?/rustc-dep-of-std",
-    "libc?/rustc-dep-of-std",
-    "rustix-futex-sync/rustc-dep-of-std",
-]
+# By default, origin coexists with libc and assume std exists and enables most
+# features.
+default = ["std", "log", "libc", "errno", "signal", "init-fini-arrays", "program-at-exit", "thread-at-exit"]
+
+# If you're using nightly Rust, enable this feature to let origin use
+# nightly-only features, which include proper support for unwinding, better
+# safety checks, and better optimizations.
+nightly = ["unwinding"]
+
+# Enable optimizations that reduce code size (at the cost of performance).
+optimize_for_size = []
 
 # Use origin's implementation of program and thread startup and shutdown as
-# well as signal handler registration.
+# well as signal handler registration. To use this, enable exactly one of
+# "origin-start" or "external-start".
 #
 # To use threads, it is also necessary to enable the "thread" feature.
 # To use signals, it is also necessary to enable the "signal" feature.
 take-charge = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
 
-# Use origin's `_start` definition.
+# Enable "take-charge" mode using origin's `_start` definition.
 origin-start = ["take-charge"]
 
-# Don't use origin's `_start` definition, but export a `start` function which
-# is meant to be run very early in program startup and passed a pointer to
-# the initial stack. Don't enable this when enabling "origin-start".
+# Enable "take-charge" mode using an exported `start` function which is meant
+# to be run very early in program startup and passed a pointer to the initial
+# stack. Don't enable this when enabling "origin-start".
 external-start = ["take-charge"]
-
-# The loggers depend on a `.init_array` entry to initialize themselves, and
-# `env_logger` needs it so that `c-scape` can initialize environment variables
-# and make `RUST_LOG` available.
-atomic-dbg-logger = ["atomic-dbg/log", "init-array"]
-env_logger = ["dep:env_logger", "init-array"]
-
-# Disable logging.
-max_level_off = ["log/max_level_off"]
-
-# Enable features which depend on the Rust global allocator, such as functions
-# that return owned strings or `Vec`s.
-alloc = ["rustix/alloc", "smallvec"]
 
 # Enable support for threads.
 thread = ["rustix/thread", "rustix/mm", "param", "rustix/process", "rustix/runtime", "rustix-futex-sync"]
 
 # Enable support for signal handlers.
 signal = ["rustix/runtime"]
-
-# Have origin call `rustix::param::init`.
-param = ["rustix/param"]
 
 # Enable support for ELF `.init_array` and `.fini_array`.
 init-fini-arrays = ["init-array", "fini-array"]
@@ -123,6 +107,15 @@ program-at-exit = ["alloc"]
 # Enable support for `origin::thread::at_exit`.
 thread-at-exit = ["alloc", "thread"]
 
+# Have origin call `atomic_dbg::log::init()` on startup.
+atomic-dbg-logger = ["atomic-dbg/log", "init-array"]
+
+# Have origin call `env_logger::init()` on startup.
+env_logger = ["dep:env_logger", "init-array"]
+
+# Disable logging.
+max_level_off = ["log/max_level_off"]
+
 # Enable highly experimental support for performing startup-time relocations,
 # needed to support statically-linked PIE executables.
 experimental-relocate = ["rustix/mm", "rustix/runtime"]
@@ -133,13 +126,8 @@ experimental-relocate = ["rustix/mm", "rustix/runtime"]
 # until a dynamic linker is written in Rust.
 unstable-errno = ["thread"]
 
-# If you're using nightly Rust, enable this feature to let origin use
-# nightly-only features, which include proper support for unwinding, better
-# safety checks, and better optimizations.
-nightly = ["unwinding"]
-
-# Enable optimizations that reduce code size (at the cost of performance).
-optimize_for_size = []
+# Have origin call `rustix::param::init` on startup.
+param = ["rustix/param"]
 
 # Provide a `#[lang = eh_personality]` function suitable for unwinding (for
 # no-std).
@@ -176,5 +164,25 @@ panic-handler-abort = ["unwinding?/panic-handler-dummy"]
 # Enable this to define the `getauxval` function.
 getauxval = ["rustix/param"]
 
+# Enable features which depend on Rust's std.
+std = ["rustix/std", "bitflags/std", "alloc"]
+
+# Enable features which depend on the Rust global allocator, such as functions
+# that return owned strings or `Vec`s.
+alloc = ["rustix/alloc", "smallvec"]
+
+# Use this iff you're experimenting with using origin from within Rust's
+# standard library implementation.
+rustc-dep-of-std = [
+    "dep:core",
+    "dep:alloc",
+    "linux-raw-sys/rustc-dep-of-std",
+    "bitflags/rustc-dep-of-std",
+    "rustix/rustc-dep-of-std",
+    "unwinding?/rustc-dep-of-std",
+    "libc?/rustc-dep-of-std",
+    "rustix-futex-sync/rustc-dep-of-std",
+]
+
 [package.metadata.docs.rs]
-features = ["origin-start", "thread", "signal", "program-at-exit", "thread-at-exit", "nightly"]
+features = ["origin-start", "signal", "program-at-exit", "thread-at-exit", "nightly"]

@@ -12,7 +12,7 @@ use crate::arch::{
 };
 #[cfg(not(feature = "nightly"))]
 use crate::ptr::Polyfill as _;
-#[cfg(feature = "alloc")]
+#[cfg(feature = "thread-at-exit")]
 use alloc::boxed::Box;
 #[cfg(feature = "unstable-errno")]
 use core::cell::Cell;
@@ -101,7 +101,7 @@ struct ThreadData {
     return_value: AtomicPtr<c_void>,
 
     // Support a few dtors before using dynamic allocation.
-    #[cfg(feature = "alloc")]
+    #[cfg(feature = "thread-at-exit")]
     dtors: smallvec::SmallVec<[Box<dyn FnOnce()>; 4]>,
 }
 
@@ -123,7 +123,7 @@ impl ThreadData {
             guard_size,
             map_size,
             return_value: AtomicPtr::new(null_mut()),
-            #[cfg(feature = "alloc")]
+            #[cfg(feature = "thread-at-exit")]
             dtors: smallvec::SmallVec::new(),
         }
     }
@@ -697,7 +697,7 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
     }
 
     // Call functions registered with `at_exit`.
-    #[cfg(feature = "alloc")]
+    #[cfg(feature = "thread-at-exit")]
     call_dtors(current);
 
     // Read the thread's state, and set it to `ABANDONED` if it was `INITIAL`,
@@ -778,7 +778,7 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
 }
 
 /// Call the destructors registered with [`at_exit`].
-#[cfg(feature = "alloc")]
+#[cfg(feature = "thread-at-exit")]
 pub(crate) fn call_dtors(current: Thread) {
     let mut current = current;
 
@@ -938,7 +938,7 @@ unsafe fn free_memory(thread: Thread) {
 }
 
 /// Registers a function to call when the current thread exits.
-#[cfg(feature = "alloc")]
+#[cfg(feature = "thread-at-exit")]
 pub fn at_exit(func: Box<dyn FnOnce()>) {
     // SAFETY: `current()` points to thread-local data which is valid as long
     // as the thread is alive.

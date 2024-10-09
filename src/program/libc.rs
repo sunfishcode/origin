@@ -28,14 +28,15 @@
 //! with origin's goal of providing Rust-idiomatic interfaces, however it does
 //! mean that origin can avoid doing any work that users might not need.
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "program-at-exit")]
 use alloc::boxed::Box;
+#[cfg(feature = "program-at-exit")]
 use core::ptr::null_mut;
 use linux_raw_sys::ctypes::c_int;
 
 /// Register a function to be called when [`exit`] is called.
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
+#[cfg(feature = "program-at-exit")]
+#[cfg_attr(docsrs, doc(cfg(feature = "program-at-exit")))]
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     use core::ffi::c_void;
 

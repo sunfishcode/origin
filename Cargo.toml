@@ -59,7 +59,8 @@ assert_cmd = "2.0.12"
 
 [features]
 # By default, origin coexists with libc and assume std exists and enables most
-# features.
+# features. To have origin avoid using libc, disable the default features and
+# enable either "origin-start" or "external-start".
 default = ["std", "log", "libc", "errno", "signal", "init-fini-arrays", "program-at-exit", "thread-at-exit"]
 
 # If you're using nightly Rust, enable this feature to let origin use
@@ -71,8 +72,8 @@ nightly = ["unwinding"]
 optimize_for_size = []
 
 # Use origin's implementation of program and thread startup and shutdown as
-# well as signal handler registration. To use this, enable exactly one of
-# "origin-start" or "external-start".
+# well as signal handler registration. To use this, disable the default
+# features and enable exactly one of "origin-start" or "external-start".
 #
 # To use threads, it is also necessary to enable the "thread" feature.
 # To use signals, it is also necessary to enable the "signal" feature.
@@ -108,9 +109,15 @@ program-at-exit = ["alloc"]
 thread-at-exit = ["alloc", "thread"]
 
 # Have origin call `atomic_dbg::log::init()` on startup.
+#
+# To have origin emit log messages for the things it does, additionally enable the
+# "log" feature.
 atomic-dbg-logger = ["atomic-dbg/log", "init-array"]
 
 # Have origin call `env_logger::init()` on startup.
+#
+# To have origin emit log messages for the things it does, additionally enable the
+# "log" feature.
 env_logger = ["dep:env_logger", "init-array"]
 
 # Disable logging.

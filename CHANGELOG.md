@@ -1,3 +1,15 @@
+# origin 0.22
+
+## Changes
+
+`program::at_exit` and `thread::at_exit` are now behind feature flags
+"program-at-exit" and "thread-at-exit", respectively. They're enabled by
+default, but many users disable the default features, so they may need to be
+explicitly enabled if needed.
+
+The "atomic-dbg-logger" and "env_logger" features no longer implicitly enable
+the "fini-array" feature.
+
 # origin 0.21
 
 ## Changes

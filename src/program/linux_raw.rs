@@ -32,6 +32,8 @@
 use crate::thread;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
+#[cfg(not(feature = "thread"))]
+use core::cell::UnsafeCell;
 use linux_raw_sys::ctypes::c_int;
 #[cfg(all(feature = "alloc", feature = "thread"))]
 use rustix_futex_sync::Mutex;
@@ -231,7 +233,7 @@ static DTORS: Mutex<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>> =
 
 /// A type for `DTORS` in the single-threaded case that we can mark as `Sync`.
 #[cfg(all(feature = "alloc", not(feature = "thread")))]
-struct Dtors(smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>);
+struct Dtors(UnsafeCell<smallvec::SmallVec<[Box<dyn FnOnce() + Send>; 32]>>);
 
 /// SAFETY: With `feature = "take-charge"`, we can assume that Origin is
 /// responsible for creating all threads in the program, and with
@@ -242,7 +244,7 @@ unsafe impl Sync for Dtors {}
 
 /// The single-threaded version of `DTORS`.
 #[cfg(all(feature = "alloc", not(feature = "thread")))]
-static mut DTORS: Dtors = Dtors(smallvec::SmallVec::new_const());
+static DTORS: Dtors = Dtors(UnsafeCell::new(smallvec::SmallVec::new_const()));
 
 /// Register a function to be called when [`exit`] is called.
 #[cfg(feature = "alloc")]
@@ -252,7 +254,7 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     let mut dtors = DTORS.lock();
     // SAFETY: See the safety comments on the `unsafe impl Sync for Dtors`.
     #[cfg(not(feature = "thread"))]
-    let dtors = unsafe { &mut DTORS.0 };
+    let dtors = unsafe { &mut *DTORS.0.get() };
 
     dtors.push(func);
 }
@@ -273,7 +275,7 @@ pub fn exit(status: c_int) -> ! {
         let mut dtors = DTORS.lock();
         // SAFETY: See the safety comments on the `unsafe impl Sync for Dtors`.
         #[cfg(not(feature = "thread"))]
-        let dtors = unsafe { &mut DTORS.0 };
+        let dtors = unsafe { &mut *DTORS.0.get() };
 
         if let Some(func) = dtors.pop() {
             #[cfg(feature = "log")]

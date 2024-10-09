@@ -32,7 +32,7 @@
 use crate::thread;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(not(feature = "thread"))]
+#[cfg(all(feature = "alloc", not(feature = "thread")))]
 use core::cell::UnsafeCell;
 use linux_raw_sys::ctypes::c_int;
 #[cfg(all(feature = "alloc", feature = "thread"))]

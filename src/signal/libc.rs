@@ -24,7 +24,7 @@ pub use linux_raw_sys::ctypes::c_int as Sigflags;
 ///
 /// # Safety
 ///
-/// yolo
+/// yolo. At least this function handles `sa_restorer` automatically though.
 pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Sigaction> {
     let action: *const Sigaction = match action {
         Some(action) => &action,

@@ -45,7 +45,7 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
 
 /// Return a special “ignore” signal handler for ignoring signals.
 ///
-/// If you're looking for `sig_dlf`; use [`SigDfl`].
+/// If you're looking for `sig_dfl`; use [`SigDfl`].
 #[doc(alias = "SIG_IGN")]
 #[must_use]
 pub const fn sig_ign() -> Sighandler {

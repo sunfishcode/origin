@@ -1,4 +1,6 @@
 use core::ffi::{c_char, c_int, c_void};
+#[cfg(not(feature = "nightly"))]
+use crate::ptr::Polyfill as _;
 
 #[no_mangle]
 unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, len: usize) -> *mut c_void {

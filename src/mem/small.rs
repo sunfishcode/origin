@@ -1,3 +1,5 @@
+#[cfg(not(feature = "nightly"))]
+use crate::ptr::Polyfill as _;
 use core::ffi::{c_char, c_int, c_void};
 
 #[no_mangle]

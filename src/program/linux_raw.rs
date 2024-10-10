@@ -278,11 +278,18 @@ pub fn exit(status: c_int) -> ! {
         let dtors = unsafe { &mut *DTORS.0.get() };
 
         if let Some(func) = dtors.pop() {
+            // Unlock `DTORS` before calling `func`.
+            drop(dtors);
+
             #[cfg(feature = "log")]
             log::trace!("Calling `at_exit`-registered function");
 
             func();
         } else {
+            // Now that we're done processing `DTORS`, leak the lock, since
+            // from this point on, nothing should try to add anything to it.
+            #[cfg(feature = "thread")]
+            core::mem::forget(dtors);
             break;
         }
     }

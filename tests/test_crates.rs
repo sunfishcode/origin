@@ -87,3 +87,39 @@ fn test_detach() {
 fn test_canary() {
     test_crate("origin-start", &["--bin=canary"], &[], "", "", Some(203));
 }
+
+#[test]
+fn test_program_dtors_adding_dtors() {
+    test_crate(
+        "origin-start",
+        &["--bin=program-dtors-adding-dtors"],
+        &[],
+        "",
+        "",
+        Some(0),
+    );
+}
+
+#[test]
+fn test_thread_dtors_adding_dtors() {
+    test_crate(
+        "origin-start",
+        &["--bin=thread-dtors-adding-dtors"],
+        &[],
+        "",
+        "",
+        Some(0),
+    );
+}
+
+#[test]
+fn test_main_thread_dtors_adding_dtors() {
+    test_crate(
+        "origin-start",
+        &["--bin=main-thread-dtors-adding-dtors"],
+        &[],
+        "",
+        "",
+        Some(0),
+    );
+}

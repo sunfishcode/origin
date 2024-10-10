@@ -127,6 +127,7 @@ fn test_main_thread_dtors_adding_dtors() {
 }
 
 #[test]
+#[ignore] // TODO: This test isn't handled well by qemu.
 fn test_trap() {
     let mut command = utils::run_test("test", "run", "origin-start", &["--bin=trap"], &[]);
     assert_eq!(

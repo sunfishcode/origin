@@ -76,7 +76,7 @@ macro_rules! debug_assert_eq {
 /// In practice, things work if we don't make any calls to functions outside
 /// of this crate, not counting functions directly implemented by the compiler.
 /// So we can do eg. `x == null()` but we can't do `x.is_null()`, because
-/// `null` is directly implemented by the compiler, while `is_null` is not.
+/// `null` is directly implemented by the compiler, while `is_null` is not 🙃.
 ///
 /// We do all the relocation memory accesses using `asm`, as they happen
 /// outside the Rust memory model. They read and write and `mprotect` memory

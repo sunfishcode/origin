@@ -339,7 +339,7 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
     // the effective stack size. Linux sets up inaccessible memory at the end
     // of the stack.
     let stack_map_size = getrlimit(Resource::Stack).current.unwrap() as usize;
-    let stack_least = stack_base.cast::<u8>().sub(stack_map_size);
+    let stack_least = stack_base.sub(stack_map_size);
     let stack_size = stack_least.offset_from(mem.cast::<u8>()) as usize;
     let guard_size = page_size();
 

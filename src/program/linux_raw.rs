@@ -119,10 +119,10 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
             static __init_array_end: c_void;
         }
 
-        // Call the `.init_array` functions. As GLIBC does, pass argc, argv,
-        // and envp as extra arguments. In addition to GLIBC ABI compatibility,
+        // Call the `.init_array` functions. As glibc does, pass argc, argv,
+        // and envp as extra arguments. In addition to glibc ABI compatibility,
         // c-scape relies on this.
-        type InitFn = extern "C" fn(c_int, *mut *mut u8, *mut *mut u8);
+        type InitFn = unsafe extern "C" fn(c_int, *mut *mut u8, *mut *mut u8);
         let mut init = core::ptr::addr_of!(__init_array_start).cast::<InitFn>();
         let init_end = core::ptr::addr_of!(__init_array_end).cast::<InitFn>();
         // Prevent the optimizer from optimizing the `!=` comparison to true;

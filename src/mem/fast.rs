@@ -1,3 +1,5 @@
+//! `memcpy` etc. implementations with performance optimizations.
+//!
 //! The following is derived from src/mem/mod.rs in Rust's
 //! [compiler_builtins library] at revision
 //! cb060052ab7e4bad408c85d44be7e60096e93e38.

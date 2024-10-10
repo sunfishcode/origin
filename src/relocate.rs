@@ -374,7 +374,7 @@ unsafe fn compute_auxp(envp: *mut *mut u8) -> *const Elf_auxv_t {
     // that would involve calling a function in another crate.
     let mut auxp = envp;
     // Don't use `is_null` because that's not `inline(always)`.
-    while (*auxp) != null_mut() {
+    while *auxp != null_mut() {
         auxp = auxp.add(1);
     }
     auxp.add(1).cast()

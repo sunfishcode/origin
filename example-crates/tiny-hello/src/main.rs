@@ -13,7 +13,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
         match rustix::io::write(rustix::stdio::stdout(), message) {
             Ok(n) => remaining = &remaining[n as usize..],
             Err(rustix::io::Errno::INTR) => continue,
-            Err(_) => origin::program::abort(),
+            Err(_) => origin::program::trap(),
         }
     }
     origin::program::exit_immediately(0);

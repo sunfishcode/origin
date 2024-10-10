@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use assert_cmd::Command;
+
 pub fn arch() -> String {
     #[cfg(target_arch = "x86_64")]
     let arch = "x86_64";
@@ -19,6 +21,22 @@ pub fn arch() -> String {
     format!("{arch}-unknown-linux-{env}")
 }
 
+pub fn run_test(
+    dir: &str,
+    cmd: &str,
+    name: &str,
+    args: &[&str],
+    envs: &[(&str, &str)],
+) -> std::process::Command {
+    let mut command = std::process::Command::new("cargo");
+    command.arg(cmd).arg("--quiet");
+    command.arg(format!("--target={}", arch()));
+    command.args(args);
+    command.envs(envs.iter().copied());
+    command.current_dir(format!("{dir}-crates/{name}"));
+    command
+}
+
 pub fn test_crate(
     dir: &str,
     cmd: &str,
@@ -29,15 +47,10 @@ pub fn test_crate(
     stderr: &'static str,
     code: Option<i32>,
 ) {
-    use assert_cmd::Command;
-
-    let mut command = Command::new("cargo");
-    command.arg(cmd).arg("--quiet");
-    command.arg(format!("--target={}", arch()));
-    command.args(args);
-    command.envs(envs.iter().copied());
-    command.current_dir(format!("{dir}-crates/{name}"));
+    let command = run_test(dir, cmd, name, args, envs);
+    let mut command = Command::from_std(command);
     let assert = command.assert();
+
     let assert = assert.stdout(stdout).stderr(stderr);
     if let Some(code) = code {
         assert.code(code);

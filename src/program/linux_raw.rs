@@ -340,9 +340,12 @@ pub fn exit_immediately(status: c_int) -> ! {
     rustix::runtime::exit_group(status)
 }
 
-/// Immediately abort the program due to the detection of an unrecoverable bug.
+/// Execute a trap instruction.
+///
+/// This will produce a `Signal::Ill`, which by default will immediately
+/// terminate the process.
 #[inline]
 #[cold]
-pub fn abort() -> ! {
-    crate::arch::abort()
+pub fn trap() -> ! {
+    crate::arch::trap()
 }

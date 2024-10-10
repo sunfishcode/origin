@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 # Origin can be depended on just like any other crate. For no_std, disable
 # the default features, and add the desired features.
-origin = { path = "../..", default-features = false, features = ["origin-start", "eh-personality-continue", "panic-handler-abort", "nightly", "optimize_for_size"] }
+origin = { path = "../..", default-features = false, features = ["origin-start", "eh-personality-continue", "panic-handler-trap", "nightly", "optimize_for_size"] }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]

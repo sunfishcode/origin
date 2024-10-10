@@ -42,10 +42,10 @@ naked_fn!(
     options(noreturn)
 );
 
-/// Abort the process without involving any panic handling code.
+/// Execute a trap instruction.
 ///
-/// This is a stable equivalent to `core::intrinsics::abort()`.
-pub(super) fn abort() -> ! {
+/// This is roughly equivalent to `core::intrinsics::abort()`.
+pub(super) fn trap() -> ! {
     unsafe {
         asm!("ud2", options(noreturn, nostack));
     }
@@ -176,7 +176,7 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
     if r0 != 0 {
         // Do not panic here as libstd's panic handler needs TLS, which is not
         // yet initialized at this point.
-        abort();
+        trap();
     }
 }
 

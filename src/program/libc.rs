@@ -78,9 +78,17 @@ pub fn exit_immediately(status: c_int) -> ! {
     }
 }
 
-/// Immediately abort the program due to the detection of an unrecoverable bug.
+/// Execute a trap instruction.
+///
+/// This will produce a `Signal::Ill`, which by default will immediately
+/// terminate the process.
 #[inline]
 #[cold]
-pub fn abort() -> ! {
-    unsafe { libc::abort() }
+pub fn trap() -> ! {
+    // Emulate the effect of executing a trap instruction.
+    loop {
+        unsafe {
+            libc::raise(libc::SIGILL);
+        }
+    }
 }

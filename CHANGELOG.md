@@ -1,3 +1,9 @@
+# origin 0.23
+
+## Changes
+
+`program::abort` has been renamed to `progaram::trap`.
+
 # origin 0.22
 
 ## Changes

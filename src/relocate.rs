@@ -27,8 +27,8 @@
 #![allow(clippy::cmp_null)]
 
 use crate::arch::{
-    abort, dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly,
-    relocation_store,
+    dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
+    trap,
 };
 #[cfg(not(feature = "nightly"))]
 use crate::ptr::addr;
@@ -55,14 +55,14 @@ const DT_RELR: usize = 36;
 #[cfg(debug_assertions)]
 const DT_RELRENT: usize = 37;
 
-// We have to override the debug_assert! family of macros to abort rather than
+// We have to override the debug_assert! family of macros to trap rather than
 // panic as panicking doesn't work this early on. See the docs of [relocate]
 // for more info.
 #[cfg(debug_assertions)]
 macro_rules! debug_assert_eq {
     ($l:expr, $r:expr) => {
         if !($l == $r) {
-            abort();
+            trap();
         }
     };
 }
@@ -232,9 +232,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
                 let reloc_value = addend.wrapping_add(offset);
                 relocation_store(reloc_addr, reloc_value);
             }
-            // Abort the process without panicking as panicking requires
+            // Trap the process without panicking as panicking requires
             // relocations to be performed first.
-            _ => abort(),
+            _ => trap(),
         }
     }
 
@@ -255,9 +255,9 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
                 let reloc_value = addend.wrapping_add(offset);
                 relocation_store(reloc_addr, reloc_value);
             }
-            // Abort the process without panicking as panicking requires
+            // Trap the process without panicking as panicking requires
             // relocations to be performed first.
-            _ => abort(),
+            _ => trap(),
         }
     }
 

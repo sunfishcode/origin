@@ -4,6 +4,8 @@
 // Most of the test crates only work with nightly.
 #![cfg(feature = "nightly")]
 
+use std::os::unix::process::ExitStatusExt;
+
 mod utils;
 
 fn test_crate(
@@ -121,5 +123,29 @@ fn test_main_thread_dtors_adding_dtors() {
         "",
         "",
         Some(0),
+    );
+}
+
+#[test]
+fn test_trap() {
+    let mut command = utils::run_test("test", "run", "origin-start", &["--bin=trap"], &[]);
+    assert_eq!(
+        command.output().unwrap().status.signal(),
+        Some(origin::signal::Signal::Ill as i32)
+    );
+}
+
+#[test]
+fn test_abort_via_raise() {
+    let mut command = utils::run_test(
+        "test",
+        "run",
+        "origin-start",
+        &["--bin=abort-via-raise"],
+        &[],
+    );
+    assert_eq!(
+        command.output().unwrap().status.signal(),
+        Some(origin::signal::Signal::Abort as i32)
     );
 }

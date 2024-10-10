@@ -10,6 +10,9 @@ pub use rustix::runtime::Sigaction;
 /// A signal identifier for use with [`sigaction`].
 pub use rustix::runtime::Signal;
 
+/// A signal set for use with [`Sigaction`].
+pub use rustix::runtime::Sigset;
+
 /// A signal handler function for use with [`Sigaction`].
 pub use linux_raw_sys::general::__kernel_sighandler_t as Sighandler;
 

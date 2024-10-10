@@ -9,20 +9,8 @@
 //! relocation memory accesses, so that Rust semantics don't have to be aware
 //! of them.
 //!
-//! However, we need to be careful to avoid making any calls to other crates.
-//! This includes functions in `core` that aren't implemented by the compiler,
-//! so we can do `ptr == null()` but we can't do `ptr.is_null()` because `null`
-//! is implemented by the compiler while `is_null` is not. And, it includes
-//! code patterns that the compiler might implement as calls to functions like
-//! `memset`.
-//!
-//! And we have to avoid reading any static variables that contain addresses,
-//! including any tables the compiler might implicitly emit.
-//!
-//! Implicit calls to `memset` etc. could possibly be prevented by using
-//! `#![no_builtins]`, however wouldn't fix the other problems, so we'd still
-//! need to rely on testing the code to make sure it doesn't segfault in any
-//! case. And, `#![no_builtins]` interferes with LTO, so we don't use it.
+//! See the comments on the `relocate` function for additional special
+//! considerations.
 
 #![allow(clippy::cmp_null)]
 
@@ -74,17 +62,27 @@ macro_rules! debug_assert_eq {
 /// guarantees that this code won't segfault at any moment.
 ///
 /// In practice, things work if we don't make any calls to functions outside
-/// of this crate, not counting functions directly implemented by the compiler.
-/// So we can do eg. `x == null()` but we can't do `x.is_null()`, because
-/// `null` is directly implemented by the compiler, while `is_null` is not 🙃.
+/// of this crate, not counting `inline(always)` functions. So we can do eg.
+/// `x == null()` but we can't do `x.is_null()`, because `null` is
+/// `inline(always)`, while `is_null` is not 🙃. And, it includes code
+/// patterns that the compiler might implement as calls to functions like
+/// `memset`.
 ///
-/// We do all the relocation memory accesses using `asm`, as they happen
+/// Implicit calls to `memset` etc. could possibly be prevented by using
+/// `#![no_builtins]`, however wouldn't fix the other problems, so we'd still
+/// need to rely on testing the code to make sure it doesn't segfault in any
+/// case. And, `#![no_builtins]` interferes with LTO, so we don't use it.
+///
+/// And, we have to avoid reading any static variables that contain addresses,
+/// including any tables the compiler might implicitly emit.
+///
+/// And, we do all the relocation memory accesses using `asm`, as they happen
 /// outside the Rust memory model. They read and write and `mprotect` memory
 /// that Rust wouldn't think could be accessed.
 ///
-/// We also need to take care to avoid panics as panicking will segfault due to
-/// `core::fmt` making use of statics that need relocation. Even after all
-/// relocations are done we still need to avoid panicking as libstd's panic
+/// And, we also need to take care to avoid panics as panicking will segfault
+/// due to `core::fmt` making use of statics that need relocation. Even after
+/// all relocations are done we still need to avoid panicking as libstd's panic
 /// handler makes use of TLS, which won't be initialized until much later.
 ///
 /// So yes, there's a reason this code is behind a feature flag.
@@ -375,7 +373,7 @@ unsafe fn compute_auxp(envp: *mut *mut u8) -> *const Elf_auxv_t {
     // Locate the AUX records we need. We don't use rustix to do this because
     // that would involve calling a function in another crate.
     let mut auxp = envp;
-    // Don't use `is_null` because that's a call.
+    // Don't use `is_null` because that's not `inline(always)`.
     while (*auxp) != null_mut() {
         auxp = auxp.add(1);
     }

@@ -9,8 +9,8 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use core::cell::UnsafeCell;
 use core::arch::asm;
+use core::cell::UnsafeCell;
 use core::ptr::{addr_of_mut, without_provenance_mut};
 use origin::{program, thread};
 

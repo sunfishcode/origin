@@ -28,7 +28,7 @@ smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
 # before `origin_main` is called.
 
 # Enable `env_logger`; eg. recognizing `RUST_LOG=trace`. This requires `std`.
-env_logger = { version = "0.11.0", optional = true, default-features = false }
+env_logger = { version = "0.11.0", default-features = false, optional = true }
 
 # Enable `atomic-dbg`'s simple logger. This doesn't require `std`.
 atomic-dbg = { version = "0.1", default-features = false, optional = true }
@@ -168,7 +168,10 @@ panic-handler = ["unwinding?/panic-handler"]
 # if you know your program will never panic and don't want any extra code.
 panic-handler-abort = ["unwinding?/panic-handler-dummy"]
 
-# Enable this to define the `getauxval` function.
+# Enable this to define a C ABI-compatible `getauxval` function. Most Rust code
+# should use functions in [`rustix::param`] instead.
+#
+# [`rustix::param`]: https://docs.rs/rustix/latest/rustix/param/index.html
 getauxval = ["rustix/param"]
 
 # Enable features which depend on Rust's std.

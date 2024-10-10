@@ -6,8 +6,8 @@
 
 extern crate alloc;
 
-use core::cell::UnsafeCell;
 use core::arch::asm;
+use core::cell::UnsafeCell;
 use origin::{program, thread};
 
 #[global_allocator]

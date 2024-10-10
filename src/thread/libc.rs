@@ -109,6 +109,8 @@ pub unsafe fn create(
     stack_size: usize,
     guard_size: usize,
 ) -> io::Result<Thread> {
+    // This should really be an `unsafe` function, but `libc::pthread_create`
+    // doesn't have `unsafe` in its signature.
     extern "C" fn start(thread_arg_ptr: *mut c_void) -> *mut c_void {
         unsafe {
             // Unpack the thread arguments.
@@ -213,7 +215,7 @@ pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
 /// Registers a function to call when the current thread exits.
 #[cfg(feature = "thread-at-exit")]
 pub fn at_exit(func: Box<dyn FnOnce()>) {
-    extern "C" fn call(arg: *mut c_void) {
+    unsafe extern "C" fn call(arg: *mut c_void) {
         unsafe {
             let arg = arg.cast::<Box<dyn FnOnce()>>();
             let arg = Box::from_raw(arg);

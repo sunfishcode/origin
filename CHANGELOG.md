@@ -2,7 +2,8 @@
 
 ## Changes
 
-`program::abort` has been renamed to `progaram::trap`.
+`program::abort` has been renamed to `progaram::trap`, and the
+"panic-handler-abort" feature has been renamed to "panic-handler-trap".
 
 # origin 0.22
 

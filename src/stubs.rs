@@ -17,9 +17,9 @@ unsafe extern "C" fn rust_eh_personality(
     8 // UnwindReasonCode::CONTINUE_UNWIND
 }
 
-// If requested, provide a version of "panic-handler-abort" ourselves.
-#[cfg(feature = "panic-handler-abort")]
+// If requested, provide a version of "panic-handler-trap" ourselves.
+#[cfg(feature = "panic-handler-trap")]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
-    crate::arch::abort()
+    crate::arch::trap()
 }

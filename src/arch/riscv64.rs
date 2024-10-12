@@ -36,8 +36,7 @@ naked_fn!(
     "mv ra, zero",  // Set the return address to zero.
     "mv fp, zero",  // Set the frame address to zero.
     "tail {entry}"; // Jump to `entry`.
-    entry = sym super::program::entry;
-    options(noreturn)
+    entry = sym super::program::entry
 );
 
 /// Execute a trap instruction.

@@ -47,8 +47,7 @@ naked_fn!(
     "push eax",     // Pass saved the incoming `esp` as the arg to `entry`.
     "push ebp",     // Set the return address to zero.
     "jmp {entry}";  // Jump to `entry`.
-    entry = sym super::program::entry;
-    options(noreturn)
+    entry = sym super::program::entry
 );
 
 /// Execute a trap instruction.
@@ -393,8 +392,6 @@ naked_fn!(
     "int 0x80",
     "ud2";
     //__NR_rt_sigreturn = const __NR_rt_sigreturn // TODO: Use this when `asm_const` is stabilized.
-    ;
-    options(noreturn)
 );
 #[cfg(feature = "signal")]
 #[cfg(test)] // TODO: obviate this
@@ -420,8 +417,6 @@ naked_fn!(
     "int 0x80",
     "ud2";
     //__NR_sigreturn = const __NR_sigreturn // TODO: Use this when `asm_const` is stabilized.
-    ;
-    options(noreturn)
 );
 #[cfg(feature = "signal")]
 #[cfg(test)] // TODO: obviate this

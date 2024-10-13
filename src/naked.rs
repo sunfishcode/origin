@@ -22,10 +22,7 @@
 //!
 //!     // Provide symbols for use in the assembly code.
 //!     symbols = sym path::to::symbols,
-//!     this = sym path::to::this;
-//!
-//!     // Add additional `asm` options.
-//!     options(noreturn)
+//!     this = sym path::to::this
 //! );
 //! ```
 
@@ -40,17 +37,15 @@ macro_rules! naked_fn {
         $doc:literal;
         $vis:vis fn $name:ident $args:tt -> $ret:ty;
         $($code:literal),*;
-        $($label:ident = $kind:ident $path:path),*;
-        options($($option:ident),*)
+        $($label:ident = $kind:ident $path:path),*
     ) => {
         #[doc = $doc]
         #[naked]
         #[no_mangle]
         $vis unsafe extern "C" fn $name $args -> $ret {
-            asm!(
+            core::arch::naked_asm!(
                 $($code),*,
-                $($label = $kind $path,)*
-                options($($option),*),
+                $($label = $kind $path),*
             )
         }
     };
@@ -65,8 +60,7 @@ macro_rules! naked_fn {
         $doc:literal;
         $vis:vis fn $name:ident $args:tt -> $ret:ty;
         $($code:literal),*;
-        $($label:ident = $kind:ident $path:path),*;
-        options($($option:ident),*)
+        $($label:ident = $kind:ident $path:path),*
     ) => {
         extern "C" {
             #[doc = $doc]
@@ -79,7 +73,6 @@ macro_rules! naked_fn {
             $($code),*,
             concat!(".size ", stringify!($name), ", .-", stringify!($name)),
             $($label = $kind $path),*
-            // Omit the options because this is a `global_asm`.
         );
     };
 }

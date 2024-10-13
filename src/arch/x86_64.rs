@@ -38,8 +38,7 @@ naked_fn!(
     "mov rdi, rsp", // Pass the incoming `rsp` as the arg to `entry`.
     "push rbp",     // Set the return address to zero.
     "jmp {entry}";  // Jump to `entry`.
-    entry = sym super::program::entry;
-    options(noreturn)
+    entry = sym super::program::entry
 );
 
 /// Execute a trap instruction.
@@ -298,8 +297,6 @@ naked_fn!(
     "syscall",
     "ud2";
     //__NR_rt_sigreturn = const __NR_rt_sigreturn // TODO: Use this when `asm_const` is stabilized.
-    ;
-    options(noreturn)
 );
 #[cfg(test)] // TODO: obviate this
 fn test_rt_sigreturn() {

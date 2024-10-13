@@ -37,8 +37,7 @@ naked_fn!(
     "mov r0, sp",   // Pass the incoming `sp` as the arg to `entry`.
     "mov lr, #0",   // Set the return address to zero.
     "b {entry}";    // Jump to `entry`.
-    entry = sym super::program::entry;
-    options(noreturn)
+    entry = sym super::program::entry
 );
 
 /// Execute a trap instruction.
@@ -303,8 +302,6 @@ naked_fn!(
     "swi 0",
     "udf #16";
     //__NR_rt_sigreturn = const __NR_rt_sigreturn // TODO: Use this when `asm_const` is stabilized.
-    ;
-    options(noreturn)
 );
 #[cfg(test)] // TODO: obviate this
 fn test_rt_sigreturn() {
@@ -328,8 +325,6 @@ naked_fn!(
     "swi 0",
     "udf #16";
     //__NR_sigreturn = const __NR_sigreturn // TODO: Use this when `asm_const` is stabilized.
-    ;
-    options(noreturn)
 );
 #[cfg(test)] // TODO: obviate this
 fn test_sigreturn() {

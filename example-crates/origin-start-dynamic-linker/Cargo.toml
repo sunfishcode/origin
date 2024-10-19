@@ -1,5 +1,5 @@
 [package]
-name = "origin-start"
+name = "origin-start-dynamic-linker"
 version = "0.0.0"
 edition = "2021"
 publish = false

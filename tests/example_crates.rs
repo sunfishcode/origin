@@ -344,7 +344,14 @@ fn example_crate_origin_start_lto_crt_static_relocation_static_relocate() {
 #[test]
 fn example_crate_origin_start_panic_abort() {
     // Use a dynamic linker.
-    test_crate("origin-start-panic-abort", &[], &[], "", COMMON_STDERR, None);
+    test_crate(
+        "origin-start-panic-abort",
+        &[],
+        &[],
+        "",
+        COMMON_STDERR,
+        None,
+    );
 }
 
 #[test]

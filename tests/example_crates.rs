@@ -164,7 +164,7 @@ fn example_crate_origin_start_dynamic_linker() {
         vec![]
     };
 
-    // Build a dummy executable with the previously built liborigin_start.so as
+    // Build a dummy executable with the previously built liborigin_start_dynamic_linker.so as
     // dynamic linker.
     let assert = Command::new("rustc")
         .args(&[
@@ -178,7 +178,7 @@ fn example_crate_origin_start_dynamic_linker() {
         ])
         .args(linker)
         .arg(format!(
-            "-Clink-arg=-Wl,--dynamic-linker={target_dir}/liborigin_start.so",
+            "-Clink-arg=-Wl,--dynamic-linker={target_dir}/liborigin_start_dynamic_linker.so",
         ))
         .arg("-o")
         .arg(format!("{target_dir}/libempty.so"))

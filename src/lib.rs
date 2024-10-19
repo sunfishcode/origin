@@ -37,10 +37,9 @@ pub(crate) mod naked;
 #[cfg(all(feature = "unwinding", not(target_arch = "arm")))]
 #[allow(unused_extern_crates)]
 extern crate unwinding;
-#[cfg(any(not(feature = "unwinding"), target_arch = "arm"))]
+#[cfg(all(feature = "unwinding", target_arch = "arm"))]
 mod unwind_unimplemented;
 
-#[cfg(feature = "take-charge")]
 #[cfg_attr(target_arch = "aarch64", path = "arch/aarch64.rs")]
 #[cfg_attr(target_arch = "x86_64", path = "arch/x86_64.rs")]
 #[cfg_attr(target_arch = "x86", path = "arch/x86.rs")]

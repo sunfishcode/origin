@@ -5,12 +5,14 @@ use core::arch::asm;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 use linux_raw_sys::elf::{Elf_Dyn, Elf_Ehdr};
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
 #[cfg(test)]
 use linux_raw_sys::general::__NR_rt_sigreturn;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 use {
     core::ffi::c_void,
@@ -44,6 +46,10 @@ naked_fn!(
 /// Execute a trap instruction.
 ///
 /// This is roughly equivalent to `core::intrinsics::abort()`.
+#[cfg(any(
+    feature = "take-charge",
+    all(not(feature = "unwinding"), feature = "panic-handler-trap")
+))]
 pub(super) fn trap() -> ! {
     unsafe {
         asm!("ud2", options(noreturn, nostack));
@@ -180,6 +186,7 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
 }
 
 /// The required alignment for the stack pointer.
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 pub(super) const STACK_ALIGNMENT: usize = 16;
 
@@ -188,6 +195,7 @@ pub(super) const STACK_ALIGNMENT: usize = 16;
 /// This can't be implemented in `rustix` because the child starts executing at
 /// the same point as the parent and we need to use inline asm to have the
 /// child jump to our new-thread entrypoint.
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn clone(
@@ -233,6 +241,7 @@ pub(super) unsafe fn clone(
 }
 
 /// Write a value to the platform thread-pointer register.
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
@@ -242,6 +251,7 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
 }
 
 /// Read the value of the platform thread-pointer register.
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) fn thread_pointer() -> *mut c_void {
@@ -257,11 +267,13 @@ pub(super) fn thread_pointer() -> *mut c_void {
 }
 
 /// TLS data ends at the location pointed to by the thread pointer.
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 pub(super) const TLS_OFFSET: usize = 0;
 
 /// `munmap` the current thread, then carefully exit the thread without
 /// touching the deallocated stack.
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
@@ -280,6 +292,7 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
     );
 }
 
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
 naked_fn!(
     "
@@ -298,7 +311,8 @@ naked_fn!(
     "ud2";
     //__NR_rt_sigreturn = const __NR_rt_sigreturn // TODO: Use this when `asm_const` is stabilized.
 );
-#[cfg(test)] // TODO: obviate this
+#[cfg(feature = "take-charge")]
+#[test] // TODO: obviate this
 fn test_rt_sigreturn() {
     assert_eq!(__NR_rt_sigreturn, 15);
 }
@@ -311,5 +325,6 @@ fn test_rt_sigreturn() {
 ///
 /// This function must never be called other than by the `sa_restorer`
 /// mechanism.
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
 pub(super) use return_from_signal_handler as return_from_signal_handler_noinfo;

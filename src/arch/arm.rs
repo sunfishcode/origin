@@ -1,5 +1,9 @@
 //! Architecture-specific assembly code.
 
+#[cfg(any(
+    feature = "take-charge",
+    all(not(feature = "unwinding"), feature = "panic-handler-trap")
+))]
 use core::arch::asm;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]

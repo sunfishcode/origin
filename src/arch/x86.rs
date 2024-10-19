@@ -1,9 +1,15 @@
 //! Architecture-specific assembly code.
 
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[cfg(not(feature = "nightly"))]
 use crate::ptr::{without_provenance_mut, Polyfill as _};
+#[cfg(any(
+    feature = "take-charge",
+    all(not(feature = "unwinding"), feature = "panic-handler-trap")
+))]
 use core::arch::asm;
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[cfg(feature = "nightly")]
 use core::ptr::without_provenance_mut;
@@ -433,6 +439,7 @@ naked_fn!(
     "ud2";
     //__NR_sigreturn = const __NR_sigreturn // TODO: Use this when `asm_const` is stabilized.
 );
+#[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
 #[test] // TODO: obviate this
 fn test_sigreturn() {

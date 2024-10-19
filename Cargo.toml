@@ -137,6 +137,9 @@ unstable-errno = ["thread"]
 # Have origin call `rustix::param::init` on startup.
 param = ["rustix/param"]
 
+# Enable support for unwinding. This depends on nightly Rust.
+unwinding = ["dep:unwinding"]
+
 # Provide a `#[lang = eh_personality]` function suitable for unwinding (for
 # no-std).
 #

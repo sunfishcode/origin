@@ -1,3 +1,13 @@
+# origin 0.24
+
+## Changes
+
+The "unwinding" feature is no longer implied by the "nightly" feature. It is
+now implied by the "eh-personality" and "panic-handler" features. This avoids
+building the unwinding crate when it isn't needed. If you see errors like
+"unwinding panics are not supported without std", enabling the "unwinding"
+feature is one way to fix them.
+
 # origin 0.23
 
 ## Changes

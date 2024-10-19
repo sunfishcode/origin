@@ -1,5 +1,5 @@
-//! If we don't have "nightly", we don't have the unwinding crate, so provide
-//! stub functions for unwinding and panicking.
+//! If we don't have "unwinding", provide stub functions for unwinding and
+//! panicking.
 
 // If requested, provide a version of "eh-personality-continue" ourselves.
 #[cfg(feature = "eh-personality-continue")]
@@ -23,3 +23,9 @@ unsafe extern "C" fn rust_eh_personality(
 fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     crate::arch::trap()
 }
+
+#[cfg(feature = "panic-handler")]
+compile_error!("\"panic-handler\" depends on \"unwinding\".");
+
+#[cfg(feature = "eh-personality")]
+compile_error!("\"eh-personality\" depends on \"unwinding\".");

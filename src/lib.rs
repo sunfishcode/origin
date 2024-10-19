@@ -67,9 +67,9 @@ pub mod signal;
 #[cfg_attr(not(feature = "take-charge"), path = "thread/libc.rs")]
 pub mod thread;
 
-// If we don't have "nightly", we don't have the unwinding crate, so provide
-// stub functions for unwinding and panicking.
-#[cfg(not(feature = "nightly"))]
+// If we don't have "unwinding", provide stub functions for unwinding and
+// panicking.
+#[cfg(not(feature = "unwinding"))]
 mod stubs;
 
 // Include definitions of `memcpy` and other functions called from LLVM

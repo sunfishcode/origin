@@ -41,8 +41,9 @@ errno = { version = "0.3.3", default-features = false, optional = true }
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
 
-# Enable support for unwinding. This depends on nightly Rust.
-[target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
+# Use the unwinding crate if support for unwinding is needed. This depends on
+# nightly Rust. And it's not supported on ARM yet.
+[target.'cfg(all(panic = "unwind", not(target_arch = "arm")))'.dependencies.unwinding]
 version = "0.2.3"
 default-features = false
 features = ["unwinder"]
@@ -65,9 +66,9 @@ assert_cmd = "2.0.12"
 default = ["std", "log", "libc", "errno", "signal", "init-fini-arrays", "program-at-exit", "thread-at-exit"]
 
 # If you're using nightly Rust, enable this feature to let origin use
-# nightly-only features, which include better safety checks and better
-# optimizations.
-nightly = []
+# nightly-only features, which include proper support for unwinding (if
+# enabled), better safety checks, and better optimizations.
+nightly = ["unwinding"]
 
 # Enable optimizations that reduce code size (at the cost of performance).
 optimize_for_size = []
@@ -136,9 +137,6 @@ unstable-errno = ["thread"]
 
 # Have origin call `rustix::param::init` on startup.
 param = ["rustix/param"]
-
-# Enable support for unwinding. This depends on nightly Rust.
-unwinding = ["dep:unwinding"]
 
 # Provide a `#[lang = eh_personality]` function suitable for unwinding (for
 # no-std).

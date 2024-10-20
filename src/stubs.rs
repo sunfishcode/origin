@@ -23,9 +23,3 @@ unsafe extern "C" fn rust_eh_personality(
 fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     crate::arch::trap()
 }
-
-#[cfg(feature = "panic-handler")]
-compile_error!("\"panic-handler\" depends on \"unwinding\".");
-
-#[cfg(feature = "eh-personality")]
-compile_error!("\"eh-personality\" depends on \"unwinding\".");

@@ -1,5 +1,5 @@
-//! If we don't have "nightly", we don't have the unwinding crate, so provide
-//! stub functions for unwinding and panicking.
+//! If we don't have "unwinding", provide stub functions for unwinding and
+//! panicking.
 
 // If requested, provide a version of "eh-personality-continue" ourselves.
 #[cfg(feature = "eh-personality-continue")]

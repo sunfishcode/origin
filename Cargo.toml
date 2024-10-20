@@ -41,7 +41,9 @@ errno = { version = "0.3.3", default-features = false, optional = true }
 core = { version = "1.0.0", optional = true, package = "rustc-std-workspace-core" }
 alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-alloc" }
 
-[target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
+# Use the unwinding crate if support for unwinding is needed. This depends on
+# nightly Rust. And it's not supported on ARM yet.
+[target.'cfg(all(panic = "unwind", not(target_arch = "arm")))'.dependencies.unwinding]
 version = "0.2.3"
 default-features = false
 features = ["unwinder"]
@@ -64,8 +66,8 @@ assert_cmd = "2.0.12"
 default = ["std", "log", "libc", "errno", "signal", "init-fini-arrays", "program-at-exit", "thread-at-exit"]
 
 # If you're using nightly Rust, enable this feature to let origin use
-# nightly-only features, which include proper support for unwinding, better
-# safety checks, and better optimizations.
+# nightly-only features, which include proper support for unwinding (if
+# enabled), better safety checks, and better optimizations.
 nightly = ["unwinding"]
 
 # Enable optimizations that reduce code size (at the cost of performance).
@@ -146,7 +148,7 @@ param = ["rustix/param"]
 # [the "personality" feature of the unwinding crate] for more details.
 #
 # [the "personality" feature of the unwinding crate]: https://crates.io/crates/unwinding#personality-and-other-utilities
-eh-personality = ["unwinding?/personality"]
+eh-personality = ["unwinding/personality"]
 
 # Provide a `#[lang = eh_personality]` function that just returns
 # `CONTINUE_UNWIND` (for no-std). Use this if you know your program will never
@@ -162,7 +164,7 @@ eh-personality-continue = ["unwinding?/personality-dummy"]
 # [the "panic-handler" feature of the unwinding crate] for more details.
 #
 # [the "panic-handler" feature of the unwinding crate]: https://crates.io/crates/unwinding#personality-and-other-utilities
-panic-handler = ["unwinding?/panic-handler"]
+panic-handler = ["unwinding/panic-handler"]
 
 # Provide a `#[panic_handler]` function that just traps (for no-std). Use this
 # if you know your program will never panic and don't want any extra code.

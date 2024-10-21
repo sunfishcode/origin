@@ -37,8 +37,12 @@ pub(crate) mod naked;
 #[cfg(all(feature = "unwinding", not(target_arch = "arm")))]
 #[allow(unused_extern_crates)]
 extern crate unwinding;
-#[cfg(all(feature = "unwinding", target_arch = "arm"))]
+#[cfg(any(not(feature = "unwinding"), target_arch = "arm"))]
 mod unwind_unimplemented;
+// If we don't have "unwinding", provide stub functions for unwinding and
+// panicking.
+#[cfg(not(feature = "unwinding"))]
+mod stubs;
 
 #[cfg_attr(target_arch = "aarch64", path = "arch/aarch64.rs")]
 #[cfg_attr(target_arch = "x86_64", path = "arch/x86_64.rs")]
@@ -65,11 +69,6 @@ pub mod signal;
 #[cfg_attr(feature = "take-charge", path = "thread/linux_raw.rs")]
 #[cfg_attr(not(feature = "take-charge"), path = "thread/libc.rs")]
 pub mod thread;
-
-// If we don't have "unwinding", provide stub functions for unwinding and
-// panicking.
-#[cfg(not(feature = "unwinding"))]
-mod stubs;
 
 // Include definitions of `memcpy` and other functions called from LLVM
 // Codegen. Normally, these would be defined by the platform libc, however with

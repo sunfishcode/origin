@@ -68,7 +68,7 @@ default = ["std", "log", "libc", "errno", "signal", "init-fini-arrays", "program
 # If you're using nightly Rust, enable this feature to let origin use
 # nightly-only features, which include proper support for unwinding (if
 # enabled), better safety checks, and better optimizations.
-nightly = ["dep:unwinding"]
+nightly = ["unwinding"]
 
 # Enable optimizations that reduce code size (at the cost of performance).
 optimize_for_size = []

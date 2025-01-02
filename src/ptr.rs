@@ -77,7 +77,7 @@ impl<T> Polyfill<T> for *const T {
 
     #[inline]
     fn map_addr(self, f: impl FnOnce(usize) -> usize) -> *mut T {
-        self.with_addr(f(self.addr()))
+        self.with_addr(f(self.addr())).cast_mut()
     }
 
     #[inline]

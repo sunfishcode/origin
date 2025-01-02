@@ -4,7 +4,6 @@
 #![no_std]
 #![no_main]
 #![feature(thread_local)]
-#![feature(strict_provenance)]
 
 extern crate alloc;
 

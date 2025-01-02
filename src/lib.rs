@@ -13,13 +13,8 @@
 )]
 // Allow our polyfills to polyfill nightly features.
 #![cfg_attr(not(feature = "nightly"), allow(unstable_name_collisions))]
-// On nightly, enable strict provenance.
-#![cfg_attr(feature = "nightly", feature(strict_provenance))]
-#![cfg_attr(feature = "nightly", feature(exposed_provenance))]
-#![cfg_attr(
-    feature = "nightly",
-    deny(fuzzy_provenance_casts, lossy_provenance_casts)
-)]
+// Allow `Polyfill` imports to be unused for now.
+#![cfg_attr(not(feature = "nightly"), allow(unused_imports))]
 
 #[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
 extern crate alloc;

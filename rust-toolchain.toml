@@ -1,2 +1,0 @@
-[toolchain]
-components = ["rustc", "cargo", "rust-std", "rust-src", "rustfmt"]

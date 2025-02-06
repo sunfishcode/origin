@@ -2,26 +2,12 @@
 
 use rustix::io;
 #[cfg(not(target_arch = "riscv64"))]
-use {crate::arch, linux_raw_sys::ctypes::c_ulong, linux_raw_sys::general::SA_RESTORER};
+use crate::arch;
 
-/// A signal action record for use with [`sigaction`].
-pub use rustix::runtime::Sigaction;
+pub use rustix::runtime::{KernelSigaction as Sigaction, KernelSigactionFlags as SigactionFlags, Signal, Siginfo};
 
-/// A signal identifier for use with [`sigaction`].
-pub use rustix::runtime::Signal;
-
-/// A signal set for use with [`Sigaction`].
-pub use rustix::runtime::Sigset;
-
-/// A signal handler function for use with [`Sigaction`].
-pub use linux_raw_sys::general::__kernel_sighandler_t as Sighandler;
-
-/// A signal information record for use with [`Sigaction`].
-// TODO: Convert the fields of this to friendlier APIs.
-pub use linux_raw_sys::general::siginfo_t as Siginfo;
-
-/// A flags type for use with [`Sigaction`].
-pub use linux_raw_sys::ctypes::c_ulong as Sigflags;
+/// A handler function type for use with [`Sigaction`].
+pub type Sighandler = rustix::runtime::KernelSighandler;
 
 /// Register a signal handler.
 ///
@@ -34,16 +20,16 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
 
     #[cfg(not(target_arch = "riscv64"))]
     if let Some(action) = &mut action {
-        action.sa_flags |= SA_RESTORER as c_ulong;
+        action.sa_flags |= SigactionFlags::RESTORER;
 
-        if (action.sa_flags & SA_SIGINFO as c_ulong) == SA_SIGINFO as c_ulong {
+        if action.sa_flags.contains(SigactionFlags::SIGINFO) {
             action.sa_restorer = Some(arch::return_from_signal_handler);
         } else {
             action.sa_restorer = Some(arch::return_from_signal_handler_noinfo);
         }
     }
 
-    rustix::runtime::sigaction(sig, action)
+    rustix::runtime::kernel_sigaction(sig, action)
 }
 
 /// Return a special “ignore” signal handler for ignoring signals.
@@ -52,24 +38,14 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
 #[doc(alias = "SIG_IGN")]
 #[must_use]
 pub const fn sig_ign() -> Sighandler {
-    linux_raw_sys::signal_macros::sig_ign()
+    rustix::runtime::kernel_sig_ign()
 }
 
 /// A special “default” signal handler representing the default behavior
 /// for handling a signal.
 ///
 /// If you're looking for `SigIgn`; use [`sig_ign`].
-#[doc(alias = "SIG_DFL")]
-pub use linux_raw_sys::signal_macros::SIG_DFL as SigDfl;
-
-// TODO: Convert these to a `bitflags`.
-
-/// `SA_RESTART`
-pub const SA_RESTART: Sigflags = linux_raw_sys::general::SA_RESTART as _;
-/// `SA_ONSTACK`
-pub const SA_ONSTACK: Sigflags = linux_raw_sys::general::SA_ONSTACK as _;
-/// `SA_SIGINFO`
-pub const SA_SIGINFO: Sigflags = linux_raw_sys::general::SA_SIGINFO as _;
+pub use rustix::runtime::KERNEL_SIG_DFL as SIG_DFL;
 
 /// `SIGSTKSZ`
 pub const SIGSTKSZ: usize = linux_raw_sys::general::SIGSTKSZ as usize;

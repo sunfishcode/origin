@@ -14,11 +14,38 @@ pub use rustix::runtime::Signal;
 pub use libc::sighandler_t as Sighandler;
 
 /// A signal information record for use with [`Sigaction`].
-// TODO: Convert the fields of this to friendlier APIs.
-pub use linux_raw_sys::general::siginfo_t as Siginfo;
+pub use libc::siginfo_t as Siginfo;
 
-/// A flags type for use with [`Sigaction`].
-pub use linux_raw_sys::ctypes::c_int as Sigflags;
+bitflags::bitflags! {
+    /// A flags type for use with [`Sigaction`].
+    #[repr(transparent)]
+    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
+    pub struct SigactionFlags: libc::c_int {
+        /// `SA_NOCLDSTOP`
+        const NOCLDSTOP = libc::SA_NOCLDSTOP as _;
+
+        /// `SA_NOCLDWAIT` (since Linux 2.6)
+        const NOCLDWAIT = libc::SA_NOCLDWAIT as _;
+
+        /// `SA_NODEFER`
+        const NODEFER = libc::SA_NODEFER as _;
+
+        /// `SA_ONSTACK`
+        const ONSTACK = libc::SA_ONSTACK as _;
+
+        /// `SA_RESETHAND`
+        const RESETHAND = libc::SA_RESETHAND as _;
+
+        /// `SA_RESTART`
+        const RESTART = libc::SA_RESTART as _;
+
+        /// `SA_SIGINFO` (since Linux 2.2)
+        const SIGINFO = libc::SA_SIGINFO as _;
+
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
+        const _ = !0;
+    }
+}
 
 /// Register a signal handler.
 ///
@@ -32,7 +59,7 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
     };
     let mut old = MaybeUninit::<Sigaction>::uninit();
 
-    if libc::sigaction(sig as libc::c_int, action, old.as_mut_ptr()) == 0 {
+    if libc::sigaction(sig.as_raw(), action, old.as_mut_ptr()) == 0 {
         Ok(old.assume_init())
     } else {
         Err(rustix::io::Errno::from_raw_os_error(errno::errno().0))
@@ -52,17 +79,7 @@ pub const fn sig_ign() -> Sighandler {
 /// for handling a signal.
 ///
 /// If you're looking for `SigIgn`; use [`sig_ign`].
-#[doc(alias = "SIG_DFL")]
-pub use libc::SIG_DFL as SigDfl;
-
-// TODO: Convert these to a `bitflags`.
-
-/// `SA_RESTART`
-pub const SA_RESTART: Sigflags = libc::SA_RESTART;
-/// `SA_ONSTACK`
-pub const SA_ONSTACK: Sigflags = libc::SA_ONSTACK;
-/// `SA_SIGINFO`
-pub const SA_SIGINFO: Sigflags = libc::SA_SIGINFO;
+pub use libc::SIG_DFL;
 
 /// `SIGSTKSZ`
 pub const SIGSTKSZ: usize = libc::SIGSTKSZ;

@@ -30,7 +30,7 @@ use rustix::param::{linux_execfn, page_size};
 use rustix::process::{getrlimit, Resource};
 use rustix::runtime::{exe_phdrs, set_tid_address};
 #[cfg(feature = "signal")]
-use rustix::runtime::{sigprocmask, How, Sigset};
+use rustix::runtime::{kernel_sigprocmask, How, KernelSigSet};
 use rustix::thread::gettid;
 
 pub use rustix::thread::Pid as ThreadId;
@@ -253,7 +253,7 @@ pub(super) fn initialize_startup_info() {
     //
     // SAFETY: We're just taking the address of `_DYNAMIC` for arithmetic
     // purposes, not dereferencing it.
-    let dynamic_addr: *const c_void = unsafe { &_DYNAMIC };
+    let dynamic_addr: *const u8 = crate::arch::dynamic_table_addr().cast();
 
     // SAFETY: We assume that the phdr array pointer and length the kernel
     // provided to the process describe a valid phdr array, and that there are
@@ -734,15 +734,8 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
             // no signals for the process are delivered to this thread.
             #[cfg(feature = "signal")]
             {
-                #[cfg(any(target_arch = "arm", target_arch = "x86"))]
-                let all = Sigset { sig: [!0, !0] };
-                #[cfg(any(
-                    target_arch = "aarch64",
-                    target_arch = "riscv64",
-                    target_arch = "x86_64"
-                ))]
-                let all = Sigset { sig: [!0] };
-                sigprocmask(How::BLOCK, Some(&all)).ok();
+                let all = KernelSigSet::all();
+                kernel_sigprocmask(How::BLOCK, Some(&all)).ok();
             }
 
             // `munmap` the memory, which also frees the stack we're currently
@@ -1097,7 +1090,7 @@ pub fn default_guard_size() -> usize {
 /// Yield the current thread, encouraging other threads to run.
 #[inline]
 pub fn yield_current() {
-    rustix::process::sched_yield()
+    rustix::thread::sched_yield()
 }
 
 /// The ARM ABI expects this to be defined.

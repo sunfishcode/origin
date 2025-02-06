@@ -10,7 +10,7 @@ publish = false
 origin = { path = "../..", default-features = false, features = ["origin-start", "eh-personality-continue", "panic-handler-trap", "nightly"] }
 
 # Crates to help writing no_std code.
-atomic-dbg = { version = "0.1.8", default-features = false }
+atomic-dbg = { version = "0.1.11", default-features = false }
 
 # This is just an example crate, and not part of the origin workspace.
 [workspace]

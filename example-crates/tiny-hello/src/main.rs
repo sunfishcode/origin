@@ -16,5 +16,5 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
             Err(_) => origin::program::trap(),
         }
     }
-    origin::program::exit_immediately(0);
+    origin::program::immediate_exit(0);
 }

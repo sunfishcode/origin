@@ -71,7 +71,7 @@ pub fn exit(status: c_int) -> ! {
 /// Exit the program without calling functions registered with [`at_exit`] or
 /// with the `.fini_array` section.
 #[inline]
-pub fn exit_immediately(status: c_int) -> ! {
+pub fn immediate_exit(status: c_int) -> ! {
     unsafe {
         // Call `libc` to exit the program.
         libc::_exit(status)

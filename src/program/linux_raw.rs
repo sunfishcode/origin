@@ -325,14 +325,14 @@ pub fn exit(status: c_int) -> ! {
         }
     }
 
-    // Call `exit_immediately` to exit the program.
-    exit_immediately(status)
+    // Call `immediate_exit` to exit the program.
+    immediate_exit(status)
 }
 
 /// Exit the program without calling functions registered with [`at_exit`] or
 /// with the `.fini_array` section.
 #[inline]
-pub fn exit_immediately(status: c_int) -> ! {
+pub fn immediate_exit(status: c_int) -> ! {
     #[cfg(feature = "log")]
     log::trace!("Program exiting with status `{:?}`", status);
 

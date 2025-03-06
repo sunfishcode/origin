@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 origin = { path = "../..", default-features = false, features = ["origin-start", "program-at-exit", "thread-at-exit", "signal", "unwinding", "eh-personality-continue", "panic-handler-trap", "nightly"] }
 atomic-dbg = { version = "0.1.11", default-features = false }
-rustix-dlmalloc = { version = "0.2.0", features = ["global"] }
+rustix-dlmalloc = { version = "0.2.1", features = ["global"] }
 rustix = { version = "1.0.0", default-features = false, features = ["process", "thread"] }
 rustix-futex-sync = "0.3.0"
 

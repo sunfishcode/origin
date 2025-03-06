@@ -83,9 +83,9 @@ pub(super) fn dynamic_table_addr() -> *const linux_raw_sys::elf::Elf_Dyn {
         asm!(
             ".weak _DYNAMIC",
             ".hidden _DYNAMIC",
-            "call 0f",
+            "call 2f",
             ".cfi_adjust_cfa_offset 4",
-            "0:",
+            "2:",
             "pop {0}", // We depend on this being exactly one byte long.
             ".cfi_adjust_cfa_offset -4",
             "add {0}, offset _GLOBAL_OFFSET_TABLE_+1",

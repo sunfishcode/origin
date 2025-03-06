@@ -7,7 +7,6 @@
 use core::arch::asm;
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
-#[cfg(feature = "nightly")]
 use core::ptr::without_provenance_mut;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]

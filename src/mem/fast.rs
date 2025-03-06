@@ -6,9 +6,6 @@
 //!
 //! [compiler_builtins library]: https://github.com/rust-lang/compiler-builtins
 
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::Polyfill as _;
-
 // memcpy/memmove/memset have optimized implementations on some architectures
 #[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
 #[cfg_attr(not(target_arch = "x86_64"), path = "impls.rs")]

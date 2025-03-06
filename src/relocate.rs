@@ -18,21 +18,11 @@ use crate::arch::{
     dynamic_table_addr, ehdr_addr, relocation_load, relocation_mprotect_readonly, relocation_store,
     trap,
 };
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::addr;
 use core::ffi::c_void;
 use core::mem;
 use core::ptr::{null, null_mut};
 use linux_raw_sys::elf::*;
 use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
-
-/// Wrapper around `.addr()` for pointers, because we can't use the polyfill
-/// in the relocation code because that might emit calls to things that aren't
-/// relocated yet.
-#[cfg(feature = "nightly")]
-fn addr<T>(addr: *const T) -> usize {
-    addr.addr()
-}
 
 // The Linux UAPI headers don't define the .relr types and consts yet.
 #[allow(non_camel_case_types)]
@@ -105,7 +95,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
 
         match a_type as _ {
             AT_BASE => auxv_base = a_val,
-            AT_PAGESZ => auxv_page_size = addr(a_val),
+            AT_PAGESZ => auxv_page_size = a_val.addr(),
             AT_ENTRY => auxv_entry = a_val,
             AT_NULL => break,
             _ => (),
@@ -129,7 +119,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     //    program headers and `AT_ENTRY` doesn't point to our own entry point.
     //    `AT_BASE` contains our own relocation offset.
 
-    if load_static_start() == addr(auxv_entry) {
+    if load_static_start() == auxv_entry.addr() {
         // This is case 1) or case 3). If `AT_BASE` doesn't exist, then we are
         // already loaded at our static address despite the lack of any dynamic
         // linker. As such it would be case 1). If `AT_BASE` does exist, we have
@@ -154,7 +144,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         // `AT_BASE` contains the relocation offset of the dynamic linker.
         auxv_base
     };
-    let offset = addr(base);
+    let offset = base.addr();
 
     // This is case 2) or 4). We need to do all `R_RELATIVE` relocations.
     // There should be no other kind of relocation because we are either a
@@ -326,7 +316,7 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     // entry point when AT_BASE is not zero and thus a dynamic linker is in
     // use. In this case the assertion would fail.
     if auxv_base == null_mut() {
-        debug_assert_eq!(load_static_start(), addr(auxv_entry));
+        debug_assert_eq!(load_static_start(), auxv_entry.addr());
     }
 
     // Finally, look through the static segment headers (phdrs) to find the
@@ -397,5 +387,5 @@ fn load_static_start() -> usize {
     // Use `relocation_load` to do the load because the optimizer won't have
     // any idea what we're up to.
     let static_start_addr: *const *const c_void = &STATIC_START.0;
-    unsafe { relocation_load(addr(static_start_addr)) }
+    unsafe { relocation_load(static_start_addr.addr()) }
 }

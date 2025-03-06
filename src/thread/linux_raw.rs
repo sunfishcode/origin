@@ -10,8 +10,6 @@
 use crate::arch::{
     clone, munmap_and_exit_thread, set_thread_pointer, thread_pointer, STACK_ALIGNMENT, TLS_OFFSET,
 };
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::Polyfill as _;
 #[cfg(feature = "thread-at-exit")]
 use alloc::boxed::Box;
 #[cfg(feature = "unstable-errno")]

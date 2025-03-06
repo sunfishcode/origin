@@ -3,8 +3,6 @@
 //! This code uses `core::arch::asm!("")` to try to discourage optimizers from
 //! vectorizing or pattern-matching these loops.
 
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::Polyfill as _;
 use core::ffi::{c_char, c_int, c_void};
 
 #[no_mangle]

@@ -12,7 +12,7 @@ edition = "2021"
 keywords = ["linux"]
 categories = ["no-std"]
 include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
-rust-version = "1.78"
+rust-version = "1.84"
 
 [dependencies]
 linux-raw-sys = { version = "0.9.2", default-features = false, features = ["general", "no_std", "elf"] }

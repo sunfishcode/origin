@@ -53,9 +53,6 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
     #[cfg(debug_assertions)]
     #[cfg(feature = "origin-start")]
     {
-        #[cfg(not(feature = "nightly"))]
-        use crate::ptr::Polyfill;
-
         // Check that `mem` is where we expect it to be.
         debug_assert_ne!(mem, core::ptr::null_mut());
         debug_assert_eq!(mem.addr() & 0xf, 0);

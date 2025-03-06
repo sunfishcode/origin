@@ -4,9 +4,6 @@
 //!
 //! [compiler_builtins library]: https://github.com/rust-lang/compiler-builtins
 
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::Polyfill as _;
-
 const WORD_SIZE: usize = core::mem::size_of::<usize>();
 const WORD_MASK: usize = WORD_SIZE - 1;
 

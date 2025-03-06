@@ -1,9 +1,5 @@
 //! Architecture-specific assembly code.
 
-#[cfg(feature = "take-charge")]
-#[cfg(feature = "thread")]
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::{without_provenance_mut, Polyfill as _};
 #[cfg(any(
     feature = "take-charge",
     all(not(feature = "unwinding"), feature = "panic-handler-trap")

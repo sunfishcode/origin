@@ -2,10 +2,7 @@
 //!
 //! This may be needed to satisfy `compiler_builtins` or other low-level code.
 
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::without_provenance_mut;
 use core::ffi::{c_ulong, c_void};
-#[cfg(feature = "nightly")]
 use core::ptr::without_provenance_mut;
 
 // `getauxval` usually returns `unsigned long`, but we make it a pointer type

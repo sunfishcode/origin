@@ -22,8 +22,6 @@
 // feature is present at compile-time. We don't bother detecting other features.
 // Note that ERMSB does not enhance the backwards (DF=1) "rep movsb".
 
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::Polyfill as _;
 use core::arch::asm;
 use core::mem;
 

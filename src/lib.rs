@@ -11,17 +11,9 @@
     all(debug_assertions, feature = "nightly"),
     feature(link_llvm_intrinsics)
 )]
-// Allow our polyfills to polyfill nightly features.
-#![cfg_attr(not(feature = "nightly"), allow(unstable_name_collisions))]
-// Allow `Polyfill` imports to be unused for now.
-#![cfg_attr(not(feature = "nightly"), allow(unused_imports))]
 
 #[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
 extern crate alloc;
-
-// Strict-provenance API polyfill.
-#[cfg(not(feature = "nightly"))]
-pub(crate) mod ptr;
 
 // Wrapper/polyfill for `#[naked]`.
 #[macro_use]

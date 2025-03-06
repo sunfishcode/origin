@@ -7,15 +7,11 @@
 //! more control when creating efficient higher-level abstractions like
 //! pthreads or `std::thread::Thread`.
 
-#[cfg(not(feature = "nightly"))]
-use crate::ptr::{with_exposed_provenance_mut, without_provenance_mut, Polyfill as _};
 #[cfg(feature = "thread-at-exit")]
 use alloc::boxed::Box;
 use core::ffi::{c_int, c_void};
 use core::mem::{size_of, transmute, zeroed};
-use core::ptr::{null_mut, NonNull};
-#[cfg(feature = "nightly")]
-use core::ptr::{with_exposed_provenance_mut, without_provenance_mut};
+use core::ptr::{null_mut, with_exposed_provenance_mut, without_provenance_mut, NonNull};
 use core::slice;
 use rustix::io;
 

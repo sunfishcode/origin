@@ -1,10 +1,12 @@
 //! Signal handlers.
 
-use rustix::io;
 #[cfg(not(target_arch = "riscv64"))]
 use crate::arch;
+use rustix::io;
 
-pub use rustix::runtime::{KernelSigaction as Sigaction, KernelSigactionFlags as SigactionFlags, Signal, Siginfo};
+pub use rustix::runtime::{
+    KernelSigaction as Sigaction, KernelSigactionFlags as SigactionFlags, Siginfo, Signal,
+};
 
 /// A handler function type for use with [`Sigaction`].
 pub type Sighandler = rustix::runtime::KernelSighandler;

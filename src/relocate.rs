@@ -138,10 +138,12 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         return;
     }
 
+    let the_ehdr = &*ehdr_addr();
+
     let base = if auxv_base == null_mut() {
         // Obtain the static address of `_start`, which is recorded in the
         // entry field of the ELF header.
-        let static_start = (*ehdr_addr()).e_entry;
+        let static_start = the_ehdr.e_entry;
 
         // This is case 2) as without dynamic linker `AT_BASE` doesn't exist
         // and we have already excluded case 1) above.
@@ -330,18 +332,14 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
     // Finally, look through the static segment headers (phdrs) to find the
     // the relro description if present. Also do a debug assertion that
     // the dynv argument matches the PT_DYNAMIC segment.
-    extern "C" {
-        #[link_name = "__ehdr_start"]
-        static EHDR: Elf_Ehdr;
-    }
 
     // The location and size of the `relro` region.
     let mut relro = 0;
     let mut relro_size = 0;
 
-    let phentsize = EHDR.e_phentsize as usize;
-    let mut current_phdr = base.byte_add(EHDR.e_phoff).cast::<Elf_Phdr>();
-    let phdrs_end = current_phdr.byte_add(EHDR.e_phnum as usize * phentsize);
+    let phentsize = the_ehdr.e_phentsize as usize;
+    let mut current_phdr = base.byte_add(the_ehdr.e_phoff).cast::<Elf_Phdr>();
+    let phdrs_end = current_phdr.byte_add(the_ehdr.e_phnum as usize * phentsize);
     while current_phdr != phdrs_end {
         let phdr = &*current_phdr;
         current_phdr = current_phdr.byte_add(phentsize);

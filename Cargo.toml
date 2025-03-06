@@ -52,7 +52,7 @@ optional = true
 # On aarch64, compiler_builtins depends on `getauxval`, so we need rustix with
 # the "param" feature.
 [target.'cfg(target_arch = "aarch64")'.dependencies.rustix]
-version = "0.38.35"
+version = "1.0.0"
 default-features = false
 features = ["param"]
 

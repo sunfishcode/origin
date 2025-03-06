@@ -15,11 +15,11 @@ include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
 rust-version = "1.78"
 
 [dependencies]
-linux-raw-sys = { version = "0.4.9", default-features = false, features = ["general", "no_std", "elf"] }
-rustix = { version = "0.38.35", default-features = false }
+linux-raw-sys = { version = "0.9.2", default-features = false, features = ["general", "no_std", "elf"] }
+rustix = { version = "1.0.0", default-features = false }
 bitflags = { version = "2.4.0", default-features = false }
 log = { version = "0.4.14", default-features = false, optional = true }
-rustix-futex-sync = { version = "0.2.1", optional = true }
+rustix-futex-sync = { version = "0.3.0", optional = true }
 smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
 
 # Optional logging backends for use with "take-charge". You can use any
@@ -31,7 +31,7 @@ smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
 env_logger = { version = "0.11.0", default-features = false, optional = true }
 
 # Enable `atomic-dbg`'s simple logger. This doesn't require `std`.
-atomic-dbg = { version = "0.1", default-features = false, optional = true }
+atomic-dbg = { version = "0.1.11", default-features = false, optional = true }
 
 # Enable this when disabling origin's implementations.
 libc = { version = "0.2.149", default-features = false, optional = true }
@@ -52,7 +52,7 @@ optional = true
 # On aarch64, compiler_builtins depends on `getauxval`, so we need rustix with
 # the "param" feature.
 [target.'cfg(target_arch = "aarch64")'.dependencies.rustix]
-version = "0.38.35"
+version = "1.0.0"
 default-features = false
 features = ["param"]
 

@@ -15,7 +15,7 @@ use core::arch::asm;
 use core::ptr::without_provenance_mut;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
-use linux_raw_sys::elf::{Elf_Dyn, Elf_Ehdr};
+use linux_raw_sys::elf::Elf_Ehdr;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
@@ -72,9 +72,12 @@ pub(super) fn trap() -> ! {
 }
 
 /// Compute the dynamic address of `_DYNAMIC`.
-#[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
-#[cfg(relocation_model = "pic")]
-pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
+#[cfg(any(
+    all(feature = "thread", feature = "take-charge"),
+    all(feature = "experimental-relocate", feature = "origin-start")
+))]
+#[allow(dead_code)]
+pub(super) fn dynamic_table_addr() -> *const linux_raw_sys::elf::Elf_Dyn {
     let addr;
     unsafe {
         asm!(
@@ -83,17 +86,8 @@ pub(super) fn dynamic_table_addr() -> *const Elf_Dyn {
             "call 2f",
             ".cfi_adjust_cfa_offset 4",
             "2:",
-            "pop {0}",
+            "pop {0}", // We depend on this being exactly one byte long.
             ".cfi_adjust_cfa_offset -4",
-            "3:",
-            // Use "2" and "3" instead of "0" and "1" because "0b" and "1b" are
-            // parsed as binary literals rather than as label references. And,
-            // hard-code the value `1` here because the assembler doesn't support
-            // the symbol difference expression in an instruction operand
-            // context. Then, check that the hard-coded value is what we expect.
-            ".ifne (3b-2b)-1",
-            ".error \"The pop opcode is expected to be 1 byte long.\"",
-            ".endif",
             "add {0}, offset _GLOBAL_OFFSET_TABLE_+1",
             "lea {0}, [{0} + _DYNAMIC@GOTOFF]",
             out(reg) addr

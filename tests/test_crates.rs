@@ -132,7 +132,7 @@ fn test_trap() {
     let mut command = utils::run_test("test", "run", "origin-start", &["--bin=trap"], &[]);
     assert_eq!(
         command.output().unwrap().status.signal(),
-        Some(origin::signal::Signal::Ill as i32)
+        Some(origin::signal::Signal::ILL.as_raw() as i32)
     );
 }
 
@@ -147,6 +147,6 @@ fn test_abort_via_raise() {
     );
     assert_eq!(
         command.output().unwrap().status.signal(),
-        Some(origin::signal::Signal::Abort as i32)
+        Some(origin::signal::Signal::ABORT.as_raw() as i32)
     );
 }

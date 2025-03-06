@@ -40,10 +40,6 @@ Origin can also be used on its own, in several different configurations:
  - The [basic example] shows a simple example of using Origin as a simple
    library. In this configuration, libc is doing most of the work.
 
- - The [no-std example] uses `#![no_std]` and starts the program using Rust's
-   `#[start]` feature, and then hands control to Origin. libc is still
-   doing most of the work here.
-
  - The [external-start example] uses `#![no_std]` and `#![no_main]`, and starts
    the program by taking over control from libc as soon as possible, and then
    hands control to Origin. Origin handles program and thread startup and

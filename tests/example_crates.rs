@@ -38,24 +38,6 @@ fn example_crate_basic_relocate() {
 }
 
 #[test]
-fn example_crate_no_std() {
-    test_crate("no-std", &[], &[], "", COMMON_STDERR, None);
-}
-
-/// Like `example_crate_no_std` but redundantly call `relocate`.
-#[test]
-fn example_crate_no_std_relocate() {
-    test_crate(
-        "no-std",
-        &["--features=origin/experimental-relocate"],
-        &[],
-        "",
-        COMMON_STDERR,
-        None,
-    );
-}
-
-#[test]
 fn example_crate_external_start() {
     test_crate("external-start", &[], &[], "", COMMON_STDERR, None);
 }

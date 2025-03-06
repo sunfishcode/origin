@@ -10,8 +10,8 @@ publish = false
 origin = { path = "../..", default-features = false, features = ["origin-start", "program-at-exit", "thread-at-exit", "eh-personality-continue", "panic-handler-trap"] }
 
 # Crates to help writing no_std code.
-atomic-dbg = { version = "0.1.8", default-features = false }
-rustix-dlmalloc = { version = "0.1.0", features = ["global"] }
+atomic-dbg = { version = "0.1.11", default-features = false }
+rustix-dlmalloc = { version = "0.2.1", features = ["global"] }
 
 [profile.dev]
 panic = "abort"

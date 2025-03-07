@@ -74,15 +74,21 @@ pub(super) fn trap() -> ! {
 #[allow(dead_code)]
 pub(super) fn dynamic_table_addr() -> *const linux_raw_sys::elf::Elf_Dyn {
     let addr;
+    // We ought to add `.cfi_adjust_cfa_offset` directives here describe our
+    // modifications to the stack pointer value, however the Rust compiler
+    // sometimes omits `.cfi_start_proc`/`.cfi_end_proc`, and when it does
+    // this it prohibits use of `.cfi_adjust_cfa_offset`, and there doesn't
+    // appear to be any way for us to test when it does this. So just comment
+    // them out entirely for now.
     unsafe {
         asm!(
             ".weak _DYNAMIC",
             ".hidden _DYNAMIC",
             "call 2f",
-            ".cfi_adjust_cfa_offset 4",
+            //".cfi_adjust_cfa_offset 4",
             "2:",
             "pop {0}", // We depend on this being exactly one byte long.
-            ".cfi_adjust_cfa_offset -4",
+            //".cfi_adjust_cfa_offset -4",
             "add {0}, offset _GLOBAL_OFFSET_TABLE_+1",
             "lea {0}, [{0} + _DYNAMIC@GOTOFF]",
             out(reg) addr

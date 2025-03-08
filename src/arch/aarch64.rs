@@ -10,7 +10,6 @@ use core::arch::asm;
 use linux_raw_sys::elf::Elf_Ehdr;
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
-#[cfg(test)]
 use linux_raw_sys::general::__NR_rt_sigreturn;
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
@@ -275,14 +274,13 @@ pub(super) const TLS_OFFSET: usize = 0;
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
-    assert_eq!(__NR_exit, 93); // TODO: obviate this
     asm!(
         "svc 0",
         "mov x0, xzr",
-        "mov x8, 93", // TODO: use {__NR_exit}
+        "mov x8, {__NR_exit}",
         "svc 0",
         "udf #16",
-        //__NR_exit = const __NR_exit, // TODO: Use this when `asm_const` is stabilized.
+        __NR_exit = const __NR_exit,
         in("x8") __NR_munmap,
         in("x0") map_addr,
         in("x1") map_len,
@@ -304,16 +302,11 @@ naked_fn!(
     ";
     pub(super) fn return_from_signal_handler() -> ();
 
-    "mov x8, 139", // TODO: use {__NR_rt_sigreturn}
+    "mov x8, {__NR_rt_sigreturn}",
     "svc 0",
     "udf #16";
-    //__NR_rt_sigreturn = const __NR_rt_sigreturn // TODO: Use this when `asm_const` is stabilized.
+    __NR_rt_sigreturn = const __NR_rt_sigreturn
 );
-#[cfg(feature = "take-charge")]
-#[test] // TODO: obviate this
-fn test_rt_sigreturn() {
-    assert_eq!(__NR_rt_sigreturn, 139);
-}
 
 /// Invoke the appropriate system call to return control from a signal
 /// handler that does not use `SA_SIGINFO`. On aarch64, this uses the same

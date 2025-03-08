@@ -13,7 +13,6 @@ use linux_raw_sys::elf::Elf_Ehdr;
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
-#[cfg(test)]
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
@@ -289,14 +288,13 @@ pub(super) const TLS_OFFSET: usize = 0;
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
-    assert_eq!(__NR_exit, 1); // TODO: obviate this
     asm!(
         "svc 0",
         "mov r0, #0",
-        "mov r7, #1", // TODO: use {__NR_exit}
+        "mov r7, {__NR_exit}",
         "svc 0",
         "udf #16",
-        //__NR_exit = const __NR_exit, // TODO: Use this when `asm_const` is stabilized.
+        __NR_exit = const __NR_exit,
         in("r7") __NR_munmap,
         in("r0") map_addr,
         in("r1") map_len,
@@ -318,16 +316,11 @@ naked_fn!(
     ";
     pub(super) fn return_from_signal_handler() -> ();
 
-    "mov r7, 173", // TODO: use {__NR_rt_sigreturn}
+    "mov r7, {__NR_rt_sigreturn}",
     "swi 0",
     "udf #16";
-    //__NR_rt_sigreturn = const __NR_rt_sigreturn // TODO: Use this when `asm_const` is stabilized.
+    __NR_rt_sigreturn = const __NR_rt_sigreturn
 );
-#[cfg(feature = "take-charge")]
-#[test] // TODO: obviate this
-fn test_rt_sigreturn() {
-    assert_eq!(__NR_rt_sigreturn, 173);
-}
 
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
@@ -343,13 +336,8 @@ naked_fn!(
     ";
     pub(super) fn return_from_signal_handler_noinfo() -> ();
 
-    "mov r7, 119", // TODO: use {__NR_sigreturn}
+    "mov r7, {__NR_sigreturn}",
     "swi 0",
     "udf #16";
-    //__NR_sigreturn = const __NR_sigreturn // TODO: Use this when `asm_const` is stabilized.
+    __NR_sigreturn = const __NR_sigreturn
 );
-#[cfg(feature = "take-charge")]
-#[test] // TODO: obviate this
-fn test_sigreturn() {
-    assert_eq!(__NR_sigreturn, 119);
-}

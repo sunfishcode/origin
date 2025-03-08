@@ -32,7 +32,7 @@
 use alloc::boxed::Box;
 #[cfg(feature = "program-at-exit")]
 use core::ptr::null_mut;
-use linux_raw_sys::ctypes::c_int;
+use libc::c_int;
 
 /// Register a function to be called when [`exit`] is called.
 #[cfg(feature = "program-at-exit")]

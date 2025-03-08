@@ -15,7 +15,7 @@ include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
 rust-version = "1.84"
 
 [dependencies]
-linux-raw-sys = { version = "0.9.2", default-features = false, features = ["general", "no_std", "elf"] }
+linux-raw-sys = { version = "0.9.2", default-features = false, optional = true, features = ["general", "no_std", "elf"] }
 rustix = { version = "1.0.0", default-features = false }
 bitflags = { version = "2.4.0", default-features = false }
 log = { version = "0.4.14", default-features = false, optional = true }
@@ -79,7 +79,7 @@ optimize_for_size = []
 #
 # To use threads, it is also necessary to enable the "thread" feature.
 # To use signals, it is also necessary to enable the "signal" feature.
-take-charge = ["rustix/use-explicitly-provided-auxv", "rustix/runtime"]
+take-charge = ["linux-raw-sys", "rustix/use-explicitly-provided-auxv", "rustix/runtime"]
 
 # Enable "take-charge" mode using origin's `_start` definition.
 origin-start = ["take-charge"]

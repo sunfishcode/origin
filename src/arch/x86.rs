@@ -16,7 +16,6 @@ use linux_raw_sys::elf::Elf_Ehdr;
 use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
-#[cfg(test)]
 use linux_raw_sys::general::{__NR_rt_sigreturn, __NR_sigreturn};
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
@@ -371,16 +370,15 @@ pub(super) const TLS_OFFSET: usize = 0;
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
-    assert_eq!(__NR_exit, 1); // TODO: obviate this
     asm!(
         // Use `int 0x80` instead of vsyscall, since vsyscall would attempt to
         // touch the stack after we `munmap` it.
         "int 0x80",
         "xor ebx, ebx",
-        "mov eax, 1", // TODO: use {__NR_exit}
+        "mov eax, {__NR_exit}",
         "int 0x80",
         "ud2",
-        //__NR_exit = const __NR_exit, // TODO: Use this when `asm_const` is stabilized.
+        __NR_exit = const __NR_exit,
         in("eax") __NR_munmap,
         in("ebx") map_addr,
         in("ecx") map_len,
@@ -402,17 +400,11 @@ naked_fn!(
     ";
     pub(super) fn return_from_signal_handler() -> ();
 
-    "mov eax, 173", // TODO: use {__NR_rt_sigreturn}
+    "mov eax,  {__NR_rt_sigreturn}",
     "int 0x80",
     "ud2";
-    //__NR_rt_sigreturn = const __NR_rt_sigreturn // TODO: Use this when `asm_const` is stabilized.
+    __NR_rt_sigreturn = const __NR_rt_sigreturn
 );
-#[cfg(feature = "take-charge")]
-#[cfg(feature = "signal")]
-#[test] // TODO: obviate this
-fn test_rt_sigreturn() {
-    assert_eq!(__NR_rt_sigreturn, 173);
-}
 
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
@@ -429,14 +421,8 @@ naked_fn!(
     pub(super) fn return_from_signal_handler_noinfo() -> ();
 
     "pop eax",
-    "mov eax, 119", // TODO: use {__NR_sigreturn}
+    "mov eax, {__NR_sigreturn}",
     "int 0x80",
     "ud2";
-    //__NR_sigreturn = const __NR_sigreturn // TODO: Use this when `asm_const` is stabilized.
+    __NR_sigreturn = const __NR_sigreturn
 );
-#[cfg(feature = "take-charge")]
-#[cfg(feature = "signal")]
-#[test] // TODO: obviate this
-fn test_sigreturn() {
-    assert_eq!(__NR_sigreturn, 119);
-}

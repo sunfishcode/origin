@@ -293,14 +293,13 @@ pub(super) const TLS_OFFSET: usize = 0x800;
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
-    assert_eq!(__NR_exit, 93); // TODO: obviate this
     asm!(
         "ecall",
         "mv a0, zero",
-        "li a7, 93", // TODO: use {__NR_exit}
+        "li a7, {__NR_exit}",
         "ecall",
         "unimp",
-        //__NR_exit = const __NR_exit, // TODO: Use this when `asm_const` is stabilized.
+        __NR_exit = const __NR_exit,
         in("a7") __NR_munmap,
         in("a0") map_addr,
         in("a1") map_len,

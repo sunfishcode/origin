@@ -18,7 +18,7 @@ extern "C" {
 }
 
 /// Read the canary field from its well-known location in TLS, if there is one,
-/// or read `__stack_chk_guard` otherweise.
+/// or read `__stack_chk_guard` otherwise.
 fn tls_guard() -> usize {
     let ret;
 

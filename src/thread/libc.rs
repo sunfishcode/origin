@@ -240,9 +240,7 @@ pub fn current() -> Thread {
 #[inline]
 #[must_use]
 pub fn current_id() -> ThreadId {
-    // Actually, in the pthread implementation here we do just make a system
-    // call, because we don't have access to the pthread internals.
-    rustix::thread::gettid()
+    unsafe { ThreadId::from_raw_unchecked(libc::gettid()) }
 }
 
 /// Set the current thread id, after a `fork`.

@@ -19,7 +19,7 @@ linux-raw-sys = { version = "0.9.2", default-features = false, optional = true, 
 rustix = { version = "1.0.0", default-features = false }
 bitflags = { version = "2.4.0", default-features = false }
 log = { version = "0.4.14", default-features = false, optional = true }
-rustix-futex-sync = { version = "0.3.0", optional = true }
+rustix-futex-sync = { version = "0.4.0", optional = true }
 smallvec = { version = "1.11.1", optional = true, features = ["const_new"] }
 
 # Optional logging backends for use with "take-charge". You can use any

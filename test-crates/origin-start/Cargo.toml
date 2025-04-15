@@ -9,7 +9,7 @@ origin = { path = "../..", default-features = false, features = ["origin-start",
 atomic-dbg = { version = "0.1.11", default-features = false }
 rustix-dlmalloc = { version = "0.2.1", features = ["global"] }
 rustix = { version = "1.0.0", default-features = false, features = ["process", "thread"] }
-rustix-futex-sync = "0.3.0"
+rustix-futex-sync = "0.4.0"
 
 # This is just a test crate, and not part of the origin workspace.
 [workspace]

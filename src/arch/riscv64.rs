@@ -119,14 +119,15 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
     r0
 }
 
-/// Perform a raw load operation to memory that Rust may consider out of bounds.
+/// Perform a raw load operation to memory that Rust may consider out of
+/// bounds.
 ///
 /// Data loaded from out-of-bounds bytes will have nondeterministic values.
 ///
 /// # Safety
 ///
-/// `ptr` must be aligned for loading a `usize` and must point to enough readable
-/// memory for loading a `usize`.
+/// `ptr` must be aligned for loading a `usize` and must point to enough
+/// readable memory for loading a `usize`.
 #[cfg(all(feature = "take-charge", not(feature = "optimize_for_size")))]
 #[inline]
 pub(super) unsafe fn oob_load(ptr: *const usize) -> usize {

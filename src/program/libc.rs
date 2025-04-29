@@ -50,9 +50,11 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     }
 
     // The function to pass to `__cxa_atexit`.
-    unsafe extern "C" fn at_exit_func(arg: *mut c_void) { unsafe {
-        Box::from_raw(arg.cast::<Box<dyn FnOnce() + Send>>())();
-    }}
+    unsafe extern "C" fn at_exit_func(arg: *mut c_void) {
+        unsafe {
+            Box::from_raw(arg.cast::<Box<dyn FnOnce() + Send>>())();
+        }
+    }
 
     let at_exit_arg = Box::into_raw(Box::new(func)).cast::<c_void>();
     let r = unsafe { __cxa_atexit(at_exit_func, at_exit_arg, null_mut()) };

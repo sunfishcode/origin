@@ -106,21 +106,23 @@ pub(super) fn ehdr_addr() -> *const Elf_Ehdr {
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 #[inline]
-pub(super) unsafe fn relocation_load(ptr: usize) -> usize { unsafe {
-    let r0;
+pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
+    unsafe {
+        let r0;
 
-    // This is read-only but we don't use `readonly` because this memory access
-    // happens outside the Rust memory model. As far as Rust knows, this is
-    // just an arbitrary side-effecting opaque operation.
-    asm!(
-        "mov {}, [{}]",
-        out(reg) r0,
-        in(reg) ptr,
-        options(nostack, preserves_flags),
-    );
+        // This is read-only but we don't use `readonly` because this memory access
+        // happens outside the Rust memory model. As far as Rust knows, this is
+        // just an arbitrary side-effecting opaque operation.
+        asm!(
+            "mov {}, [{}]",
+            out(reg) r0,
+            in(reg) ptr,
+            options(nostack, preserves_flags),
+        );
 
-    r0
-} }
+        r0
+    }
+}
 
 /// Perform a single store operation, outside the Rust memory model.
 ///
@@ -138,14 +140,16 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize { unsafe {
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 #[inline]
-pub(super) unsafe fn relocation_store(ptr: usize, value: usize) { unsafe {
-    asm!(
-        "mov [{}], {}",
-        in(reg) ptr,
-        in(reg) value,
-        options(nostack, preserves_flags),
-    );
-} }
+pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
+    unsafe {
+        asm!(
+            "mov [{}], {}",
+            in(reg) ptr,
+            in(reg) value,
+            options(nostack, preserves_flags),
+        );
+    }
+}
 
 /// Mark “relro” memory as readonly.
 ///
@@ -166,29 +170,31 @@ pub(super) unsafe fn relocation_store(ptr: usize, value: usize) { unsafe {
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 #[inline]
-pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) { unsafe {
-    let r0: usize;
+pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
+    unsafe {
+        let r0: usize;
 
-    // This is read-only but we don't use `readonly` because the side effects
-    // happen outside the Rust memory model. As far as Rust knows, this is
-    // just an arbitrary side-effecting opaque operation.
-    asm!(
-        "syscall",
-        inlateout("rax") __NR_mprotect as usize => r0,
-        in("rdi") ptr,
-        in("rsi") len,
-        in("rdx") PROT_READ,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags),
-    );
+        // This is read-only but we don't use `readonly` because the side effects
+        // happen outside the Rust memory model. As far as Rust knows, this is
+        // just an arbitrary side-effecting opaque operation.
+        asm!(
+            "syscall",
+            inlateout("rax") __NR_mprotect as usize => r0,
+            in("rdi") ptr,
+            in("rsi") len,
+            in("rdx") PROT_READ,
+            lateout("rcx") _,
+            lateout("r11") _,
+            options(nostack, preserves_flags),
+        );
 
-    if r0 != 0 {
-        // Do not panic here as libstd's panic handler needs TLS, which is not
-        // yet initialized at this point.
-        trap();
+        if r0 != 0 {
+            // Do not panic here as libstd's panic handler needs TLS, which is not
+            // yet initialized at this point.
+            trap();
+        }
     }
-} }
+}
 
 /// The required alignment for the stack pointer.
 #[cfg(feature = "take-charge")]
@@ -211,49 +217,53 @@ pub(super) unsafe fn clone(
     newtls: *mut c_void,
     fn_: extern "C" fn(),
     num_args: usize,
-) -> isize { unsafe {
-    let r0;
-    asm!(
-        "syscall",            // Do the `clone` system call.
-        "test eax, eax",      // Branch if we're in the parent thread.
-        "jnz 2f",
+) -> isize {
+    unsafe {
+        let r0;
+        asm!(
+            "syscall",            // Do the `clone` system call.
+            "test eax, eax",      // Branch if we're in the parent thread.
+            "jnz 2f",
 
-        // Child thread.
-        "mov rdi, r9",        // Pass `fn_` as the first argument.
-        "mov rsi, rsp",       // Pass the args pointer as the second argument.
-        "mov rdx, r12",       // Pass `num_args` as the third argument.
-        "xor ebp, ebp",       // Zero the frame address.
-        "push rax",           // Zero the return address.
-        "jmp {entry}",        // Call `entry`.
+            // Child thread.
+            "mov rdi, r9",        // Pass `fn_` as the first argument.
+            "mov rsi, rsp",       // Pass the args pointer as the second argument.
+            "mov rdx, r12",       // Pass `num_args` as the third argument.
+            "xor ebp, ebp",       // Zero the frame address.
+            "push rax",           // Zero the return address.
+            "jmp {entry}",        // Call `entry`.
 
-        // Parent thread.
-        "2:",
+            // Parent thread.
+            "2:",
 
-        entry = sym super::thread::entry,
-        inlateout("rax") __NR_clone as usize => r0,
-        in("rdi") flags,
-        in("rsi") child_stack,
-        in("rdx") parent_tid,
-        in("r10") child_tid,
-        in("r8") newtls,
-        in("r9") fn_,
-        in("r12") num_args,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack)
-    );
-    r0
-} }
+            entry = sym super::thread::entry,
+            inlateout("rax") __NR_clone as usize => r0,
+            in("rdi") flags,
+            in("rsi") child_stack,
+            in("rdx") parent_tid,
+            in("r10") child_tid,
+            in("r8") newtls,
+            in("r9") fn_,
+            in("r12") num_args,
+            lateout("rcx") _,
+            lateout("r11") _,
+            options(nostack)
+        );
+        r0
+    }
+}
 
 /// Write a value to the platform thread-pointer register.
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
-pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) { unsafe {
-    rustix::runtime::set_fs(ptr);
-    debug_assert_eq!(*ptr.cast::<*const c_void>(), ptr);
-    debug_assert_eq!(thread_pointer(), ptr);
-} }
+pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
+    unsafe {
+        rustix::runtime::set_fs(ptr);
+        debug_assert_eq!(*ptr.cast::<*const c_void>(), ptr);
+        debug_assert_eq!(thread_pointer(), ptr);
+    }
+}
 
 /// Read the value of the platform thread-pointer register.
 #[cfg(feature = "take-charge")]
@@ -281,20 +291,22 @@ pub(super) const TLS_OFFSET: usize = 0;
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
-pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! { unsafe {
-    asm!(
-        "syscall",
-        "xor edi, edi",
-        "mov eax, {__NR_exit}",
-        "syscall",
-        "ud2",
-        __NR_exit = const __NR_exit,
-        in("rax") __NR_munmap,
-        in("rdi") map_addr,
-        in("rsi") map_len,
-        options(noreturn, nostack)
-    );
-} }
+pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
+    unsafe {
+        asm!(
+            "syscall",
+            "xor edi, edi",
+            "mov eax, {__NR_exit}",
+            "syscall",
+            "ud2",
+            __NR_exit = const __NR_exit,
+            in("rax") __NR_munmap,
+            in("rdi") map_addr,
+            in("rsi") map_len,
+            options(noreturn, nostack)
+        );
+    }
+}
 
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]

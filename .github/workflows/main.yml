@@ -23,7 +23,7 @@ jobs:
     strategy:
       matrix:
         build: [ubuntu, i686-linux, aarch64-linux, riscv64-linux]
-        rust: [1.84.1, nightly-2025-04-28]
+        rust: [1.85, nightly-2025-04-28]
         include:
           - build: ubuntu
             os: ubuntu-latest

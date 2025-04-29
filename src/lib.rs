@@ -3,8 +3,6 @@
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "experimental-relocate", feature(cfg_relocation_model))]
-// On nightly, enable `#[naked]` functions.
-#![cfg_attr(feature = "nightly", feature(naked_functions))]
 // On nightly, enable llvm intrinsics for additional debug asserts.
 #![cfg_attr(all(debug_assertions, feature = "nightly"), allow(internal_features))]
 #![cfg_attr(

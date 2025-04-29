@@ -8,7 +8,7 @@
 //! ///
 //! /// SAFETY: `argc`, `argv`, and `envp` describe incoming program
 //! /// command-line arguments and environment variables.
-//! #[no_mangle]
+//! #[unsafe(no_mangle)]
 //! unsafe fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
 //!     todo!("Run the program and return the program exit status.")
 //! }

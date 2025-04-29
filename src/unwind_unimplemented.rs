@@ -74,31 +74,31 @@ unsafe extern "C" fn _Unwind_GetCFA() {
 }
 
 #[cfg(target_arch = "arm")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn _Unwind_VRS_Get() {
     unimplemented!("_Unwind_VRS_Get")
 }
 
 #[cfg(target_arch = "arm")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn _Unwind_VRS_Set() {
     unimplemented!("_Unwind_VRS_Set")
 }
 
 #[cfg(target_arch = "arm")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn __aeabi_unwind_cpp_pr0() {
     unimplemented!("__aeabi_unwind_cpp_pr0")
 }
 
 #[cfg(target_arch = "arm")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn __aeabi_unwind_cpp_pr1() {
     unimplemented!("__aeabi_unwind_cpp_pr1")
 }
 
 #[cfg(target_arch = "arm")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn __gnu_unwind_frame() {
     unimplemented!("__gnu_unwind_frame")
 }

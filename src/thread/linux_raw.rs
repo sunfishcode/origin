@@ -1116,7 +1116,7 @@ pub fn yield_current() {
 
 /// The ARM ABI expects this to be defined.
 #[cfg(target_arch = "arm")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn __aeabi_read_tp() -> *mut c_void {
     thread_pointer()
 }

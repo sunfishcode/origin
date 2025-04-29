@@ -121,19 +121,21 @@ pub(super) fn ehdr_addr() -> *const Elf_Ehdr {
 #[cfg(relocation_model = "pic")]
 #[inline]
 pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
-    let r0;
+    {
+        let r0;
 
-    // This is read-only but we don't use `readonly` because this memory access
-    // happens outside the Rust memory model. As far as Rust knows, this is
-    // just an arbitrary side-effecting opaque operation.
-    asm!(
-        "ldr {}, [{}]",
-        out(reg) r0,
-        in(reg) ptr,
-        options(nostack, preserves_flags),
-    );
+        // This is read-only but we don't use `readonly` because this memory access
+        // happens outside the Rust memory model. As far as Rust knows, this is
+        // just an arbitrary side-effecting opaque operation.
+        asm!(
+            "ldr {}, [{}]",
+            out(reg) r0,
+            in(reg) ptr,
+            options(nostack, preserves_flags),
+        );
 
-    r0
+        r0
+    }
 }
 
 /// Perform a single store operation, outside the Rust memory model.
@@ -152,12 +154,14 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
 #[cfg(relocation_model = "pic")]
 #[inline]
 pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
-    asm!(
-        "str {}, [{}]",
-        in(reg) value,
-        in(reg) ptr,
-        options(nostack, preserves_flags),
-    );
+    unsafe {
+        asm!(
+            "str {}, [{}]",
+            in(reg) value,
+            in(reg) ptr,
+            options(nostack, preserves_flags),
+        );
+    }
 }
 
 /// Mark “relro” memory as readonly.
@@ -180,24 +184,26 @@ pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
 #[cfg(relocation_model = "pic")]
 #[inline]
 pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
-    let r0: usize;
+    unsafe {
+        let r0: usize;
 
-    // This is read-only but we don't use `readonly` because the side effects
-    // happen outside the Rust memory model. As far as Rust knows, this is
-    // just an arbitrary side-effecting opaque operation.
-    asm!(
-        "svc 0",
-        in("r7") __NR_mprotect,
-        inlateout("r0") ptr as usize => r0,
-        in("r1") len,
-        in("r2") PROT_READ,
-        options(nostack, preserves_flags),
-    );
+        // This is read-only but we don't use `readonly` because the side effects
+        // happen outside the Rust memory model. As far as Rust knows, this is
+        // just an arbitrary side-effecting opaque operation.
+        asm!(
+            "svc 0",
+            in("r7") __NR_mprotect,
+            inlateout("r0") ptr as usize => r0,
+            in("r1") len,
+            in("r2") PROT_READ,
+            options(nostack, preserves_flags),
+        );
 
-    if r0 != 0 {
-        // Do not panic here as libstd's panic handler needs TLS, which is not
-        // yet initialized at this point.
-        trap();
+        if r0 != 0 {
+            // Do not panic here as libstd's panic handler needs TLS, which is not
+            // yet initialized at this point.
+            trap();
+        }
     }
 }
 
@@ -223,35 +229,37 @@ pub(super) unsafe fn clone(
     fn_: extern "C" fn(),
     num_args: usize,
 ) -> isize {
-    let r0;
-    asm!(
-        "svc 0",              // Do the `clone` system call.
-        "tst r0, r0",         // Branch if we're in the parent thread.
-        "bne 0f",
+    unsafe {
+        let r0;
+        asm!(
+            "svc 0",              // Do the `clone` system call.
+            "tst r0, r0",         // Branch if we're in the parent thread.
+            "bne 0f",
 
-        // Child thread.
-        "mov r0, {fn_}",      // Pass `fn_` as the first argument.
-        "mov r1, sp",         // Pass the args pointer as the second argument.
-        "mov r2, {num_args}", // Pass `num_args` as the third argument.
-        "mov fp, #0",         // Zero the frame address.
-        "mov lr, #0",         // Zero the return address.
-        "b {entry}",          // Call `entry`.
+            // Child thread.
+            "mov r0, {fn_}",      // Pass `fn_` as the first argument.
+            "mov r1, sp",         // Pass the args pointer as the second argument.
+            "mov r2, {num_args}", // Pass `num_args` as the third argument.
+            "mov fp, #0",         // Zero the frame address.
+            "mov lr, #0",         // Zero the return address.
+            "b {entry}",          // Call `entry`.
 
-        // Parent thread.
-        "0:",
+            // Parent thread.
+            "0:",
 
-        entry = sym super::thread::entry,
-        fn_ = in(reg) fn_,
-        num_args = in(reg) num_args,
-        in("r7") __NR_clone,
-        inlateout("r0") flags as usize => r0,
-        in("r1") child_stack,
-        in("r2") parent_tid,
-        in("r3") newtls,
-        in("r4") child_tid,
-        options(nostack)
-    );
-    r0
+            entry = sym super::thread::entry,
+            fn_ = in(reg) fn_,
+            num_args = in(reg) num_args,
+            in("r7") __NR_clone,
+            inlateout("r0") flags as usize => r0,
+            in("r1") child_stack,
+            in("r2") parent_tid,
+            in("r3") newtls,
+            in("r4") child_tid,
+            options(nostack)
+        );
+        r0
+    }
 }
 
 /// Write a value to the platform thread-pointer register.
@@ -259,9 +267,11 @@ pub(super) unsafe fn clone(
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
-    let res = rustix::runtime::arm_set_tls(ptr);
-    debug_assert_eq!(res, Ok(()));
-    debug_assert_eq!(thread_pointer(), ptr);
+    unsafe {
+        let res = rustix::runtime::arm_set_tls(ptr);
+        debug_assert_eq!(res, Ok(()));
+        debug_assert_eq!(thread_pointer(), ptr);
+    }
 }
 
 /// Read the value of the platform thread-pointer register.
@@ -288,18 +298,20 @@ pub(super) const TLS_OFFSET: usize = 0;
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
-    asm!(
-        "svc 0",
-        "mov r0, #0",
-        "mov r7, {__NR_exit}",
-        "svc 0",
-        "udf #16",
-        __NR_exit = const __NR_exit,
-        in("r7") __NR_munmap,
-        in("r0") map_addr,
-        in("r1") map_len,
-        options(noreturn, nostack)
-    );
+    unsafe {
+        asm!(
+            "svc 0",
+            "mov r0, #0",
+            "mov r7, {__NR_exit}",
+            "svc 0",
+            "udf #16",
+            __NR_exit = const __NR_exit,
+            in("r7") __NR_munmap,
+            in("r0") map_addr,
+            in("r1") map_len,
+            options(noreturn, nostack)
+        );
+    }
 }
 
 #[cfg(feature = "take-charge")]

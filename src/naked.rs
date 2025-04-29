@@ -40,8 +40,8 @@ macro_rules! naked_fn {
         $($label:ident = $kind:ident $path:path),*
     ) => {
         #[doc = $doc]
-        #[naked]
-        #[no_mangle]
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
         $vis unsafe extern "C" fn $name $args -> $ret {
             core::arch::naked_asm!(
                 $($code),*,
@@ -62,7 +62,7 @@ macro_rules! naked_fn {
         $($code:literal),*;
         $($label:ident = $kind:ident $path:path),*
     ) => {
-        extern "C" {
+        unsafe extern "C" {
             #[doc = $doc]
             $vis fn $name $args -> $ret;
         }

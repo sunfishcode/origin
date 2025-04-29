@@ -3,7 +3,7 @@
 
 // If requested, provide a version of "eh-personality-continue" ourselves.
 #[cfg(feature = "eh-personality-continue")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn rust_eh_personality(
     version: core::ffi::c_int,
     _actions: core::ffi::c_int,

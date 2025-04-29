@@ -8,11 +8,11 @@ description = "Program startup and thread support written in Rust"
 documentation = "https://docs.rs/origin"
 license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
 repository = "https://github.com/sunfishcode/origin"
-edition = "2021"
+edition = "2024"
 keywords = ["linux"]
 categories = ["no-std"]
 include = ["src", "Cargo.toml", "COPYRIGHT", "LICENSE*", "/*.md"]
-rust-version = "1.84"
+rust-version = "1.85"
 
 [dependencies]
 linux-raw-sys = { version = "0.9.2", default-features = false, optional = true, features = ["general", "no_std", "elf"] }
@@ -44,7 +44,7 @@ alloc = { version = "1.0.0", optional = true, package = "rustc-std-workspace-all
 # Use the unwinding crate if support for unwinding is needed. This depends on
 # nightly Rust. And it's not supported on ARM yet.
 [target.'cfg(not(target_arch = "arm"))'.dependencies.unwinding]
-version = "0.2.5"
+version = "0.2.6"
 default-features = false
 features = ["unwinder"]
 optional = true

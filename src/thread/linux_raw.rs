@@ -8,7 +8,7 @@
 //! pthreads or `std::thread::Thread`.
 
 use crate::arch::{
-    clone, munmap_and_exit_thread, set_thread_pointer, thread_pointer, STACK_ALIGNMENT, TLS_OFFSET,
+    STACK_ALIGNMENT, TLS_OFFSET, clone, munmap_and_exit_thread, set_thread_pointer, thread_pointer,
 };
 #[cfg(feature = "thread-at-exit")]
 use alloc::boxed::Box;
@@ -17,18 +17,18 @@ use core::cell::Cell;
 use core::cmp::max;
 use core::ffi::c_void;
 use core::mem::{align_of, offset_of, size_of};
-use core::ptr::{copy_nonoverlapping, drop_in_place, null, null_mut, NonNull};
+use core::ptr::{NonNull, copy_nonoverlapping, drop_in_place, null, null_mut};
 use core::slice;
 use core::sync::atomic::Ordering::SeqCst;
-use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU32, AtomicU8};
+use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU8, AtomicU32};
 use linux_raw_sys::elf::*;
 use rustix::io;
-use rustix::mm::{mmap_anonymous, mprotect, MapFlags, MprotectFlags, ProtFlags};
+use rustix::mm::{MapFlags, MprotectFlags, ProtFlags, mmap_anonymous, mprotect};
 use rustix::param::{linux_execfn, page_size};
-use rustix::process::{getrlimit, Resource};
-use rustix::runtime::{exe_phdrs, set_tid_address};
+use rustix::process::{Resource, getrlimit};
 #[cfg(feature = "signal")]
-use rustix::runtime::{kernel_sigprocmask, How, KernelSigSet};
+use rustix::runtime::{How, KernelSigSet, kernel_sigprocmask};
+use rustix::runtime::{exe_phdrs, set_tid_address};
 use rustix::thread::gettid;
 
 pub use rustix::thread::Pid as ThreadId;
@@ -55,7 +55,7 @@ impl Thread {
     /// `raw` must be a valid non-null thread pointer.
     #[inline]
     pub unsafe fn from_raw_unchecked(raw: *mut c_void) -> Self {
-        Self(NonNull::new_unchecked(raw.cast()))
+        unsafe { Self(NonNull::new_unchecked(raw.cast())) }
     }
 
     /// Convert to `Self` from a raw non-null pointer that was returned from
@@ -301,7 +301,7 @@ pub(super) fn initialize_startup_info() {
     }
 }
 
-extern "C" {
+unsafe extern "C" {
     /// Declare the `_DYNAMIC` symbol so that we can compare its address with
     /// the static address in the `PT_DYNAMIC` header to learn our offset. Use
     /// a weak symbol because `_DYNAMIC` is not always present.
@@ -324,63 +324,65 @@ core::arch::global_asm!(".weak _DYNAMIC");
 /// initial value of the stack pointer in a new process, pointing to the
 /// initial contents of the stack.
 pub(super) unsafe fn initialize_main(mem: *mut c_void) {
-    // Determine the top of the stack. Linux puts the `AT_EXECFN` string at
-    // the top, so find the end of that, and then round up to the page size.
-    // See <https://lwn.net/Articles/631631/> for details.
-    let execfn = linux_execfn().to_bytes_with_nul();
-    let stack_base = execfn.as_ptr().add(execfn.len());
-    let stack_base = stack_base
-        .map_addr(|ptr| round_up(ptr, page_size()))
-        .cast_mut();
+    unsafe {
+        // Determine the top of the stack. Linux puts the `AT_EXECFN` string at
+        // the top, so find the end of that, and then round up to the page size.
+        // See <https://lwn.net/Articles/631631/> for details.
+        let execfn = linux_execfn().to_bytes_with_nul();
+        let stack_base = execfn.as_ptr().add(execfn.len());
+        let stack_base = stack_base
+            .map_addr(|ptr| round_up(ptr, page_size()))
+            .cast_mut();
 
-    // We're running before any user code, so the startup soft stack limit is
-    // the effective stack size. Linux sets up inaccessible memory at the end
-    // of the stack.
-    let stack_map_size = getrlimit(Resource::Stack).current.unwrap() as usize;
-    let stack_least = stack_base.sub(stack_map_size);
-    let stack_size = stack_least.offset_from(mem.cast::<u8>()) as usize;
-    let guard_size = page_size();
+        // We're running before any user code, so the startup soft stack limit is
+        // the effective stack size. Linux sets up inaccessible memory at the end
+        // of the stack.
+        let stack_map_size = getrlimit(Resource::Stack).current.unwrap() as usize;
+        let stack_least = stack_base.sub(stack_map_size);
+        let stack_size = stack_least.offset_from(mem.cast::<u8>()) as usize;
+        let guard_size = page_size();
 
-    // Initialize the canary value from the OS-provided random bytes.
-    let random_ptr = rustix::runtime::random().cast::<usize>();
-    let canary = random_ptr.read_unaligned();
-    __stack_chk_guard = canary;
+        // Initialize the canary value from the OS-provided random bytes.
+        let random_ptr = rustix::runtime::random().cast::<usize>();
+        let canary = random_ptr.read_unaligned();
+        __stack_chk_guard = canary;
 
-    let mut alloc_size = 0;
-    let (tls_data_bottom, header) = calculate_tls_size(&mut alloc_size);
+        let mut alloc_size = 0;
+        let (tls_data_bottom, header) = calculate_tls_size(&mut alloc_size);
 
-    // Allocate the thread data. Use `mmap_anonymous` rather than `alloc` here
-    // as the allocator may depend on thread-local data, which is what we're
-    // initializing here.
-    let new = mmap_anonymous(
-        null_mut(),
-        alloc_size,
-        ProtFlags::READ | ProtFlags::WRITE,
-        MapFlags::PRIVATE,
-    )
-    .unwrap()
-    .cast::<u8>();
+        // Allocate the thread data. Use `mmap_anonymous` rather than `alloc` here
+        // as the allocator may depend on thread-local data, which is what we're
+        // initializing here.
+        let new = mmap_anonymous(
+            null_mut(),
+            alloc_size,
+            ProtFlags::READ | ProtFlags::WRITE,
+            MapFlags::PRIVATE,
+        )
+        .unwrap()
+        .cast::<u8>();
 
-    let metadata_align = max(unsafe { STARTUP_TLS_INFO.align }, align_of::<Metadata>());
-    debug_assert_eq!(new.addr() % metadata_align, 0);
+        let metadata_align = max(STARTUP_TLS_INFO.align, align_of::<Metadata>());
+        debug_assert_eq!(new.addr() % metadata_align, 0);
 
-    let tls_data = new.add(tls_data_bottom);
-    let metadata: *mut Metadata = new.add(header).cast();
+        let tls_data = new.add(tls_data_bottom);
+        let metadata: *mut Metadata = new.add(header).cast();
 
-    let (newtls, thread_id_ptr) = initialize_tls(
-        tls_data,
-        metadata,
-        canary,
-        stack_least,
-        stack_size,
-        guard_size,
-        0,
-    );
-    let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
-    *thread_id_ptr = tid.as_raw_nonzero().get();
+        let (newtls, thread_id_ptr) = initialize_tls(
+            tls_data,
+            metadata,
+            canary,
+            stack_least,
+            stack_size,
+            guard_size,
+            0,
+        );
+        let tid = rustix::runtime::set_tid_address(thread_id_ptr.cast());
+        *thread_id_ptr = tid.as_raw_nonzero().get();
 
-    // Point the platform thread-pointer register at the new thread metadata.
-    set_thread_pointer(newtls);
+        // Point the platform thread-pointer register at the new thread metadata.
+        set_thread_pointer(newtls);
+    }
 }
 
 fn calculate_tls_size(map_size: &mut usize) -> (usize, usize) {
@@ -436,39 +438,41 @@ unsafe fn initialize_tls(
     guard_size: usize,
     map_size: usize,
 ) -> (*mut c_void, *mut i32) {
-    let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
+    unsafe {
+        let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
 
-    // Initialize the thread metadata.
-    metadata.write(Metadata {
-        abi: Abi {
-            canary,
-            dtv: null(),
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-            this: newtls,
-            _pad: Default::default(),
-            thread_pointee: [],
-        },
-        thread: ThreadData::new(stack_least.cast(), stack_size, guard_size, map_size),
-    });
+        // Initialize the thread metadata.
+        metadata.write(Metadata {
+            abi: Abi {
+                canary,
+                dtv: null(),
+                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+                this: newtls,
+                _pad: Default::default(),
+                thread_pointee: [],
+            },
+            thread: ThreadData::new(stack_least.cast(), stack_size, guard_size, map_size),
+        });
 
-    // Initialize the TLS data with explicit initializer data.
-    slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
-        slice::from_raw_parts(
-            STARTUP_TLS_INFO.addr.cast::<u8>(),
-            STARTUP_TLS_INFO.file_size,
-        ),
-    );
+        // Initialize the TLS data with explicit initializer data.
+        slice::from_raw_parts_mut(tls_data, STARTUP_TLS_INFO.file_size).copy_from_slice(
+            slice::from_raw_parts(
+                STARTUP_TLS_INFO.addr.cast::<u8>(),
+                STARTUP_TLS_INFO.file_size,
+            ),
+        );
 
-    // Initialize the TLS data beyond `file_size` which is zero-filled.
-    slice::from_raw_parts_mut(
-        tls_data.add(STARTUP_TLS_INFO.file_size),
-        STARTUP_TLS_INFO.mem_size - STARTUP_TLS_INFO.file_size,
-    )
-    .fill(0);
+        // Initialize the TLS data beyond `file_size` which is zero-filled.
+        slice::from_raw_parts_mut(
+            tls_data.add(STARTUP_TLS_INFO.file_size),
+            STARTUP_TLS_INFO.mem_size - STARTUP_TLS_INFO.file_size,
+        )
+        .fill(0);
 
-    let thread_id_ptr = (*metadata).thread.thread_id.as_ptr().cast::<i32>();
+        let thread_id_ptr = (*metadata).thread.thread_id.as_ptr().cast::<i32>();
 
-    (newtls, thread_id_ptr)
+        (newtls, thread_id_ptr)
+    }
 }
 
 /// Creates a new thread.
@@ -629,142 +633,147 @@ pub(super) unsafe extern "C" fn entry(
     args: *mut *mut c_void,
     num_args: usize,
 ) -> ! {
-    #[cfg(feature = "log")]
-    log::trace!("Thread[{:?}] launched", current_id().as_raw_nonzero());
+    unsafe {
+        #[cfg(feature = "log")]
+        log::trace!("Thread[{:?}] launched", current_id().as_raw_nonzero());
 
-    // Do some basic precondition checks, to ensure that our assembly code did
-    // what we expect it to do. These are debug-only for now, to keep the
-    // release-mode startup code simple to disassemble and inspect, while we're
-    // getting started.
-    #[cfg(debug_assertions)]
-    {
-        // If we have nightly, we can do additional checks.
-        #[cfg(feature = "nightly")]
+        // Do some basic precondition checks, to ensure that our assembly code did
+        // what we expect it to do. These are debug-only for now, to keep the
+        // release-mode startup code simple to disassemble and inspect, while we're
+        // getting started.
+        #[cfg(debug_assertions)]
         {
-            extern "C" {
-                #[link_name = "llvm.frameaddress"]
-                fn builtin_frame_address(level: i32) -> *const u8;
-                #[link_name = "llvm.returnaddress"]
-                fn builtin_return_address(level: i32) -> *const u8;
+            // If we have nightly, we can do additional checks.
+            #[cfg(feature = "nightly")]
+            {
+                unsafe extern "C" {
+                    #[link_name = "llvm.frameaddress"]
+                    fn builtin_frame_address(level: i32) -> *const u8;
+                    #[link_name = "llvm.returnaddress"]
+                    fn builtin_return_address(level: i32) -> *const u8;
+                    #[cfg(target_arch = "aarch64")]
+                    #[link_name = "llvm.sponentry"]
+                    fn builtin_sponentry() -> *const u8;
+                }
+
+                // Check that the incoming stack pointer is where we expect it to be.
+                debug_assert_eq!(builtin_return_address(0), null());
+                debug_assert_ne!(builtin_frame_address(0), null());
+                #[cfg(not(any(target_arch = "x86", target_arch = "arm")))]
+                debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
+                #[cfg(target_arch = "arm")]
+                debug_assert_eq!(builtin_frame_address(0).addr() & 0x3, 0);
+                #[cfg(target_arch = "x86")]
+                debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
+                debug_assert_eq!(builtin_frame_address(1), null());
                 #[cfg(target_arch = "aarch64")]
-                #[link_name = "llvm.sponentry"]
-                fn builtin_sponentry() -> *const u8;
+                debug_assert_ne!(builtin_sponentry(), null());
+                #[cfg(target_arch = "aarch64")]
+                debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
             }
 
-            // Check that the incoming stack pointer is where we expect it to be.
-            debug_assert_eq!(builtin_return_address(0), null());
-            debug_assert_ne!(builtin_frame_address(0), null());
-            #[cfg(not(any(target_arch = "x86", target_arch = "arm")))]
-            debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
-            #[cfg(target_arch = "arm")]
-            debug_assert_eq!(builtin_frame_address(0).addr() & 0x3, 0);
-            #[cfg(target_arch = "x86")]
-            debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
-            debug_assert_eq!(builtin_frame_address(1), null());
-            #[cfg(target_arch = "aarch64")]
-            debug_assert_ne!(builtin_sponentry(), null());
-            #[cfg(target_arch = "aarch64")]
-            debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
+            // Check that `clone` stored our thread id as we expected.
+            debug_assert_eq!(current_id(), gettid());
         }
 
-        // Check that `clone` stored our thread id as we expected.
-        debug_assert_eq!(current_id(), gettid());
+        // Call the user thread function. In `std`, this is `thread_start`. Ignore
+        // the return value for now, as `std` doesn't need it.
+        let fn_: unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>> =
+            core::mem::transmute(fn_);
+        let args = slice::from_raw_parts_mut(args, num_args);
+        let return_value = fn_(args);
+
+        exit(return_value)
     }
-
-    // Call the user thread function. In `std`, this is `thread_start`. Ignore
-    // the return value for now, as `std` doesn't need it.
-    let fn_: unsafe fn(&mut [*mut c_void]) -> Option<NonNull<c_void>> = core::mem::transmute(fn_);
-    let args = slice::from_raw_parts_mut(args, num_args);
-    let return_value = fn_(args);
-
-    exit(return_value)
 }
 
 /// Call the destructors registered with [`at_exit`] and exit the thread.
 unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
-    let current = current();
+    unsafe {
+        let current = current();
 
-    #[cfg(feature = "log")]
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!(
-            "Thread[{:?}] returned {:?}",
-            current.0.as_ref().thread_id.load(SeqCst),
-            return_value
-        );
-    }
-
-    // Call functions registered with `at_exit`.
-    #[cfg(feature = "thread-at-exit")]
-    call_dtors(current);
-
-    // Read the thread's state, and set it to `ABANDONED` if it was `INITIAL`,
-    // which tells `join_thread` to free the memory. Otherwise, it's in the
-    // `DETACHED` state, and we free the memory immediately.
-    let state = current
-        .0
-        .as_ref()
-        .detached
-        .compare_exchange(INITIAL, ABANDONED, SeqCst, SeqCst);
-    if let Err(e) = state {
-        // The thread was detached. Prepare to free the memory. First read out
-        // all the fields that we'll need before freeing it.
-        #[cfg(feature = "log")]
-        let current_thread_id = current.0.as_ref().thread_id.load(SeqCst);
-        let current_map_size = current.0.as_ref().map_size;
-        let current_stack_addr = current.0.as_ref().stack_addr;
-        let current_guard_size = current.0.as_ref().guard_size;
-
-        #[cfg(feature = "log")]
-        log::trace!("Thread[{:?}] exiting as detached", current_thread_id);
-        debug_assert_eq!(e, DETACHED);
-
-        // Deallocate the `ThreadData`.
-        drop_in_place(current.0.as_ptr());
-
-        // Free the thread's `mmap` region, if we allocated it.
-        let map_size = current_map_size;
-        if map_size != 0 {
-            // Null out the tid address so that the kernel doesn't write to
-            // memory that we've freed trying to clear our tid when we exit.
-            let _ = set_tid_address(null_mut());
-
-            // In preparation for freeing the stack, block all signals, so that
-            // no signals for the process are delivered to this thread.
-            #[cfg(feature = "signal")]
-            {
-                let all = KernelSigSet::all();
-                kernel_sigprocmask(How::BLOCK, Some(&all)).ok();
-            }
-
-            // `munmap` the memory, which also frees the stack we're currently
-            // on, and do an `exit` carefully without touching the stack.
-            let map = current_stack_addr.byte_sub(current_guard_size);
-            munmap_and_exit_thread(map, map_size);
-        }
-    } else {
-        // The thread was not detached, so its memory will be freed when it's
-        // joined.
         #[cfg(feature = "log")]
         if log::log_enabled!(log::Level::Trace) {
             log::trace!(
-                "Thread[{:?}] exiting as joinable",
-                current.0.as_ref().thread_id.load(SeqCst)
+                "Thread[{:?}] returned {:?}",
+                current.0.as_ref().thread_id.load(SeqCst),
+                return_value
             );
         }
 
-        // Convert `return_value` into a `*mut c_void` so that we can store it
-        // in an `AtomicPtr`.
-        let return_value = match return_value {
-            Some(return_value) => return_value.as_ptr(),
-            None => null_mut(),
-        };
+        // Call functions registered with `at_exit`.
+        #[cfg(feature = "thread-at-exit")]
+        call_dtors(current);
 
-        // Store the return value in the thread for `join_thread` to read.
-        current.0.as_ref().return_value.store(return_value, SeqCst);
+        // Read the thread's state, and set it to `ABANDONED` if it was `INITIAL`,
+        // which tells `join_thread` to free the memory. Otherwise, it's in the
+        // `DETACHED` state, and we free the memory immediately.
+        let state = current
+            .0
+            .as_ref()
+            .detached
+            .compare_exchange(INITIAL, ABANDONED, SeqCst, SeqCst);
+        if let Err(e) = state {
+            // The thread was detached. Prepare to free the memory. First read out
+            // all the fields that we'll need before freeing it.
+            #[cfg(feature = "log")]
+            let current_thread_id = current.0.as_ref().thread_id.load(SeqCst);
+            let current_map_size = current.0.as_ref().map_size;
+            let current_stack_addr = current.0.as_ref().stack_addr;
+            let current_guard_size = current.0.as_ref().guard_size;
+
+            #[cfg(feature = "log")]
+            log::trace!("Thread[{:?}] exiting as detached", current_thread_id);
+            debug_assert_eq!(e, DETACHED);
+
+            // Deallocate the `ThreadData`.
+            drop_in_place(current.0.as_ptr());
+
+            // Free the thread's `mmap` region, if we allocated it.
+            let map_size = current_map_size;
+            if map_size != 0 {
+                // Null out the tid address so that the kernel doesn't write to
+                // memory that we've freed trying to clear our tid when we exit.
+                let _ = set_tid_address(null_mut());
+
+                // In preparation for freeing the stack, block all signals, so that
+                // no signals for the process are delivered to this thread.
+                #[cfg(feature = "signal")]
+                {
+                    let all = KernelSigSet::all();
+                    kernel_sigprocmask(How::BLOCK, Some(&all)).ok();
+                }
+
+                // `munmap` the memory, which also frees the stack we're currently
+                // on, and do an `exit` carefully without touching the stack.
+                let map = current_stack_addr.byte_sub(current_guard_size);
+                munmap_and_exit_thread(map, map_size);
+            }
+        } else {
+            // The thread was not detached, so its memory will be freed when it's
+            // joined.
+            #[cfg(feature = "log")]
+            if log::log_enabled!(log::Level::Trace) {
+                log::trace!(
+                    "Thread[{:?}] exiting as joinable",
+                    current.0.as_ref().thread_id.load(SeqCst)
+                );
+            }
+
+            // Convert `return_value` into a `*mut c_void` so that we can store it
+            // in an `AtomicPtr`.
+            let return_value = match return_value {
+                Some(return_value) => return_value.as_ptr(),
+                None => null_mut(),
+            };
+
+            // Store the return value in the thread for `join_thread` to read.
+            current.0.as_ref().return_value.store(return_value, SeqCst);
+        }
+
+        // Terminate the thread.
+        rustix::runtime::exit_thread(0)
     }
-
-    // Terminate the thread.
-    rustix::runtime::exit_thread(0)
 }
 
 /// Call the destructors registered with [`at_exit`].
@@ -801,25 +810,27 @@ pub(crate) fn call_dtors(current: Thread) {
 /// and will not be joined.
 #[inline]
 pub unsafe fn detach(thread: Thread) {
-    #[cfg(feature = "log")]
-    let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
-
-    #[cfg(feature = "log")]
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!(
-            "Thread[{:?}] marked as detached by Thread[{:?}]",
-            thread_id,
-            current_id().as_raw_nonzero()
-        );
-    }
-
-    if thread.0.as_ref().detached.swap(DETACHED, SeqCst) == ABANDONED {
-        wait_for_exit(thread);
+    unsafe {
+        #[cfg(feature = "log")]
+        let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
 
         #[cfg(feature = "log")]
-        log_thread_to_be_freed(thread_id);
+        if log::log_enabled!(log::Level::Trace) {
+            log::trace!(
+                "Thread[{:?}] marked as detached by Thread[{:?}]",
+                thread_id,
+                current_id().as_raw_nonzero()
+            );
+        }
 
-        free_memory(thread);
+        if thread.0.as_ref().detached.swap(DETACHED, SeqCst) == ABANDONED {
+            wait_for_exit(thread);
+
+            #[cfg(feature = "log")]
+            log_thread_to_be_freed(thread_id);
+
+            free_memory(thread);
+        }
     }
 }
 
@@ -833,36 +844,38 @@ pub unsafe fn detach(thread: Thread) {
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
 pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
-    let thread_data = thread.0.as_ref();
+    unsafe {
+        let thread_data = thread.0.as_ref();
 
-    #[cfg(feature = "log")]
-    let thread_id = thread_data.thread_id.load(SeqCst);
+        #[cfg(feature = "log")]
+        let thread_id = thread_data.thread_id.load(SeqCst);
 
-    #[cfg(feature = "log")]
-    if log::log_enabled!(log::Level::Trace) {
-        log::trace!(
-            "Thread[{:?}] is being joined by Thread[{:?}]",
-            thread_id,
-            current_id().as_raw_nonzero()
-        );
+        #[cfg(feature = "log")]
+        if log::log_enabled!(log::Level::Trace) {
+            log::trace!(
+                "Thread[{:?}] is being joined by Thread[{:?}]",
+                thread_id,
+                current_id().as_raw_nonzero()
+            );
+        }
+
+        wait_for_exit(thread);
+        debug_assert_eq!(thread_data.detached.load(SeqCst), ABANDONED);
+
+        #[cfg(feature = "log")]
+        log_thread_to_be_freed(thread_id);
+
+        // Load the return value stored by `exit_thread`, before we free the
+        // thread's memory.
+        let return_value = thread_data.return_value.load(SeqCst);
+
+        // `munmap` the stack and metadata for the thread.
+        free_memory(thread);
+
+        // Convert the `*mut c_void` we stored in the `AtomicPtr` back into an
+        // `Option<NonNull<c_void>>`.
+        NonNull::new(return_value)
     }
-
-    wait_for_exit(thread);
-    debug_assert_eq!(thread_data.detached.load(SeqCst), ABANDONED);
-
-    #[cfg(feature = "log")]
-    log_thread_to_be_freed(thread_id);
-
-    // Load the return value stored by `exit_thread`, before we free the
-    // thread's memory.
-    let return_value = thread_data.return_value.load(SeqCst);
-
-    // `munmap` the stack and metadata for the thread.
-    free_memory(thread);
-
-    // Convert the `*mut c_void` we stored in the `AtomicPtr` back into an
-    // `Option<NonNull<c_void>>`.
-    NonNull::new(return_value)
 }
 
 /// Wait until `thread` has exited.
@@ -870,27 +883,29 @@ pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
 unsafe fn wait_for_exit(thread: Thread) {
-    use rustix::thread::futex;
+    unsafe {
+        use rustix::thread::futex;
 
-    // Check whether the thread has exited already; we set the
-    // `CloneFlags::CHILD_CLEARTID` flag on the clone syscall, so we can test
-    // for `NONE` here.
-    let thread_data = thread.0.as_ref();
-    let thread_id = &thread_data.thread_id;
-    while let Some(id_value) = ThreadId::from_raw(thread_id.load(SeqCst)) {
-        // This doesn't use any shared memory, but we can't use
-        // `FutexFlags::PRIVATE` because the wake comes from Linux
-        // as arranged by the `CloneFlags::CHILD_CLEARTID` flag,
-        // and Linux doesn't use the private flag for the wake.
-        match futex::wait(
-            AtomicU32::from_ptr(thread_id.as_ptr().cast()),
-            futex::Flags::empty(),
-            id_value.as_raw_nonzero().get() as u32,
-            None,
-        ) {
-            Ok(_) => break,
-            Err(io::Errno::INTR) => continue,
-            Err(e) => debug_assert_eq!(e, io::Errno::AGAIN),
+        // Check whether the thread has exited already; we set the
+        // `CloneFlags::CHILD_CLEARTID` flag on the clone syscall, so we can test
+        // for `NONE` here.
+        let thread_data = thread.0.as_ref();
+        let thread_id = &thread_data.thread_id;
+        while let Some(id_value) = ThreadId::from_raw(thread_id.load(SeqCst)) {
+            // This doesn't use any shared memory, but we can't use
+            // `FutexFlags::PRIVATE` because the wake comes from Linux
+            // as arranged by the `CloneFlags::CHILD_CLEARTID` flag,
+            // and Linux doesn't use the private flag for the wake.
+            match futex::wait(
+                AtomicU32::from_ptr(thread_id.as_ptr().cast()),
+                futex::Flags::empty(),
+                id_value.as_raw_nonzero().get() as u32,
+                None,
+            ) {
+                Ok(_) => break,
+                Err(io::Errno::INTR) => continue,
+                Err(e) => debug_assert_eq!(e, io::Errno::AGAIN),
+            }
         }
     }
 }
@@ -909,21 +924,23 @@ fn log_thread_to_be_freed(thread_id: i32) {
 /// `thread` must point to a valid thread record for a thread that has
 /// already exited.
 unsafe fn free_memory(thread: Thread) {
-    use rustix::mm::munmap;
+    unsafe {
+        use rustix::mm::munmap;
 
-    // The thread was detached. Prepare to free the memory. First read out
-    // all the fields that we'll need before freeing it.
-    let map_size = thread.0.as_ref().map_size;
-    let stack_addr = thread.0.as_ref().stack_addr;
-    let guard_size = thread.0.as_ref().guard_size;
+        // The thread was detached. Prepare to free the memory. First read out
+        // all the fields that we'll need before freeing it.
+        let map_size = thread.0.as_ref().map_size;
+        let stack_addr = thread.0.as_ref().stack_addr;
+        let guard_size = thread.0.as_ref().guard_size;
 
-    // Deallocate the `ThreadData`.
-    drop_in_place(thread.0.as_ptr());
+        // Deallocate the `ThreadData`.
+        drop_in_place(thread.0.as_ptr());
 
-    // Free the thread's `mmap` region, if we allocated it.
-    if map_size != 0 {
-        let map = stack_addr.byte_sub(guard_size);
-        munmap(map, map_size).unwrap();
+        // Free the thread's `mmap` region, if we allocated it.
+        if map_size != 0 {
+            let map = stack_addr.byte_sub(guard_size);
+            munmap(map, map_size).unwrap();
+        }
     }
 }
 
@@ -987,18 +1004,20 @@ pub fn current_id() -> ThreadId {
 #[doc(hidden)]
 #[inline]
 pub unsafe fn set_current_id_after_a_fork(tid: ThreadId) {
-    let current = current();
-    debug_assert_ne!(
-        tid.as_raw_nonzero().get(),
-        current.0.as_ref().thread_id.load(SeqCst),
-        "current thread ID already matches new thread ID"
-    );
-    debug_assert_eq!(tid, gettid(), "new thread ID disagrees with `gettid`");
-    current
-        .0
-        .as_ref()
-        .thread_id
-        .store(tid.as_raw_nonzero().get(), SeqCst);
+    unsafe {
+        let current = current();
+        debug_assert_ne!(
+            tid.as_raw_nonzero().get(),
+            current.0.as_ref().thread_id.load(SeqCst),
+            "current thread ID already matches new thread ID"
+        );
+        debug_assert_eq!(tid, gettid(), "new thread ID disagrees with `gettid`");
+        current
+            .0
+            .as_ref()
+            .thread_id
+            .store(tid.as_raw_nonzero().get(), SeqCst);
+    }
 }
 
 /// Return the address of the thread-local `errno` state.
@@ -1049,8 +1068,10 @@ pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
 #[inline]
 #[cfg_attr(docsrs, doc(cfg(feature = "take-charge")))]
 pub unsafe fn id(thread: Thread) -> Option<ThreadId> {
-    let raw = thread.0.as_ref().thread_id.load(SeqCst);
-    ThreadId::from_raw(raw)
+    unsafe {
+        let raw = thread.0.as_ref().thread_id.load(SeqCst);
+        ThreadId::from_raw(raw)
+    }
 }
 
 /// Return the current thread's stack address (lowest address), size, and guard
@@ -1062,8 +1083,10 @@ pub unsafe fn id(thread: Thread) -> Option<ThreadId> {
 #[inline]
 #[must_use]
 pub unsafe fn stack(thread: Thread) -> (*mut c_void, usize, usize) {
-    let data = thread.0.as_ref();
-    (data.stack_addr, data.stack_size, data.guard_size)
+    unsafe {
+        let data = thread.0.as_ref();
+        (data.stack_addr, data.stack_size, data.guard_size)
+    }
 }
 
 /// Return the default stack size for new threads.
@@ -1093,13 +1116,13 @@ pub fn yield_current() {
 
 /// The ARM ABI expects this to be defined.
 #[cfg(target_arch = "arm")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn __aeabi_read_tp() -> *mut c_void {
     thread_pointer()
 }
 
 /// Some targets use this global variable instead of the TLS `canary` field.
-#[no_mangle]
+#[unsafe(no_mangle)]
 static mut __stack_chk_guard: usize = 0;
 
 const fn round_up(addr: usize, boundary: usize) -> usize {

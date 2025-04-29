@@ -137,19 +137,21 @@ pub(super) fn ehdr_addr() -> *const Elf_Ehdr {
 #[cfg(relocation_model = "pic")]
 #[inline]
 pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
-    let r0;
+    unsafe {
+        let r0;
 
-    // This is read-only but we don't use `readonly` because this memory access
-    // happens outside the Rust memory model. As far as Rust knows, this is
-    // just an arbitrary side-effecting opaque operation.
-    asm!(
-        "mov {}, [{}]",
-        out(reg) r0,
-        in(reg) ptr,
-        options(nostack, preserves_flags),
-    );
+        // This is read-only but we don't use `readonly` because this memory access
+        // happens outside the Rust memory model. As far as Rust knows, this is
+        // just an arbitrary side-effecting opaque operation.
+        asm!(
+            "mov {}, [{}]",
+            out(reg) r0,
+            in(reg) ptr,
+            options(nostack, preserves_flags),
+        );
 
-    r0
+        r0
+    }
 }
 
 /// Perform a single store operation, outside the Rust memory model.
@@ -168,12 +170,14 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
 #[cfg(relocation_model = "pic")]
 #[inline]
 pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
-    asm!(
-        "mov [{}], {}",
-        in(reg) ptr,
-        in(reg) value,
-        options(nostack, preserves_flags),
-    );
+    unsafe {
+        asm!(
+            "mov [{}], {}",
+            in(reg) ptr,
+            in(reg) value,
+            options(nostack, preserves_flags),
+        );
+    }
 }
 
 /// Mark “relro” memory as readonly.
@@ -196,24 +200,26 @@ pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
 #[cfg(relocation_model = "pic")]
 #[inline]
 pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
-    let r0: usize;
+    unsafe {
+        let r0: usize;
 
-    // This is read-only but we don't use `readonly` because the side effects
-    // happen outside the Rust memory model. As far as Rust knows, this is
-    // just an arbitrary side-effecting opaque operation.
-    asm!(
-        "int 0x80",
-        inlateout("eax") __NR_mprotect as usize => r0,
-        in("ebx") ptr,
-        in("ecx") len,
-        in("edx") PROT_READ,
-        options(nostack, preserves_flags),
-    );
+        // This is read-only but we don't use `readonly` because the side effects
+        // happen outside the Rust memory model. As far as Rust knows, this is
+        // just an arbitrary side-effecting opaque operation.
+        asm!(
+            "int 0x80",
+            inlateout("eax") __NR_mprotect as usize => r0,
+            in("ebx") ptr,
+            in("ecx") len,
+            in("edx") PROT_READ,
+            options(nostack, preserves_flags),
+        );
 
-    if r0 != 0 {
-        // Do not panic here as libstd's panic handler needs TLS, which is not
-        // yet initialized at this point.
-        trap();
+        if r0 != 0 {
+            // Do not panic here as libstd's panic handler needs TLS, which is not
+            // yet initialized at this point.
+            trap();
+        }
     }
 }
 
@@ -239,80 +245,82 @@ pub(super) unsafe fn clone(
     fn_: extern "C" fn(),
     num_args: usize,
 ) -> isize {
-    let mut gs: u32 = 0;
-    asm!("mov {0:x}, gs", inout(reg) gs);
-    let entry_number = gs >> 3;
+    unsafe {
+        let mut gs: u32 = 0;
+        asm!("mov {0:x}, gs", inout(reg) gs);
+        let entry_number = gs >> 3;
 
-    let mut user_desc = rustix::runtime::UserDesc {
-        entry_number,
-        base_addr: newtls.addr() as u32,
-        limit: 0xfffff,
-        _bitfield_align_1: [],
-        _bitfield_1: Default::default(),
-        __bindgen_padding_0: [0_u8; 3_usize],
-    };
-    user_desc.set_seg_32bit(1);
-    user_desc.set_contents(0);
-    user_desc.set_read_exec_only(0);
-    user_desc.set_limit_in_pages(1);
-    user_desc.set_seg_not_present(0);
-    user_desc.set_useable(1);
-    let newtls: *const _ = &user_desc;
+        let mut user_desc = rustix::runtime::UserDesc {
+            entry_number,
+            base_addr: newtls.addr() as u32,
+            limit: 0xfffff,
+            _bitfield_align_1: [],
+            _bitfield_1: Default::default(),
+            __bindgen_padding_0: [0_u8; 3_usize],
+        };
+        user_desc.set_seg_32bit(1);
+        user_desc.set_contents(0);
+        user_desc.set_read_exec_only(0);
+        user_desc.set_limit_in_pages(1);
+        user_desc.set_seg_not_present(0);
+        user_desc.set_useable(1);
+        let newtls: *const _ = &user_desc;
 
-    // Push `fn_` to the child stack, since after all the `clone` args, and
-    // `num_args` in `ebp`, there are no more free registers.
-    let child_stack = child_stack.cast::<*mut c_void>().sub(1);
-    child_stack.write(fn_ as _);
+        // Push `fn_` to the child stack, since after all the `clone` args, and
+        // `num_args` in `ebp`, there are no more free registers.
+        let child_stack = child_stack.cast::<*mut c_void>().sub(1);
+        child_stack.write(fn_ as _);
 
-    // See the comments for x86's `syscall6` in `rustix`. Inline asm isn't
-    // allowed to name ebp or esi as operands, so we have to jump through
-    // extra hoops here.
-    let r0;
-    asm!(
-        "push esi",           // Save incoming register value.
-        "push ebp",           // Save incoming register value.
+        // See the comments for x86's `syscall6` in `rustix`. Inline asm isn't
+        // allowed to name ebp or esi as operands, so we have to jump through
+        // extra hoops here.
+        let r0;
+        asm!(
+            "push esi",           // Save incoming register value.
+            "push ebp",           // Save incoming register value.
 
-        // Pass `num_args` to the child in `ebp`.
-        "mov ebp, [eax+8]",
+            // Pass `num_args` to the child in `ebp`.
+            "mov ebp, [eax+8]",
 
-        "mov esi, [eax+0]",   // Pass `newtls` to the `int 0x80`.
-        "mov eax, [eax+4]",   // Pass `__NR_clone` to the `int 0x80`.
+            "mov esi, [eax+0]",   // Pass `newtls` to the `int 0x80`.
+            "mov eax, [eax+4]",   // Pass `__NR_clone` to the `int 0x80`.
 
-        // Use `int 0x80` instead of vsyscall, following `clone`'s
-        // documentation; vsyscall would attempt to return to the parent stack
-        // in the child.
-        "int 0x80",           // Do the `clone` system call.
-        "test eax, eax",      // Branch if we're in the parent.
-        "jnz 2f",
+            // Use `int 0x80` instead of vsyscall, following `clone`'s
+            // documentation; vsyscall would attempt to return to the parent stack
+            // in the child.
+            "int 0x80",           // Do the `clone` system call.
+            "test eax, eax",      // Branch if we're in the parent.
+            "jnz 2f",
 
-        // Child thread.
-        "pop edi",            // Load `fn_` from the child stack.
-        "mov esi, esp",       // Snapshot the args pointer.
-        "push eax",           // Pad for stack pointer alignment.
-        "push ebp",           // Pass `num_args` as the third argument.
-        "push esi",           // Pass the args pointer as the second argument.
-        "push edi",           // Pass `fn_` as the first argument.
-        "xor ebp, ebp",       // Zero the frame address.
-        "push eax",           // Zero the return address.
-        "jmp {entry}",        // Call `entry`.
+            // Child thread.
+            "pop edi",            // Load `fn_` from the child stack.
+            "mov esi, esp",       // Snapshot the args pointer.
+            "push eax",           // Pad for stack pointer alignment.
+            "push ebp",           // Pass `num_args` as the third argument.
+            "push esi",           // Pass the args pointer as the second argument.
+            "push edi",           // Pass `fn_` as the first argument.
+            "xor ebp, ebp",       // Zero the frame address.
+            "push eax",           // Zero the return address.
+            "jmp {entry}",        // Call `entry`.
 
-        // Parent thread.
-        "2:",
-        "pop ebp",            // Restore incoming register value.
-        "pop esi",            // Restore incoming register value.
+            // Parent thread.
+            "2:",
+            "pop ebp",            // Restore incoming register value.
+            "pop esi",            // Restore incoming register value.
 
-        entry = sym super::thread::entry,
-        inout("eax") &[
-            newtls.cast::<c_void>().cast_mut(),
-            without_provenance_mut(__NR_clone as usize),
-            without_provenance_mut(num_args)
-        ] => r0,
-        in("ebx") flags,
-        in("ecx") child_stack,
-        in("edx") parent_tid,
-        in("edi") child_tid,
-    );
-    r0
+            entry = sym super::thread::entry,
+            inout("eax") &[
+                newtls.cast::<c_void>().cast_mut(),
+                without_provenance_mut(__NR_clone as usize),
+                without_provenance_mut(num_args)
+            ] => r0,
+            in("ebx") flags,
+            in("ecx") child_stack,
+            in("edx") parent_tid,
+            in("edi") child_tid,
+        );
+        r0
+    }
 }
 
 /// Write a value to the platform thread-pointer register.
@@ -320,27 +328,29 @@ pub(super) unsafe fn clone(
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
-    let mut user_desc = rustix::runtime::UserDesc {
-        entry_number: !0u32,
-        base_addr: ptr.addr() as u32,
-        limit: 0xfffff,
-        _bitfield_align_1: [],
-        _bitfield_1: Default::default(),
-        __bindgen_padding_0: [0_u8; 3_usize],
-    };
-    user_desc.set_seg_32bit(1);
-    user_desc.set_contents(0);
-    user_desc.set_read_exec_only(0);
-    user_desc.set_limit_in_pages(1);
-    user_desc.set_seg_not_present(0);
-    user_desc.set_useable(1);
-    let res = rustix::runtime::set_thread_area(&mut user_desc);
-    debug_assert_eq!(res, Ok(()));
-    debug_assert_ne!(user_desc.entry_number, !0);
+    unsafe {
+        let mut user_desc = rustix::runtime::UserDesc {
+            entry_number: !0u32,
+            base_addr: ptr.addr() as u32,
+            limit: 0xfffff,
+            _bitfield_align_1: [],
+            _bitfield_1: Default::default(),
+            __bindgen_padding_0: [0_u8; 3_usize],
+        };
+        user_desc.set_seg_32bit(1);
+        user_desc.set_contents(0);
+        user_desc.set_read_exec_only(0);
+        user_desc.set_limit_in_pages(1);
+        user_desc.set_seg_not_present(0);
+        user_desc.set_useable(1);
+        let res = rustix::runtime::set_thread_area(&mut user_desc);
+        debug_assert_eq!(res, Ok(()));
+        debug_assert_ne!(user_desc.entry_number, !0);
 
-    asm!("mov gs, {0:x}", in(reg) ((user_desc.entry_number << 3) | 3) as u16);
-    debug_assert_eq!(*ptr.cast::<*const c_void>(), ptr);
-    debug_assert_eq!(thread_pointer(), ptr);
+        asm!("mov gs, {0:x}", in(reg) ((user_desc.entry_number << 3) | 3) as u16);
+        debug_assert_eq!(*ptr.cast::<*const c_void>(), ptr);
+        debug_assert_eq!(thread_pointer(), ptr);
+    }
 }
 
 /// Read the value of the platform thread-pointer register.
@@ -370,20 +380,22 @@ pub(super) const TLS_OFFSET: usize = 0;
 #[cfg(feature = "thread")]
 #[inline]
 pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
-    asm!(
-        // Use `int 0x80` instead of vsyscall, since vsyscall would attempt to
-        // touch the stack after we `munmap` it.
-        "int 0x80",
-        "xor ebx, ebx",
-        "mov eax, {__NR_exit}",
-        "int 0x80",
-        "ud2",
-        __NR_exit = const __NR_exit,
-        in("eax") __NR_munmap,
-        in("ebx") map_addr,
-        in("ecx") map_len,
-        options(noreturn, nostack)
-    );
+    unsafe {
+        asm!(
+            // Use `int 0x80` instead of vsyscall, since vsyscall would attempt to
+            // touch the stack after we `munmap` it.
+            "int 0x80",
+            "xor ebx, ebx",
+            "mov eax, {__NR_exit}",
+            "int 0x80",
+            "ud2",
+            __NR_exit = const __NR_exit,
+            in("eax") __NR_munmap,
+            in("ebx") map_addr,
+            in("ecx") map_len,
+            options(noreturn, nostack)
+        );
+    }
 }
 
 #[cfg(feature = "take-charge")]

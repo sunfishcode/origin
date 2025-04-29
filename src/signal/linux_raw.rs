@@ -17,21 +17,23 @@ pub type Sighandler = rustix::runtime::KernelSighandler;
 ///
 /// yolo. At least this function handles `sa_restorer` automatically though.
 pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Sigaction> {
-    #[allow(unused_mut)]
-    let mut action = action;
+    unsafe {
+        #[allow(unused_mut)]
+        let mut action = action;
 
-    #[cfg(not(target_arch = "riscv64"))]
-    if let Some(action) = &mut action {
-        action.sa_flags |= SigactionFlags::RESTORER;
+        #[cfg(not(target_arch = "riscv64"))]
+        if let Some(action) = &mut action {
+            action.sa_flags |= SigactionFlags::RESTORER;
 
-        if action.sa_flags.contains(SigactionFlags::SIGINFO) {
-            action.sa_restorer = Some(arch::return_from_signal_handler);
-        } else {
-            action.sa_restorer = Some(arch::return_from_signal_handler_noinfo);
+            if action.sa_flags.contains(SigactionFlags::SIGINFO) {
+                action.sa_restorer = Some(arch::return_from_signal_handler);
+            } else {
+                action.sa_restorer = Some(arch::return_from_signal_handler_noinfo);
+            }
         }
-    }
 
-    rustix::runtime::kernel_sigaction(sig, action)
+        rustix::runtime::kernel_sigaction(sig, action)
+    }
 }
 
 /// Return a special “ignore” signal handler for ignoring signals.

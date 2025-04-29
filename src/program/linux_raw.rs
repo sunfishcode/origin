@@ -8,7 +8,7 @@
 //! ///
 //! /// SAFETY: `argc`, `argv`, and `envp` describe incoming program
 //! /// command-line arguments and environment variables.
-//! #[no_mangle]
+//! #[unsafe(no_mangle)]
 //! unsafe fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
 //!     todo!("Run the program and return the program exit status.")
 //! }
@@ -47,119 +47,121 @@ compile_error!("\"origin-program\" depends on either \"origin-start\" or \"exter
 ///
 /// `mem` must point to the stack as provided by the operating system.
 pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
-    // Do some basic precondition checks, to ensure that our assembly code did
-    // what we expect it to do. These are debug-only, to keep the release-mode
-    // startup code small and simple to disassemble and inspect.
-    #[cfg(debug_assertions)]
-    #[cfg(feature = "origin-start")]
-    {
-        // Check that `mem` is where we expect it to be.
-        debug_assert_ne!(mem, core::ptr::null_mut());
-        debug_assert_eq!(mem.addr() & 0xf, 0);
-
-        // If we have nightly, we can do additional checks.
-        #[cfg(feature = "nightly")]
+    unsafe {
+        // Do some basic precondition checks, to ensure that our assembly code did
+        // what we expect it to do. These are debug-only, to keep the release-mode
+        // startup code small and simple to disassemble and inspect.
+        #[cfg(debug_assertions)]
+        #[cfg(feature = "origin-start")]
         {
-            extern "C" {
-                #[link_name = "llvm.frameaddress"]
-                fn builtin_frame_address(level: i32) -> *const u8;
-                #[link_name = "llvm.returnaddress"]
-                fn builtin_return_address(level: i32) -> *const u8;
+            // Check that `mem` is where we expect it to be.
+            debug_assert_ne!(mem, core::ptr::null_mut());
+            debug_assert_eq!(mem.addr() & 0xf, 0);
+
+            // If we have nightly, we can do additional checks.
+            #[cfg(feature = "nightly")]
+            {
+                unsafe extern "C" {
+                    #[link_name = "llvm.frameaddress"]
+                    fn builtin_frame_address(level: i32) -> *const u8;
+                    #[link_name = "llvm.returnaddress"]
+                    fn builtin_return_address(level: i32) -> *const u8;
+                    #[cfg(target_arch = "aarch64")]
+                    #[link_name = "llvm.sponentry"]
+                    fn builtin_sponentry() -> *const u8;
+                }
+
+                // Check that `mem` is where we expect it to be.
+                debug_assert!(builtin_frame_address(0).addr() <= mem.addr());
+
+                // Check that the incoming stack pointer is where we expect it to be.
+                debug_assert_eq!(builtin_return_address(0), core::ptr::null());
+                debug_assert_ne!(builtin_frame_address(0), core::ptr::null());
+                #[cfg(not(any(target_arch = "arm", target_arch = "x86")))]
+                debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
+                #[cfg(target_arch = "arm")]
+                debug_assert_eq!(builtin_frame_address(0).addr() & 0x7, 0);
+                #[cfg(target_arch = "x86")]
+                debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
+                debug_assert_eq!(builtin_frame_address(1), core::ptr::null());
                 #[cfg(target_arch = "aarch64")]
-                #[link_name = "llvm.sponentry"]
-                fn builtin_sponentry() -> *const u8;
+                debug_assert_ne!(builtin_sponentry(), core::ptr::null());
+                #[cfg(target_arch = "aarch64")]
+                debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
+            }
+        }
+
+        // Compute `argc`, `argv`, and `envp`.
+        let (argc, argv, envp) = compute_args(mem);
+
+        // Before doing anything else, perform dynamic relocations.
+        #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
+        #[cfg(relocation_model = "pic")]
+        {
+            crate::relocate::relocate(envp);
+        }
+
+        // Initialize program state before running any user code.
+        init_runtime(mem, envp);
+
+        // Call the functions registered via `.init_array`.
+        #[cfg(feature = "init-array")]
+        {
+            use core::arch::asm;
+            use core::ffi::c_void;
+
+            // The linker-generated symbols that mark the start and end of the
+            // `.init_array` section.
+            extern "C" {
+                static __init_array_start: c_void;
+                static __init_array_end: c_void;
             }
 
-            // Check that `mem` is where we expect it to be.
-            debug_assert!(builtin_frame_address(0).addr() <= mem.addr());
+            // Call the `.init_array` functions. As glibc does, pass argc, argv,
+            // and envp as extra arguments. In addition to glibc ABI compatibility,
+            // c-scape relies on this.
+            type InitFn = unsafe extern "C" fn(c_int, *mut *mut u8, *mut *mut u8);
+            let mut init = core::ptr::addr_of!(__init_array_start).cast::<InitFn>();
+            let init_end = core::ptr::addr_of!(__init_array_end).cast::<InitFn>();
+            // Prevent the optimizer from optimizing the `!=` comparison to true;
+            // `init` and `init_start` may have the same address.
+            asm!("# {}", inout(reg) init, options(pure, nomem, nostack, preserves_flags));
 
-            // Check that the incoming stack pointer is where we expect it to be.
-            debug_assert_eq!(builtin_return_address(0), core::ptr::null());
-            debug_assert_ne!(builtin_frame_address(0), core::ptr::null());
-            #[cfg(not(any(target_arch = "arm", target_arch = "x86")))]
-            debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 0);
-            #[cfg(target_arch = "arm")]
-            debug_assert_eq!(builtin_frame_address(0).addr() & 0x7, 0);
-            #[cfg(target_arch = "x86")]
-            debug_assert_eq!(builtin_frame_address(0).addr() & 0xf, 8);
-            debug_assert_eq!(builtin_frame_address(1), core::ptr::null());
-            #[cfg(target_arch = "aarch64")]
-            debug_assert_ne!(builtin_sponentry(), core::ptr::null());
-            #[cfg(target_arch = "aarch64")]
-            debug_assert_eq!(builtin_sponentry().addr() & 0xf, 0);
-        }
-    }
+            while init != init_end {
+                #[cfg(feature = "log")]
+                log::trace!(
+                    "Calling `.init_array`-registered function `{:?}({:?}, {:?}, {:?})`",
+                    *init,
+                    argc,
+                    argv,
+                    envp
+                );
 
-    // Compute `argc`, `argv`, and `envp`.
-    let (argc, argv, envp) = compute_args(mem);
+                (*init)(argc, argv, envp);
 
-    // Before doing anything else, perform dynamic relocations.
-    #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
-    #[cfg(relocation_model = "pic")]
-    {
-        crate::relocate::relocate(envp);
-    }
-
-    // Initialize program state before running any user code.
-    init_runtime(mem, envp);
-
-    // Call the functions registered via `.init_array`.
-    #[cfg(feature = "init-array")]
-    {
-        use core::arch::asm;
-        use core::ffi::c_void;
-
-        // The linker-generated symbols that mark the start and end of the
-        // `.init_array` section.
-        extern "C" {
-            static __init_array_start: c_void;
-            static __init_array_end: c_void;
+                init = init.add(1);
+            }
         }
 
-        // Call the `.init_array` functions. As glibc does, pass argc, argv,
-        // and envp as extra arguments. In addition to glibc ABI compatibility,
-        // c-scape relies on this.
-        type InitFn = unsafe extern "C" fn(c_int, *mut *mut u8, *mut *mut u8);
-        let mut init = core::ptr::addr_of!(__init_array_start).cast::<InitFn>();
-        let init_end = core::ptr::addr_of!(__init_array_end).cast::<InitFn>();
-        // Prevent the optimizer from optimizing the `!=` comparison to true;
-        // `init` and `init_start` may have the same address.
-        asm!("# {}", inout(reg) init, options(pure, nomem, nostack, preserves_flags));
+        {
+            // Declare `origin_main` as documented in [`crate::program`].
+            unsafe extern "Rust" {
+                fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32;
+            }
 
-        while init != init_end {
             #[cfg(feature = "log")]
-            log::trace!(
-                "Calling `.init_array`-registered function `{:?}({:?}, {:?}, {:?})`",
-                *init,
-                argc,
-                argv,
-                envp
-            );
+            log::trace!("Calling `origin_main({:?}, {:?}, {:?})`", argc, argv, envp);
 
-            (*init)(argc, argv, envp);
+            // Call `origin_main`.
+            let status = origin_main(argc as usize, argv, envp);
 
-            init = init.add(1);
+            #[cfg(feature = "log")]
+            log::trace!("`origin_main` returned `{:?}`", status);
+
+            // Run functions registered with `at_exit`, and exit with
+            // `origin_main`'s return value.
+            exit(status)
         }
-    }
-
-    {
-        // Declare `origin_main` as documented in [`crate::program`].
-        extern "Rust" {
-            fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32;
-        }
-
-        #[cfg(feature = "log")]
-        log::trace!("Calling `origin_main({:?}, {:?}, {:?})`", argc, argv, envp);
-
-        // Call `origin_main`.
-        let status = origin_main(argc as usize, argv, envp);
-
-        #[cfg(feature = "log")]
-        log::trace!("`origin_main` returned `{:?}`", status);
-
-        // Run functions registered with `at_exit`, and exit with
-        // `origin_main`'s return value.
-        exit(status)
     }
 }
 
@@ -172,7 +174,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 /// on the initial stack.
 #[cfg(feature = "external-start")]
 pub unsafe fn start(mem: *mut usize) -> ! {
-    entry(mem)
+    unsafe { entry(mem) }
 }
 
 /// Compute `argc`, `argv`, and `envp`.
@@ -181,19 +183,21 @@ pub unsafe fn start(mem: *mut usize) -> ! {
 ///
 /// `mem` must point to the stack as provided by the operating system.
 unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
-    use linux_raw_sys::ctypes::c_uint;
+    unsafe {
+        use linux_raw_sys::ctypes::c_uint;
 
-    let kernel_argc = *mem;
-    let argc = kernel_argc as c_int;
-    let argv = mem.add(1).cast::<*mut u8>();
-    let envp = argv.add(argc as c_uint as usize + 1);
+        let kernel_argc = *mem;
+        let argc = kernel_argc as c_int;
+        let argv = mem.add(1).cast::<*mut u8>();
+        let envp = argv.add(argc as c_uint as usize + 1);
 
-    // Do a few more precondition checks on `argc` and `argv`.
-    debug_assert!(argc >= 0);
-    debug_assert_eq!(kernel_argc, argc as _);
-    debug_assert_eq!(*argv.add(argc as usize), core::ptr::null_mut());
+        // Do a few more precondition checks on `argc` and `argv`.
+        debug_assert!(argc >= 0);
+        debug_assert_eq!(kernel_argc, argc as _);
+        debug_assert_eq!(*argv.add(argc as usize), core::ptr::null_mut());
 
-    (argc, argv, envp)
+        (argc, argv, envp)
+    }
 }
 
 /// Initialize `origin` and `rustix` runtime state.
@@ -207,7 +211,9 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     // Explicitly initialize `rustix`. This is needed for things like
     // `page_size()` to work.
     #[cfg(feature = "param")]
-    rustix::param::init(envp);
+    unsafe {
+        rustix::param::init(envp);
+    }
 
     // Read the program headers and extract the TLS info.
     #[cfg(feature = "thread")]
@@ -215,7 +221,9 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 
     // Initialize the main thread.
     #[cfg(feature = "thread")]
-    thread::initialize_main(mem.cast());
+    unsafe {
+        thread::initialize_main(mem.cast());
+    }
 }
 
 /// Functions registered with [`at_exit`].

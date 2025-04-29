@@ -7,13 +7,13 @@ use core::ptr::without_provenance_mut;
 
 // `getauxval` usually returns `unsigned long`, but we make it a pointer type
 // so that it preserves provenance.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn getauxval(type_: c_ulong) -> *mut c_void {
     _getauxval(type_)
 }
 
 #[cfg(target_arch = "aarch64")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn __getauxval(type_: c_ulong) -> *mut c_void {
     _getauxval(type_)
 }

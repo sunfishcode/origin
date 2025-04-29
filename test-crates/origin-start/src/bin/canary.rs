@@ -13,7 +13,7 @@ use origin::{program, thread};
 #[global_allocator]
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;
 
-extern "C" {
+unsafe extern "C" {
     static __stack_chk_guard: UnsafeCell<usize>;
 }
 
@@ -40,27 +40,29 @@ fn tls_guard() -> usize {
     ret
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
-    assert_ne!(*__stack_chk_guard.get(), 0);
-    assert_eq!(*__stack_chk_guard.get(), tls_guard());
+    unsafe {
+        assert_ne!(*__stack_chk_guard.get(), 0);
+        assert_eq!(*__stack_chk_guard.get(), tls_guard());
 
-    let thread = thread::create(
-        |_args| {
-            assert_ne!(*__stack_chk_guard.get(), 0);
-            assert_eq!(*__stack_chk_guard.get(), tls_guard());
-            None
-        },
-        &[],
-        thread::default_stack_size(),
-        thread::default_guard_size(),
-    )
-    .unwrap();
+        let thread = thread::create(
+            |_args| {
+                assert_ne!(*__stack_chk_guard.get(), 0);
+                assert_eq!(*__stack_chk_guard.get(), tls_guard());
+                None
+            },
+            &[],
+            thread::default_stack_size(),
+            thread::default_guard_size(),
+        )
+        .unwrap();
 
-    thread::join(thread);
+        thread::join(thread);
 
-    assert_ne!(*__stack_chk_guard.get(), 0);
-    assert_eq!(*__stack_chk_guard.get(), tls_guard());
+        assert_ne!(*__stack_chk_guard.get(), 0);
+        assert_eq!(*__stack_chk_guard.get(), tls_guard());
 
-    program::exit(203);
+        program::exit(203);
+    }
 }

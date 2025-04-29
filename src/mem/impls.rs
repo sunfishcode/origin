@@ -40,24 +40,28 @@ pub unsafe fn copy_forward(mut dest: *mut u8, mut src: *const u8, mut n: usize) 
     unsafe {
         #[inline(always)]
         unsafe fn copy_forward_bytes(mut dest: *mut u8, mut src: *const u8, n: usize) {
-            let dest_end = dest.add(n);
-            while dest < dest_end {
-                *dest = *src;
-                dest = dest.add(1);
-                src = src.add(1);
+            unsafe {
+                let dest_end = dest.add(n);
+                while dest < dest_end {
+                    *dest = *src;
+                    dest = dest.add(1);
+                    src = src.add(1);
+                }
             }
         }
 
         #[inline(always)]
         unsafe fn copy_forward_aligned_words(dest: *mut u8, src: *const u8, n: usize) {
-            let mut dest_usize = dest as *mut usize;
-            let mut src_usize = src as *mut usize;
-            let dest_end = dest.add(n) as *mut usize;
+            unsafe {
+                let mut dest_usize = dest as *mut usize;
+                let mut src_usize = src as *mut usize;
+                let dest_end = dest.add(n) as *mut usize;
 
-            while dest_usize < dest_end {
-                *dest_usize = *src_usize;
-                dest_usize = dest_usize.add(1);
-                src_usize = src_usize.add(1);
+                while dest_usize < dest_end {
+                    *dest_usize = *src_usize;
+                    dest_usize = dest_usize.add(1);
+                    src_usize = src_usize.add(1);
+                }
             }
         }
 
@@ -69,29 +73,31 @@ pub unsafe fn copy_forward(mut dest: *mut u8, mut src: *const u8, mut n: usize) 
         )))]
         #[inline(always)]
         unsafe fn copy_forward_misaligned_words(dest: *mut u8, src: *const u8, n: usize) {
-            let mut dest_usize = dest as *mut usize;
-            let dest_end = dest.add(n) as *mut usize;
+            unsafe {
+                let mut dest_usize = dest as *mut usize;
+                let dest_end = dest.add(n) as *mut usize;
 
-            // Calculate the misalignment offset and shift needed to reassemble value.
-            let offset = src.addr() & WORD_MASK;
-            let shift = offset * 8;
+                // Calculate the misalignment offset and shift needed to reassemble value.
+                let offset = src.addr() & WORD_MASK;
+                let shift = offset * 8;
 
-            // Realign src
-            let mut src_aligned = src.with_addr(src.addr() & !WORD_MASK).cast::<usize>();
-            // This will read (but won't use) bytes out of bound.
-            let mut prev_word = crate::arch::oob_load(src_aligned);
+                // Realign src
+                let mut src_aligned = src.with_addr(src.addr() & !WORD_MASK).cast::<usize>();
+                // This will read (but won't use) bytes out of bound.
+                let mut prev_word = crate::arch::oob_load(src_aligned);
 
-            while dest_usize < dest_end {
-                src_aligned = src_aligned.add(1);
-                let cur_word = *src_aligned;
-                #[cfg(target_endian = "little")]
-                let resembled = prev_word >> shift | cur_word << (WORD_SIZE * 8 - shift);
-                #[cfg(target_endian = "big")]
-                let resembled = prev_word << shift | cur_word >> (WORD_SIZE * 8 - shift);
-                prev_word = cur_word;
+                while dest_usize < dest_end {
+                    src_aligned = src_aligned.add(1);
+                    let cur_word = *src_aligned;
+                    #[cfg(target_endian = "little")]
+                    let resembled = prev_word >> shift | cur_word << (WORD_SIZE * 8 - shift);
+                    #[cfg(target_endian = "big")]
+                    let resembled = prev_word << shift | cur_word >> (WORD_SIZE * 8 - shift);
+                    prev_word = cur_word;
 
-                *dest_usize = resembled;
-                dest_usize = dest_usize.add(1);
+                    *dest_usize = resembled;
+                    dest_usize = dest_usize.add(1);
+                }
             }
         }
 
@@ -103,14 +109,16 @@ pub unsafe fn copy_forward(mut dest: *mut u8, mut src: *const u8, mut n: usize) 
         ))]
         #[inline(always)]
         unsafe fn copy_forward_misaligned_words(dest: *mut u8, src: *const u8, n: usize) {
-            let mut dest_usize = dest as *mut usize;
-            let mut src_usize = src as *mut usize;
-            let dest_end = dest.add(n) as *mut usize;
+            unsafe {
+                let mut dest_usize = dest as *mut usize;
+                let mut src_usize = src as *mut usize;
+                let dest_end = dest.add(n) as *mut usize;
 
-            while dest_usize < dest_end {
-                *dest_usize = read_usize_unaligned(src_usize);
-                dest_usize = dest_usize.add(1);
-                src_usize = src_usize.add(1);
+                while dest_usize < dest_end {
+                    *dest_usize = read_usize_unaligned(src_usize);
+                    dest_usize = dest_usize.add(1);
+                    src_usize = src_usize.add(1);
+                }
             }
         }
 
@@ -145,24 +153,28 @@ pub unsafe fn copy_backward(dest: *mut u8, src: *const u8, mut n: usize) {
         // as their inputs instead of pointers to the start!
         #[inline(always)]
         unsafe fn copy_backward_bytes(mut dest: *mut u8, mut src: *const u8, n: usize) {
-            let dest_start = dest.sub(n);
-            while dest_start < dest {
-                dest = dest.sub(1);
-                src = src.sub(1);
-                *dest = *src;
+            unsafe {
+                let dest_start = dest.sub(n);
+                while dest_start < dest {
+                    dest = dest.sub(1);
+                    src = src.sub(1);
+                    *dest = *src;
+                }
             }
         }
 
         #[inline(always)]
         unsafe fn copy_backward_aligned_words(dest: *mut u8, src: *const u8, n: usize) {
-            let mut dest_usize = dest as *mut usize;
-            let mut src_usize = src as *mut usize;
-            let dest_start = dest.sub(n) as *mut usize;
+            unsafe {
+                let mut dest_usize = dest as *mut usize;
+                let mut src_usize = src as *mut usize;
+                let dest_start = dest.sub(n) as *mut usize;
 
-            while dest_start < dest_usize {
-                dest_usize = dest_usize.sub(1);
-                src_usize = src_usize.sub(1);
-                *dest_usize = *src_usize;
+                while dest_start < dest_usize {
+                    dest_usize = dest_usize.sub(1);
+                    src_usize = src_usize.sub(1);
+                    *dest_usize = *src_usize;
+                }
             }
         }
 
@@ -174,29 +186,31 @@ pub unsafe fn copy_backward(dest: *mut u8, src: *const u8, mut n: usize) {
         )))]
         #[inline(always)]
         unsafe fn copy_backward_misaligned_words(dest: *mut u8, src: *const u8, n: usize) {
-            let mut dest_usize = dest as *mut usize;
-            let dest_start = dest.sub(n) as *mut usize;
+            unsafe {
+                let mut dest_usize = dest as *mut usize;
+                let dest_start = dest.sub(n) as *mut usize;
 
-            // Calculate the misalignment offset and shift needed to reassemble value.
-            let offset = src.addr() & WORD_MASK;
-            let shift = offset * 8;
+                // Calculate the misalignment offset and shift needed to reassemble value.
+                let offset = src.addr() & WORD_MASK;
+                let shift = offset * 8;
 
-            // Realign src_aligned
-            let mut src_aligned = src.with_addr(src.addr() & !WORD_MASK).cast::<usize>();
-            // This will read (but won't use) bytes out of bound.
-            let mut prev_word = crate::arch::oob_load(src_aligned);
+                // Realign src_aligned
+                let mut src_aligned = src.with_addr(src.addr() & !WORD_MASK).cast::<usize>();
+                // This will read (but won't use) bytes out of bound.
+                let mut prev_word = crate::arch::oob_load(src_aligned);
 
-            while dest_start < dest_usize {
-                src_aligned = src_aligned.sub(1);
-                let cur_word = *src_aligned;
-                #[cfg(target_endian = "little")]
-                let resembled = prev_word << (WORD_SIZE * 8 - shift) | cur_word >> shift;
-                #[cfg(target_endian = "big")]
-                let resembled = prev_word >> (WORD_SIZE * 8 - shift) | cur_word << shift;
-                prev_word = cur_word;
+                while dest_start < dest_usize {
+                    src_aligned = src_aligned.sub(1);
+                    let cur_word = *src_aligned;
+                    #[cfg(target_endian = "little")]
+                    let resembled = prev_word << (WORD_SIZE * 8 - shift) | cur_word >> shift;
+                    #[cfg(target_endian = "big")]
+                    let resembled = prev_word >> (WORD_SIZE * 8 - shift) | cur_word << shift;
+                    prev_word = cur_word;
 
-                dest_usize = dest_usize.sub(1);
-                *dest_usize = resembled;
+                    dest_usize = dest_usize.sub(1);
+                    *dest_usize = resembled;
+                }
             }
         }
 
@@ -208,14 +222,16 @@ pub unsafe fn copy_backward(dest: *mut u8, src: *const u8, mut n: usize) {
         ))]
         #[inline(always)]
         unsafe fn copy_backward_misaligned_words(dest: *mut u8, src: *const u8, n: usize) {
-            let mut dest_usize = dest as *mut usize;
-            let mut src_usize = src as *mut usize;
-            let dest_start = dest.sub(n) as *mut usize;
+            unsafe {
+                let mut dest_usize = dest as *mut usize;
+                let mut src_usize = src as *mut usize;
+                let dest_start = dest.sub(n) as *mut usize;
 
-            while dest_start < dest_usize {
-                dest_usize = dest_usize.sub(1);
-                src_usize = src_usize.sub(1);
-                *dest_usize = read_usize_unaligned(src_usize);
+                while dest_start < dest_usize {
+                    dest_usize = dest_usize.sub(1);
+                    src_usize = src_usize.sub(1);
+                    *dest_usize = read_usize_unaligned(src_usize);
+                }
             }
         }
 

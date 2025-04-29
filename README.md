@@ -28,7 +28,7 @@ This is used by [Mustang] and [Eyra] in their libc implementations, and in the
 [Origin Studio] project in its std implementation, which are three different
 ways to support building Rust programs written entirely in Rust.
 
-It works with both stable (currently Rust >= 1.78) and nightly Rust. If you're
+It works with both stable (currently Rust >= 1.85) and nightly Rust. If you're
 using nightly Rust, enable the feature "nightly" to let origin use nightly-only
 features, which include proper support for unwinding, better safety checks, and
 better optimizations.

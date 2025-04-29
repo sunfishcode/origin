@@ -9,13 +9,13 @@ use core::ptr::without_provenance_mut;
 // so that it preserves provenance.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn getauxval(type_: c_ulong) -> *mut c_void {
-    unsafe { _getauxval(type_) }
+    _getauxval(type_)
 }
 
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __getauxval(type_: c_ulong) -> *mut c_void {
-    unsafe { _getauxval(type_) }
+    _getauxval(type_)
 }
 
 fn _getauxval(type_: c_ulong) -> *mut c_void {

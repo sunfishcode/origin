@@ -251,28 +251,32 @@ pub unsafe fn set_bytes(mut s: *mut u8, c: u8, mut n: usize) {
     unsafe {
         #[inline(always)]
         pub unsafe fn set_bytes_bytes(mut s: *mut u8, c: u8, n: usize) {
-            let end = s.add(n);
-            while s < end {
-                *s = c;
-                s = s.add(1);
+            unsafe {
+                let end = s.add(n);
+                while s < end {
+                    *s = c;
+                    s = s.add(1);
+                }
             }
         }
 
         #[inline(always)]
         pub unsafe fn set_bytes_words(s: *mut u8, c: u8, n: usize) {
-            let mut broadcast = c as usize;
-            let mut bits = 8;
-            while bits < WORD_SIZE * 8 {
-                broadcast |= broadcast << bits;
-                bits *= 2;
-            }
+            unsafe {
+                let mut broadcast = c as usize;
+                let mut bits = 8;
+                while bits < WORD_SIZE * 8 {
+                    broadcast |= broadcast << bits;
+                    bits *= 2;
+                }
 
-            let mut s_usize = s as *mut usize;
-            let end = s.add(n) as *mut usize;
+                let mut s_usize = s as *mut usize;
+                let end = s.add(n) as *mut usize;
 
-            while s_usize < end {
-                *s_usize = broadcast;
-                s_usize = s_usize.add(1);
+                while s_usize < end {
+                    *s_usize = broadcast;
+                    s_usize = s_usize.add(1);
+                }
             }
         }
 

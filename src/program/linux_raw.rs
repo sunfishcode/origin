@@ -46,7 +46,7 @@ compile_error!("\"origin-program\" depends on either \"origin-start\" or \"exter
 /// # Safety
 ///
 /// `mem` must point to the stack as provided by the operating system.
-pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
+pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! { unsafe {
     // Do some basic precondition checks, to ensure that our assembly code did
     // what we expect it to do. These are debug-only, to keep the release-mode
     // startup code small and simple to disassemble and inspect.
@@ -60,7 +60,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
         // If we have nightly, we can do additional checks.
         #[cfg(feature = "nightly")]
         {
-            extern "C" {
+            unsafe extern "C" {
                 #[link_name = "llvm.frameaddress"]
                 fn builtin_frame_address(level: i32) -> *const u8;
                 #[link_name = "llvm.returnaddress"]
@@ -144,7 +144,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 
     {
         // Declare `origin_main` as documented in [`crate::program`].
-        extern "Rust" {
+        unsafe extern "Rust" {
             fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32;
         }
 
@@ -161,7 +161,7 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
         // `origin_main`'s return value.
         exit(status)
     }
-}
+} }
 
 /// A program entry point similar to `_start`, but which is meant to be called
 /// by something else in the program rather than the OS.
@@ -171,16 +171,16 @@ pub(super) unsafe extern "C" fn entry(mem: *mut usize) -> ! {
 /// `mem` must point to a stack with the contents that the OS would provide
 /// on the initial stack.
 #[cfg(feature = "external-start")]
-pub unsafe fn start(mem: *mut usize) -> ! {
+pub unsafe fn start(mem: *mut usize) -> ! { unsafe {
     entry(mem)
-}
+} }
 
 /// Compute `argc`, `argv`, and `envp`.
 ///
 /// # Safety
 ///
 /// `mem` must point to the stack as provided by the operating system.
-unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
+unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) { unsafe {
     use linux_raw_sys::ctypes::c_uint;
 
     let kernel_argc = *mem;
@@ -194,7 +194,7 @@ unsafe fn compute_args(mem: *mut usize) -> (i32, *mut *mut u8, *mut *mut u8) {
     debug_assert_eq!(*argv.add(argc as usize), core::ptr::null_mut());
 
     (argc, argv, envp)
-}
+} }
 
 /// Initialize `origin` and `rustix` runtime state.
 ///
@@ -207,7 +207,7 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
     // Explicitly initialize `rustix`. This is needed for things like
     // `page_size()` to work.
     #[cfg(feature = "param")]
-    rustix::param::init(envp);
+    unsafe { rustix::param::init(envp); }
 
     // Read the program headers and extract the TLS info.
     #[cfg(feature = "thread")]
@@ -215,7 +215,7 @@ unsafe fn init_runtime(mem: *mut usize, envp: *mut *mut u8) {
 
     // Initialize the main thread.
     #[cfg(feature = "thread")]
-    thread::initialize_main(mem.cast());
+    unsafe { thread::initialize_main(mem.cast()); }
 }
 
 /// Functions registered with [`at_exit`].

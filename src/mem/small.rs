@@ -5,8 +5,8 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
-#[no_mangle]
-unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, len: usize) -> *mut c_void {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, len: usize) -> *mut c_void { unsafe {
     let start = dst;
     let mut dst = dst.cast::<u8>();
     let mut src = src.cast::<u8>();
@@ -18,10 +18,10 @@ unsafe extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, len: usize) ->
         core::arch::asm!("");
     }
     start
-}
+} }
 
-#[no_mangle]
-unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, len: usize) -> *mut c_void {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, len: usize) -> *mut c_void { unsafe {
     let start = dst;
     let mut dst = dst.cast::<u8>();
     let mut src = src.cast::<u8>();
@@ -46,10 +46,10 @@ unsafe extern "C" fn memmove(dst: *mut c_void, src: *const c_void, len: usize) -
         }
     }
     start
-}
+} }
 
-#[no_mangle]
-unsafe extern "C" fn memset(dst: *mut c_void, fill: c_int, len: usize) -> *mut c_void {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn memset(dst: *mut c_void, fill: c_int, len: usize) -> *mut c_void { unsafe {
     let mut s = dst.cast::<u8>();
     let end = s.add(len);
     while s < end {
@@ -58,10 +58,10 @@ unsafe extern "C" fn memset(dst: *mut c_void, fill: c_int, len: usize) -> *mut c
         core::arch::asm!("");
     }
     dst
-}
+} }
 
-#[no_mangle]
-unsafe extern "C" fn memcmp(a: *const c_void, b: *const c_void, len: usize) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn memcmp(a: *const c_void, b: *const c_void, len: usize) -> c_int { unsafe {
     let a = a.cast::<u8>();
     let b = b.cast::<u8>();
     let mut i = 0;
@@ -75,16 +75,16 @@ unsafe extern "C" fn memcmp(a: *const c_void, b: *const c_void, len: usize) -> c
         core::arch::asm!("");
     }
     0
-}
+} }
 
 // Obsolescent
-#[no_mangle]
-unsafe extern "C" fn bcmp(a: *const c_void, b: *const c_void, len: usize) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn bcmp(a: *const c_void, b: *const c_void, len: usize) -> c_int { unsafe {
     memcmp(a, b, len)
-}
+} }
 
-#[no_mangle]
-unsafe extern "C" fn strlen(s: *const c_char) -> usize {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn strlen(s: *const c_char) -> usize { unsafe {
     let mut s = s;
     let mut n = 0;
     while *s != 0 {
@@ -93,4 +93,4 @@ unsafe extern "C" fn strlen(s: *const c_char) -> usize {
         core::arch::asm!("");
     }
     n
-}
+} }

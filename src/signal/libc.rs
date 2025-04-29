@@ -52,7 +52,7 @@ bitflags::bitflags! {
 /// # Safety
 ///
 /// yolo. At least this function handles `sa_restorer` automatically though.
-pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Sigaction> {
+pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Sigaction> { unsafe {
     let action: *const Sigaction = match action {
         Some(action) => &action,
         None => null(),
@@ -64,7 +64,7 @@ pub unsafe fn sigaction(sig: Signal, action: Option<Sigaction>) -> io::Result<Si
     } else {
         Err(rustix::io::Errno::from_raw_os_error(errno::errno().0))
     }
-}
+}}
 
 /// Return a special “ignore” signal handler for ignoring signals.
 ///

@@ -5,8 +5,8 @@
 
 extern crate origin;
 
-#[no_mangle]
-unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
+#[unsafe(no_mangle)]
+unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 { unsafe {
     let message = b"Hello, world!\n";
     let mut remaining = &message[..];
     while !remaining.is_empty() {
@@ -17,4 +17,4 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
         }
     }
     origin::program::immediate_exit(0);
-}
+}}

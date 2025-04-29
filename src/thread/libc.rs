@@ -18,7 +18,7 @@ use rustix::io;
 pub use rustix::thread::Pid as ThreadId;
 
 // Symbols defined in libc but not declared in the libc crate.
-extern "C" {
+unsafe extern "C" {
     fn __cxa_thread_atexit_impl(
         func: unsafe extern "C" fn(*mut c_void),
         obj: *mut c_void,
@@ -184,11 +184,11 @@ pub unsafe fn create(
 /// `thread` must point to a valid thread record that has not yet been detached
 /// and will not be joined.
 #[inline]
-pub unsafe fn detach(thread: Thread) {
+pub unsafe fn detach(thread: Thread) { unsafe {
     let thread = thread.0;
 
     assert_eq!(libc::pthread_detach(thread), 0);
-}
+}}
 
 /// Waits for a thread to finish.
 ///
@@ -199,14 +199,14 @@ pub unsafe fn detach(thread: Thread) {
 ///
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
-pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
+pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> { unsafe {
     let thread = thread.0;
 
     let mut return_value: *mut c_void = null_mut();
     assert_eq!(libc::pthread_join(thread, &mut return_value), 0);
 
     NonNull::new(return_value)
-}
+}}
 
 /// Registers a function to call when the current thread exits.
 #[cfg(feature = "thread-at-exit")]
@@ -287,7 +287,7 @@ pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
 /// `thread` must point to a valid thread record.
 #[inline]
 #[must_use]
-pub unsafe fn stack(thread: Thread) -> (*mut c_void, usize, usize) {
+pub unsafe fn stack(thread: Thread) -> (*mut c_void, usize, usize) { unsafe {
     let thread = thread.0;
 
     let mut attr: libc::pthread_attr_t = zeroed();
@@ -304,7 +304,7 @@ pub unsafe fn stack(thread: Thread) -> (*mut c_void, usize, usize) {
     assert_eq!(libc::pthread_attr_getguardsize(&attr, &mut guard_size), 0);
 
     (stack_addr, stack_size, guard_size)
-}
+}}
 
 /// Return the default stack size for new threads.
 #[inline]
@@ -344,7 +344,7 @@ pub fn yield_current() {
 
 /// Return the address of `__dso_handle`, appropriately casted.
 #[cfg(feature = "thread-at-exit")]
-unsafe fn dso_handle() -> *mut c_void {
+unsafe fn dso_handle() -> *mut c_void { unsafe {
     let dso_handle: *const *const c_void = &__dso_handle;
     dso_handle.cast::<c_void>().cast_mut()
-}
+}}

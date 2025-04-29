@@ -16,8 +16,8 @@ use origin::{program, thread};
 #[global_allocator]
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;
 
-#[no_mangle]
-unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
+#[unsafe(no_mangle)]
+unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 { unsafe {
     // Assert that the main thread initialized its TLS properly.
     check_eq(TEST_DATA.0);
 
@@ -79,7 +79,7 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     check_eq([TEST_DATA.0[0], without_provenance_mut(78), TEST_DATA.0[2]]);
 
     program::exit(200);
-}
+}}
 
 struct SyncTestData([*const u32; 3]);
 unsafe impl Sync for SyncTestData {}

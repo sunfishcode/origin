@@ -12,8 +12,8 @@ use origin::{program, thread};
 #[global_allocator]
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;
 
-#[no_mangle]
-unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
+#[unsafe(no_mangle)]
+unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 { unsafe {
     eprintln!("Hello from main thread");
 
     program::at_exit(Box::new(|| {
@@ -41,4 +41,4 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
 
     eprintln!("Goodbye from main");
     program::exit(0);
-}
+}}

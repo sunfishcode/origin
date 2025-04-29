@@ -8,7 +8,7 @@
 //! ///
 //! /// SAFETY: `argc`, `argv`, and `envp` describe incoming program
 //! /// command-line arguments and environment variables.
-//! #[no_mangle]
+//! #[unsafe(no_mangle)]
 //! unsafe fn origin_main(argc: usize, argv: *mut *mut u8, envp: *mut *mut u8) -> i32 {
 //!     todo!("Run the program and return the program exit status.")
 //! }
@@ -40,7 +40,7 @@ use libc::c_int;
 pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     use core::ffi::c_void;
 
-    extern "C" {
+    unsafe extern "C" {
         // <https://refspecs.linuxbase.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/baselib---cxa-atexit.html>
         fn __cxa_atexit(
             func: unsafe extern "C" fn(*mut c_void),
@@ -50,9 +50,9 @@ pub fn at_exit(func: Box<dyn FnOnce() + Send>) {
     }
 
     // The function to pass to `__cxa_atexit`.
-    unsafe extern "C" fn at_exit_func(arg: *mut c_void) {
+    unsafe extern "C" fn at_exit_func(arg: *mut c_void) { unsafe {
         Box::from_raw(arg.cast::<Box<dyn FnOnce() + Send>>())();
-    }
+    }}
 
     let at_exit_arg = Box::into_raw(Box::new(func)).cast::<c_void>();
     let r = unsafe { __cxa_atexit(at_exit_func, at_exit_arg, null_mut()) };

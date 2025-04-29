@@ -77,7 +77,7 @@ macro_rules! debug_assert_eq {
 ///
 /// So yes, there's a reason this code is behind a feature flag.
 #[cold]
-pub(super) unsafe fn relocate(envp: *mut *mut u8) {
+pub(super) unsafe fn relocate(envp: *mut *mut u8) { unsafe {
     // Locate the AUX records we need.
     let auxp = compute_auxp(envp);
 
@@ -354,10 +354,10 @@ pub(super) unsafe fn relocate(envp: *mut *mut u8) {
         let mprotect_addr = relro.wrapping_add(offset) & auxv_page_size.wrapping_neg();
         relocation_mprotect_readonly(mprotect_addr, relro_size);
     }
-}
+} }
 
 /// Compute the address of the AUX table.
-unsafe fn compute_auxp(envp: *mut *mut u8) -> *const Elf_auxv_t {
+unsafe fn compute_auxp(envp: *mut *mut u8) -> *const Elf_auxv_t { unsafe {
     // Locate the AUX records we need. We don't use rustix to do this because
     // that would involve calling a function in another crate.
     let mut auxp = envp;
@@ -366,7 +366,7 @@ unsafe fn compute_auxp(envp: *mut *mut u8) -> *const Elf_auxv_t {
         auxp = auxp.add(1);
     }
     auxp.add(1).cast()
-}
+} }
 
 /// Load the address of `_start` from static memory.
 ///

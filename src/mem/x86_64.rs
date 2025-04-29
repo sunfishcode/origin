@@ -27,7 +27,7 @@ use core::mem;
 
 #[inline(always)]
 #[cfg(target_feature = "ermsb")]
-pub unsafe fn copy_forward(dest: *mut u8, src: *const u8, count: usize) {
+pub unsafe fn copy_forward(dest: *mut u8, src: *const u8, count: usize) { unsafe {
     // FIXME: Use the Intel syntax once we drop LLVM 9 support on rust-lang/rust.
     core::arch::asm!(
         "repe movsb (%rsi), (%rdi)",
@@ -36,11 +36,11 @@ pub unsafe fn copy_forward(dest: *mut u8, src: *const u8, count: usize) {
         inout("rsi") src => _,
         options(att_syntax, nostack, preserves_flags)
     );
-}
+} }
 
 #[inline(always)]
 #[cfg(not(target_feature = "ermsb"))]
-pub unsafe fn copy_forward(mut dest: *mut u8, mut src: *const u8, count: usize) {
+pub unsafe fn copy_forward(mut dest: *mut u8, mut src: *const u8, count: usize) { unsafe {
     let (pre_byte_count, qword_count, byte_count) = rep_param(dest, count);
     // Separating the blocks gives the compiler more freedom to reorder instructions.
     asm!(
@@ -64,10 +64,10 @@ pub unsafe fn copy_forward(mut dest: *mut u8, mut src: *const u8, count: usize) 
         inout("rsi") src => _,
         options(att_syntax, nostack, preserves_flags)
     );
-}
+} }
 
 #[inline(always)]
-pub unsafe fn copy_backward(dest: *mut u8, src: *const u8, count: usize) {
+pub unsafe fn copy_backward(dest: *mut u8, src: *const u8, count: usize) { unsafe {
     let (pre_byte_count, qword_count, byte_count) = rep_param(dest, count);
     // We can't separate this block due to std/cld
     asm!(
@@ -91,11 +91,11 @@ pub unsafe fn copy_backward(dest: *mut u8, src: *const u8, count: usize) {
         // We modify flags, but we restore it afterwards
         options(att_syntax, nostack, preserves_flags)
     );
-}
+} }
 
 #[inline(always)]
 #[cfg(target_feature = "ermsb")]
-pub unsafe fn set_bytes(dest: *mut u8, c: u8, count: usize) {
+pub unsafe fn set_bytes(dest: *mut u8, c: u8, count: usize) { unsafe {
     // FIXME: Use the Intel syntax once we drop LLVM 9 support on rust-lang/rust.
     core::arch::asm!(
         "repe stosb %al, (%rdi)",
@@ -104,11 +104,11 @@ pub unsafe fn set_bytes(dest: *mut u8, c: u8, count: usize) {
         inout("al") c => _,
         options(att_syntax, nostack, preserves_flags)
     )
-}
+} }
 
 #[inline(always)]
 #[cfg(not(target_feature = "ermsb"))]
-pub unsafe fn set_bytes(mut dest: *mut u8, c: u8, count: usize) {
+pub unsafe fn set_bytes(mut dest: *mut u8, c: u8, count: usize) { unsafe {
     let c = c as u64 * 0x0101_0101_0101_0101;
     let (pre_byte_count, qword_count, byte_count) = rep_param(dest, count);
     // Separating the blocks gives the compiler more freedom to reorder instructions.
@@ -133,17 +133,17 @@ pub unsafe fn set_bytes(mut dest: *mut u8, c: u8, count: usize) {
         in("rax") c,
         options(att_syntax, nostack, preserves_flags)
     );
-}
+} }
 
 #[inline(always)]
-pub unsafe fn compare_bytes(a: *const u8, b: *const u8, n: usize) -> i32 {
+pub unsafe fn compare_bytes(a: *const u8, b: *const u8, n: usize) -> i32 { unsafe {
     #[inline(always)]
     unsafe fn cmp<T, U, F>(mut a: *const T, mut b: *const T, n: usize, f: F) -> i32
     where
         T: Clone + Copy + Eq,
         U: Clone + Copy + Eq,
         F: FnOnce(*const U, *const U, usize) -> i32,
-    {
+    { unsafe {
         // Ensure T is not a ZST.
         assert!(mem::size_of::<T>() != 0);
 
@@ -156,7 +156,7 @@ pub unsafe fn compare_bytes(a: *const u8, b: *const u8, n: usize) -> i32 {
             b = b.add(1);
         }
         f(a.cast(), b.cast(), n % mem::size_of::<T>())
-    }
+    } }
     let c1 = |mut a: *const u8, mut b: *const u8, n| {
         for _ in 0..n {
             if a.read() != b.read() {
@@ -172,7 +172,7 @@ pub unsafe fn compare_bytes(a: *const u8, b: *const u8, n: usize) -> i32 {
     let c8 = |a: *const u64, b, n| cmp(a, b, n, c4);
     let c16 = |a: *const u128, b, n| cmp(a, b, n, c8);
     c16(a.cast(), b.cast(), n)
-}
+} }
 
 // In order to process more than on byte simultaneously when executing strlen,
 // two things must be considered:
@@ -186,7 +186,7 @@ pub unsafe fn compare_bytes(a: *const u8, b: *const u8, n: usize) -> i32 {
 
 #[cfg(target_feature = "sse2")]
 #[inline(always)]
-pub unsafe fn c_string_length(mut s: *const core::ffi::c_char) -> usize {
+pub unsafe fn c_string_length(mut s: *const core::ffi::c_char) -> usize { unsafe {
     use core::arch::x86_64::{__m128i, _mm_cmpeq_epi8, _mm_movemask_epi8, _mm_set1_epi8};
 
     let mut n = 0;
@@ -249,13 +249,13 @@ pub unsafe fn c_string_length(mut s: *const core::ffi::c_char) -> usize {
             return n + cmp.trailing_zeros() as usize;
         }
     }
-}
+} }
 
 // Provided for scenarios like kernel development, where SSE might not
 // be available.
 #[cfg(not(target_feature = "sse2"))]
 #[inline(always)]
-pub unsafe fn c_string_length(mut s: *const core::ffi::c_char) -> usize {
+pub unsafe fn c_string_length(mut s: *const core::ffi::c_char) -> usize { unsafe {
     let mut n = 0;
 
     // Check bytes in steps of one until
@@ -302,7 +302,7 @@ pub unsafe fn c_string_length(mut s: *const core::ffi::c_char) -> usize {
             s = s.add(1);
         }
     }
-}
+} }
 
 /// Determine optimal parameters for a `rep` instruction.
 fn rep_param(dest: *mut u8, mut count: usize) -> (usize, usize, usize) {

@@ -6,7 +6,7 @@
 use atomic_dbg::eprintln;
 use origin::program;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
     eprintln!("Hello!");
 

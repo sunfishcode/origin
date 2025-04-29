@@ -106,7 +106,7 @@ pub(super) fn ehdr_addr() -> *const Elf_Ehdr {
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 #[inline]
-pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
+pub(super) unsafe fn relocation_load(ptr: usize) -> usize { unsafe {
     let r0;
 
     // This is read-only but we don't use `readonly` because this memory access
@@ -120,7 +120,7 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
     );
 
     r0
-}
+} }
 
 /// Perform a single store operation, outside the Rust memory model.
 ///
@@ -138,14 +138,14 @@ pub(super) unsafe fn relocation_load(ptr: usize) -> usize {
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 #[inline]
-pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
+pub(super) unsafe fn relocation_store(ptr: usize, value: usize) { unsafe {
     asm!(
         "mov [{}], {}",
         in(reg) ptr,
         in(reg) value,
         options(nostack, preserves_flags),
     );
-}
+} }
 
 /// Mark “relro” memory as readonly.
 ///
@@ -166,7 +166,7 @@ pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
 #[cfg(all(feature = "experimental-relocate", feature = "origin-start"))]
 #[cfg(relocation_model = "pic")]
 #[inline]
-pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
+pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) { unsafe {
     let r0: usize;
 
     // This is read-only but we don't use `readonly` because the side effects
@@ -188,7 +188,7 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
         // yet initialized at this point.
         trap();
     }
-}
+} }
 
 /// The required alignment for the stack pointer.
 #[cfg(feature = "take-charge")]
@@ -211,7 +211,7 @@ pub(super) unsafe fn clone(
     newtls: *mut c_void,
     fn_: extern "C" fn(),
     num_args: usize,
-) -> isize {
+) -> isize { unsafe {
     let r0;
     asm!(
         "syscall",            // Do the `clone` system call.
@@ -243,17 +243,17 @@ pub(super) unsafe fn clone(
         options(nostack)
     );
     r0
-}
+} }
 
 /// Write a value to the platform thread-pointer register.
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
-pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
+pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) { unsafe {
     rustix::runtime::set_fs(ptr);
     debug_assert_eq!(*ptr.cast::<*const c_void>(), ptr);
     debug_assert_eq!(thread_pointer(), ptr);
-}
+} }
 
 /// Read the value of the platform thread-pointer register.
 #[cfg(feature = "take-charge")]
@@ -281,7 +281,7 @@ pub(super) const TLS_OFFSET: usize = 0;
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
-pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! {
+pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usize) -> ! { unsafe {
     asm!(
         "syscall",
         "xor edi, edi",
@@ -294,7 +294,7 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
         in("rsi") map_len,
         options(noreturn, nostack)
     );
-}
+} }
 
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]

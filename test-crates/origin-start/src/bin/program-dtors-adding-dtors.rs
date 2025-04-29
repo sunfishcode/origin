@@ -14,7 +14,7 @@ static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::Glob
 
 static FLAG: AtomicBool = AtomicBool::new(false);
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
     program::at_exit(Box::new(|| {
         assert!(FLAG.load(Ordering::Relaxed));

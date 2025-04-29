@@ -14,8 +14,8 @@ static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::Glob
 
 static FLAG: AtomicBool = AtomicBool::new(false);
 
-#[no_mangle]
-unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
+#[unsafe(no_mangle)]
+unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 { unsafe {
     let thread = thread::create(
         |_args| {
             thread::at_exit(Box::new(|| {
@@ -45,4 +45,4 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     thread::join(thread);
 
     0
-}
+}}

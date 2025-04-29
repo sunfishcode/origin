@@ -10,8 +10,8 @@ use origin::{program, thread};
 #[global_allocator]
 static GLOBAL_ALLOCATOR: rustix_dlmalloc::GlobalDlmalloc = rustix_dlmalloc::GlobalDlmalloc;
 
-#[no_mangle]
-unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
+#[unsafe(no_mangle)]
+unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 { unsafe {
     let long_thread = thread::create(
         |_args| None,
         &[],
@@ -43,4 +43,4 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
     thread::detach(long_thread);
 
     program::exit(202);
-}
+}}

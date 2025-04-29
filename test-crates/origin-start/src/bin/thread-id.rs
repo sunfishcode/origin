@@ -21,8 +21,8 @@ enum Id {
     Child(thread::ThreadId),
 }
 
-#[no_mangle]
-unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 {
+#[unsafe(no_mangle)]
+unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) -> i32 { unsafe {
     assert_eq!(thread::current_id(), thread::id(thread::current()).unwrap());
     program::at_exit(Box::new(|| {
         assert_eq!(thread::current_id(), thread::id(thread::current()).unwrap())
@@ -109,4 +109,4 @@ unsafe fn origin_main(_argc: usize, _argv: *mut *mut u8, _envp: *mut *mut u8) ->
 
     assert_eq!(thread::current_id(), thread::id(thread::current()).unwrap());
     program::exit(201);
-}
+}}

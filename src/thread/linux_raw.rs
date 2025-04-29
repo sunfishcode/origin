@@ -54,9 +54,9 @@ impl Thread {
     ///
     /// `raw` must be a valid non-null thread pointer.
     #[inline]
-    pub unsafe fn from_raw_unchecked(raw: *mut c_void) -> Self {
+    pub unsafe fn from_raw_unchecked(raw: *mut c_void) -> Self { unsafe {
         Self(NonNull::new_unchecked(raw.cast()))
-    }
+    } }
 
     /// Convert to `Self` from a raw non-null pointer that was returned from
     /// `Thread::to_raw_non_null`.
@@ -301,7 +301,7 @@ pub(super) fn initialize_startup_info() {
     }
 }
 
-extern "C" {
+unsafe extern "C" {
     /// Declare the `_DYNAMIC` symbol so that we can compare its address with
     /// the static address in the `PT_DYNAMIC` header to learn our offset. Use
     /// a weak symbol because `_DYNAMIC` is not always present.
@@ -323,7 +323,7 @@ core::arch::global_asm!(".weak _DYNAMIC");
 /// `initialize_startup_info` must be called before this. And `mem` must be the
 /// initial value of the stack pointer in a new process, pointing to the
 /// initial contents of the stack.
-pub(super) unsafe fn initialize_main(mem: *mut c_void) {
+pub(super) unsafe fn initialize_main(mem: *mut c_void) { unsafe {
     // Determine the top of the stack. Linux puts the `AT_EXECFN` string at
     // the top, so find the end of that, and then round up to the page size.
     // See <https://lwn.net/Articles/631631/> for details.
@@ -361,7 +361,7 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
     .unwrap()
     .cast::<u8>();
 
-    let metadata_align = max(unsafe { STARTUP_TLS_INFO.align }, align_of::<Metadata>());
+    let metadata_align = max(STARTUP_TLS_INFO.align, align_of::<Metadata>());
     debug_assert_eq!(new.addr() % metadata_align, 0);
 
     let tls_data = new.add(tls_data_bottom);
@@ -381,7 +381,7 @@ pub(super) unsafe fn initialize_main(mem: *mut c_void) {
 
     // Point the platform thread-pointer register at the new thread metadata.
     set_thread_pointer(newtls);
-}
+} }
 
 fn calculate_tls_size(map_size: &mut usize) -> (usize, usize) {
     // SAFETY: `STARTUP_TLS_INFO` is initialized at program startup before
@@ -435,7 +435,7 @@ unsafe fn initialize_tls(
     stack_size: usize,
     guard_size: usize,
     map_size: usize,
-) -> (*mut c_void, *mut i32) {
+) -> (*mut c_void, *mut i32) { unsafe {
     let newtls: *mut c_void = (*metadata).abi.thread_pointee.as_mut_ptr().cast();
 
     // Initialize the thread metadata.
@@ -469,7 +469,7 @@ unsafe fn initialize_tls(
     let thread_id_ptr = (*metadata).thread.thread_id.as_ptr().cast::<i32>();
 
     (newtls, thread_id_ptr)
-}
+} }
 
 /// Creates a new thread.
 ///
@@ -628,7 +628,7 @@ pub(super) unsafe extern "C" fn entry(
     fn_: extern "C" fn(),
     args: *mut *mut c_void,
     num_args: usize,
-) -> ! {
+) -> ! { unsafe {
     #[cfg(feature = "log")]
     log::trace!("Thread[{:?}] launched", current_id().as_raw_nonzero());
 
@@ -641,7 +641,7 @@ pub(super) unsafe extern "C" fn entry(
         // If we have nightly, we can do additional checks.
         #[cfg(feature = "nightly")]
         {
-            extern "C" {
+            unsafe extern "C" {
                 #[link_name = "llvm.frameaddress"]
                 fn builtin_frame_address(level: i32) -> *const u8;
                 #[link_name = "llvm.returnaddress"]
@@ -678,10 +678,10 @@ pub(super) unsafe extern "C" fn entry(
     let return_value = fn_(args);
 
     exit(return_value)
-}
+} }
 
 /// Call the destructors registered with [`at_exit`] and exit the thread.
-unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
+unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! { unsafe {
     let current = current();
 
     #[cfg(feature = "log")]
@@ -765,7 +765,7 @@ unsafe fn exit(return_value: Option<NonNull<c_void>>) -> ! {
 
     // Terminate the thread.
     rustix::runtime::exit_thread(0)
-}
+} }
 
 /// Call the destructors registered with [`at_exit`].
 #[cfg(feature = "thread-at-exit")]
@@ -800,7 +800,7 @@ pub(crate) fn call_dtors(current: Thread) {
 /// `thread` must point to a valid thread record that has not yet been detached
 /// and will not be joined.
 #[inline]
-pub unsafe fn detach(thread: Thread) {
+pub unsafe fn detach(thread: Thread) { unsafe {
     #[cfg(feature = "log")]
     let thread_id = thread.0.as_ref().thread_id.load(SeqCst);
 
@@ -821,7 +821,7 @@ pub unsafe fn detach(thread: Thread) {
 
         free_memory(thread);
     }
-}
+} }
 
 /// Waits for a thread to finish.
 ///
@@ -832,7 +832,7 @@ pub unsafe fn detach(thread: Thread) {
 ///
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
-pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
+pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> { unsafe {
     let thread_data = thread.0.as_ref();
 
     #[cfg(feature = "log")]
@@ -863,13 +863,13 @@ pub unsafe fn join(thread: Thread) -> Option<NonNull<c_void>> {
     // Convert the `*mut c_void` we stored in the `AtomicPtr` back into an
     // `Option<NonNull<c_void>>`.
     NonNull::new(return_value)
-}
+} }
 
 /// Wait until `thread` has exited.
 ///
 /// `thread` must point to a valid thread record that has not already been
 /// detached or joined.
-unsafe fn wait_for_exit(thread: Thread) {
+unsafe fn wait_for_exit(thread: Thread) { unsafe {
     use rustix::thread::futex;
 
     // Check whether the thread has exited already; we set the
@@ -893,7 +893,7 @@ unsafe fn wait_for_exit(thread: Thread) {
             Err(e) => debug_assert_eq!(e, io::Errno::AGAIN),
         }
     }
-}
+} }
 
 #[cfg(feature = "log")]
 fn log_thread_to_be_freed(thread_id: i32) {
@@ -908,7 +908,7 @@ fn log_thread_to_be_freed(thread_id: i32) {
 ///
 /// `thread` must point to a valid thread record for a thread that has
 /// already exited.
-unsafe fn free_memory(thread: Thread) {
+unsafe fn free_memory(thread: Thread) { unsafe {
     use rustix::mm::munmap;
 
     // The thread was detached. Prepare to free the memory. First read out
@@ -925,7 +925,7 @@ unsafe fn free_memory(thread: Thread) {
         let map = stack_addr.byte_sub(guard_size);
         munmap(map, map_size).unwrap();
     }
-}
+} }
 
 /// Registers a function to call when the current thread exits.
 #[cfg(feature = "thread-at-exit")]
@@ -986,7 +986,7 @@ pub fn current_id() -> ThreadId {
 /// return.
 #[doc(hidden)]
 #[inline]
-pub unsafe fn set_current_id_after_a_fork(tid: ThreadId) {
+pub unsafe fn set_current_id_after_a_fork(tid: ThreadId) { unsafe {
     let current = current();
     debug_assert_ne!(
         tid.as_raw_nonzero().get(),
@@ -999,7 +999,7 @@ pub unsafe fn set_current_id_after_a_fork(tid: ThreadId) {
         .as_ref()
         .thread_id
         .store(tid.as_raw_nonzero().get(), SeqCst);
-}
+} }
 
 /// Return the address of the thread-local `errno` state.
 ///
@@ -1048,10 +1048,10 @@ pub fn current_tls_addr(module: usize, offset: usize) -> *mut c_void {
 /// `thread` must point to a valid thread record.
 #[inline]
 #[cfg_attr(docsrs, doc(cfg(feature = "take-charge")))]
-pub unsafe fn id(thread: Thread) -> Option<ThreadId> {
+pub unsafe fn id(thread: Thread) -> Option<ThreadId> { unsafe {
     let raw = thread.0.as_ref().thread_id.load(SeqCst);
     ThreadId::from_raw(raw)
-}
+} }
 
 /// Return the current thread's stack address (lowest address), size, and guard
 /// size.
@@ -1061,10 +1061,10 @@ pub unsafe fn id(thread: Thread) -> Option<ThreadId> {
 /// `thread` must point to a valid thread record.
 #[inline]
 #[must_use]
-pub unsafe fn stack(thread: Thread) -> (*mut c_void, usize, usize) {
+pub unsafe fn stack(thread: Thread) -> (*mut c_void, usize, usize) { unsafe {
     let data = thread.0.as_ref();
     (data.stack_addr, data.stack_size, data.guard_size)
-}
+} }
 
 /// Return the default stack size for new threads.
 #[inline]
@@ -1099,7 +1099,7 @@ extern "C" fn __aeabi_read_tp() -> *mut c_void {
 }
 
 /// Some targets use this global variable instead of the TLS `canary` field.
-#[no_mangle]
+#[unsafe(no_mangle)]
 static mut __stack_chk_guard: usize = 0;
 
 const fn round_up(addr: usize, boundary: usize) -> usize {

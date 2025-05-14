@@ -3,7 +3,7 @@
 /// c-scape initializes its environment-variable state at
 /// `.init_array.00098`, so using `.00099` means we run after that, so
 /// initializing loggers that depend on eg. `RUST_LOG` work.
-#[link_section = ".init_array.00099"]
+#[unsafe(link_section = ".init_array.00099")]
 #[used]
 static INIT_ARRAY: unsafe extern "C" fn() = {
     unsafe extern "C" fn function() {

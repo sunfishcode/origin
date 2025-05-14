@@ -181,19 +181,26 @@ does take a few extra bytes.
 With all these optimizations, the generated code looks like this:
 
 ```asm
-00000000004000b0 <.text>:
-  4000b0:	48 89 e7             	mov    %rsp,%rdi
-  4000b3:	55                   	push   %rbp
-  4000b4:	e9 00 00 00 00       	jmp    0x4000b9
-  4000b9:	6a 2a                	push   $0x2a
-  4000bb:	5f                   	pop    %rdi
-  4000bc:	b8 e7 00 00 00       	mov    $0xe7,%eax
-  4000c1:	0f 05                	syscall
+00000000002000cc <.text>:
+  2000cc:	48 89 e7             	mov    %rsp,%rdi
+  2000cf:	55                   	push   %rbp
+  2000d0:	e9 00 00 00 00       	jmp    0x2000d5
+  2000d5:	6a 2a                	push   $0x2a
+  2000d7:	5f                   	pop    %rdi
+  2000d8:	b8 e7 00 00 00       	mov    $0xe7,%eax
+  2000dd:	0f 05                	syscall
+  2000df:	0f 0b                	ud2
 ```
 
 Those first 3 instructions are origin's `_start` function. The next 5
 instructions are `origin::program::entry` and everything, including the user
 `origin_main` function and the `exit_group` syscall inlined into it.
+
+Even though we added "trap-unreachable=no", we still have a ud2 instruction
+after the syscall. It's added by rustix because in theory users could run
+the program under a seccomp configuration in which `exit_group` does return,
+and rustix needs to be completely sure that execution won't fall through into
+whatever instructions happen to appear next in memory.
 
 ## Optimizations not done
 
@@ -232,6 +239,11 @@ the compiler to use the same `push`/`pop` trick it does for the 42 constant,
 saving 2 bytes. In theory origin could have a feature to enable this, however
 it's a very minor optimization, and it would introduce undefined behavior if
 somehow some thread got created outside of origin, so I chose not to add it.
+
+We could also add an option to rustix to have it omit the `ud2` after the
+`exit_group` syscall for users willing to promise that they won't run the
+program under a pathological seccomp configuration, however it'd only save
+2 bytes in an uncommon situation.
 
 ## Sources
 

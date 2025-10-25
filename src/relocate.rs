@@ -21,8 +21,8 @@ use crate::arch::{
 use core::ffi::c_void;
 use core::mem;
 use core::ptr::{null, null_mut};
+use linux_raw_sys::auxvec::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
 use linux_raw_sys::elf::*;
-use linux_raw_sys::general::{AT_BASE, AT_ENTRY, AT_NULL, AT_PAGESZ};
 
 // The Linux UAPI headers don't define the .relr types and consts yet.
 #[allow(non_camel_case_types)]

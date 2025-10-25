@@ -20,9 +20,9 @@ unsafe extern "C" fn __getauxval(type_: c_ulong) -> *mut c_void {
 
 fn _getauxval(type_: c_ulong) -> *mut c_void {
     match type_ as _ {
-        linux_raw_sys::general::AT_HWCAP => without_provenance_mut(rustix::param::linux_hwcap().0),
-        linux_raw_sys::general::AT_HWCAP2 => without_provenance_mut(rustix::param::linux_hwcap().1),
-        linux_raw_sys::general::AT_MINSIGSTKSZ => {
+        linux_raw_sys::auxvec::AT_HWCAP => without_provenance_mut(rustix::param::linux_hwcap().0),
+        linux_raw_sys::auxvec::AT_HWCAP2 => without_provenance_mut(rustix::param::linux_hwcap().1),
+        linux_raw_sys::auxvec::AT_MINSIGSTKSZ => {
             without_provenance_mut(rustix::param::linux_minsigstksz())
         }
         _ => todo!("unrecognized __getauxval {}", type_),

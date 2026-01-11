@@ -54,7 +54,10 @@ macro_rules! naked_fn {
 /// `#[naked]` is nightly-only. We use it when we can, and fall back to
 /// `global_asm` otherwise. This macro supports a limited subset of the
 /// features of `#[naked]`.
-#[cfg(not(feature = "nightly"))]
+///
+/// Note: ARM targets use `%function` syntax for the .type directive,
+/// while other targets use `@function`.
+#[cfg(all(not(feature = "nightly"), not(target_arch = "arm")))]
 macro_rules! naked_fn {
     (
         $doc:literal;
@@ -69,6 +72,30 @@ macro_rules! naked_fn {
         core::arch::global_asm!(
             concat!(".global ", stringify!($name)),
             concat!(".type ", stringify!($name), ", @function"),
+            concat!(stringify!($name), ":"),
+            $($code),*,
+            concat!(".size ", stringify!($name), ", .-", stringify!($name)),
+            $($label = $kind $path),*
+        );
+    };
+}
+
+/// ARM variant using `%function` syntax.
+#[cfg(all(not(feature = "nightly"), target_arch = "arm"))]
+macro_rules! naked_fn {
+    (
+        $doc:literal;
+        $vis:vis fn $name:ident $args:tt -> $ret:ty;
+        $($code:literal),*;
+        $($label:ident = $kind:ident $path:path),*
+    ) => {
+        unsafe extern "C" {
+            #[doc = $doc]
+            $vis fn $name $args -> $ret;
+        }
+        core::arch::global_asm!(
+            concat!(".global ", stringify!($name)),
+            concat!(".type ", stringify!($name), ", %function"),
             concat!(stringify!($name), ":"),
             $($code),*,
             concat!(".size ", stringify!($name), ", .-", stringify!($name)),

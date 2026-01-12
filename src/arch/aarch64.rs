@@ -22,28 +22,28 @@ use {
     rustix::thread::RawPid,
 };
 
+/// The program entry point.
+///
+/// # Safety
+///
+/// This function must never be called explicitly. It is the first thing
+/// executed in the program, and it assumes that memory is laid out according
+/// to the operating system convention for starting a new program.
 #[cfg(feature = "origin-start")]
-naked_fn!(
-    "
-    The program entry point.
-
-    # Safety
-
-    This function must never be called explicitly. It is the first thing
-    executed in the program, and it assumes that memory is laid out according
-    to the operating system convention for starting a new program.
-    ";
-    pub(super) fn _start() -> !;
-
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+pub(super) unsafe extern "C" fn _start() -> ! {
     // Jump to `entry`, passing it the initial stack pointer value as an
     // argument, a null return address, a null frame pointer, and an aligned
     // stack pointer. On many architectures, the incoming frame pointer is
     // already null.
-    "mov x0, sp",   // Pass the incoming `sp` as the arg to `entry`.
-    "mov x30, xzr", // Set the return address to zero.
-    "b {entry}";    // Jump to `entry`.
-    entry = sym super::program::entry
-);
+    core::arch::naked_asm!(
+        "mov x0, sp",   // Pass the incoming `sp` as the arg to `entry`.
+        "mov x30, xzr", // Set the return address to zero.
+        "b {entry}",    // Jump to `entry`.
+        entry = sym super::program::entry
+    )
+}
 
 /// Execute a trap instruction.
 ///
@@ -300,25 +300,24 @@ pub(super) unsafe fn munmap_and_exit_thread(map_addr: *mut c_void, map_len: usiz
     }
 }
 
+/// Invoke the `__NR_rt_sigreturn` system call to return control from a signal
+/// handler.
+///
+/// # Safety
+///
+/// This function must never be called other than by the `sa_restorer`
+/// mechanism.
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "signal")]
-naked_fn!(
-    "
-    Invoke the `__NR_rt_sigreturn` system call to return control from a signal
-    handler.
-
-    # Safety
-
-    This function must never be called other than by the `sa_restorer`
-    mechanism.
-    ";
-    pub(super) fn return_from_signal_handler() -> ();
-
-    "mov x8, {__NR_rt_sigreturn}",
-    "svc 0",
-    "udf #16";
-    __NR_rt_sigreturn = const __NR_rt_sigreturn
-);
+#[unsafe(naked)]
+pub(super) unsafe extern "C" fn return_from_signal_handler() {
+    core::arch::naked_asm!(
+        "mov x8, {__NR_rt_sigreturn}",
+        "svc 0",
+        "udf #16",
+        __NR_rt_sigreturn = const __NR_rt_sigreturn
+    )
+}
 
 /// Invoke the appropriate system call to return control from a signal
 /// handler that does not use `SA_SIGINFO`. On aarch64, this uses the same

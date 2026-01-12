@@ -19,29 +19,29 @@ use {
     rustix::thread::RawPid,
 };
 
+/// The program entry point.
+///
+/// # Safety
+///
+/// This function must never be called explicitly. It is the first thing
+/// executed in the program, and it assumes that memory is laid out according
+/// to the operating system convention for starting a new program.
 #[cfg(feature = "origin-start")]
-naked_fn!(
-    "
-    The program entry point.
-
-    # Safety
-
-    This function must never be called explicitly. It is the first thing
-    executed in the program, and it assumes that memory is laid out according
-    to the operating system convention for starting a new program.
-    ";
-    pub(super) fn _start() -> !;
-
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+pub(super) unsafe extern "C" fn _start() -> ! {
     // Jump to `entry`, passing it the initial stack pointer value as an
     // argument, a null return address, a null frame pointer, and an aligned
     // stack pointer. On many architectures, the incoming frame pointer is
     // already null.
-    "mv a0, sp",    // Pass the incoming `sp` as the arg to `entry`.
-    "mv ra, zero",  // Set the return address to zero.
-    "mv fp, zero",  // Set the frame address to zero.
-    "tail {entry}"; // Jump to `entry`.
-    entry = sym super::program::entry
-);
+    core::arch::naked_asm!(
+        "mv a0, sp",    // Pass the incoming `sp` as the arg to `entry`.
+        "mv ra, zero",  // Set the return address to zero.
+        "mv fp, zero",  // Set the frame address to zero.
+        "tail {entry}", // Jump to `entry`.
+        entry = sym super::program::entry
+    )
+}
 
 /// Execute a trap instruction.
 ///

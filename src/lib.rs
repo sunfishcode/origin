@@ -9,6 +9,11 @@
     all(debug_assertions, feature = "nightly"),
     feature(link_llvm_intrinsics)
 )]
+// PowerPC64 and MIPS inline assembly requires experimental_arch feature.
+#![cfg_attr(
+    any(target_arch = "powerpc64", target_arch = "mips"),
+    feature(asm_experimental_arch)
+)]
 
 #[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
 extern crate alloc;
@@ -34,6 +39,8 @@ mod stubs;
 #[cfg_attr(target_arch = "x86", path = "arch/x86.rs")]
 #[cfg_attr(target_arch = "riscv64", path = "arch/riscv64.rs")]
 #[cfg_attr(target_arch = "arm", path = "arch/arm.rs")]
+#[cfg_attr(target_arch = "powerpc64", path = "arch/powerpc64.rs")]
+#[cfg_attr(target_arch = "mips", path = "arch/mips32.rs")]
 mod arch;
 #[cfg(all(feature = "take-charge", feature = "log"))]
 mod log;

@@ -13,10 +13,6 @@
 #[cfg(all(feature = "alloc", not(feature = "rustc-dep-of-std")))]
 extern crate alloc;
 
-// Wrapper/polyfill for `#[naked]`.
-#[macro_use]
-pub(crate) mod naked;
-
 // Pull in the `unwinding` crate to satisfy `_Unwind_*` symbol references.
 // Except that 32-bit arm isn't supported yet, so we use stubs instead.
 #[cfg(all(feature = "unwinding", not(target_arch = "arm")))]

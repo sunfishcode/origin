@@ -56,7 +56,6 @@ pub(super) unsafe extern "C" fn __start() -> ! {
     )
 }
 
-
 /// Execute a trap instruction.
 ///
 /// This is roughly equivalent to `core::intrinsics::abort()`.

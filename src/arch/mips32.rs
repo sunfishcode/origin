@@ -214,7 +214,6 @@ pub(super) unsafe fn relocation_store(ptr: usize, value: usize) {
 #[inline]
 pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
     unsafe {
-        let r0: usize;
         let err: usize;
 
         // MIPS O32 syscall: $v0 = syscall number, $a0-$a3 = args.
@@ -222,15 +221,14 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
         asm!(
             ".set noreorder",
             "syscall",
-            "move {0}, $v0",
-            "move {1}, $a3",
+            "move {0}, $a3",
             ".set reorder",
-            out(reg) r0,
             out(reg) err,
             in("$v0") __NR_mprotect,
             in("$a0") ptr,
             in("$a1") len,
             in("$a2") PROT_READ,
+            lateout("$v0") _,
             lateout("$a3") _,
             lateout("$t0") _,
             lateout("$t1") _,
@@ -250,7 +248,6 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
             // yet initialized at this point.
             trap();
         }
-        let _ = r0;
     }
 }
 

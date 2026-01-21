@@ -15,7 +15,10 @@ use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "thread")]
 use {
     core::ffi::c_void,
-    linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap, __NR_set_thread_area},
+    linux_raw_sys::general::{
+        __NR_clone, __NR_exit, __NR_munmap, __NR_set_thread_area, CLONE_CHILD_CLEARTID,
+        CLONE_CHILD_SETTID,
+    },
     rustix::thread::RawPid,
 };
 
@@ -256,11 +259,15 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
 #[cfg(feature = "thread")]
 pub(super) const STACK_ALIGNMENT: usize = 8;
 
-/// A wrapper around the Linux `clone` system call.
+// MIPS errno value for "operation not supported" (different from x86's 95).
+#[cfg(feature = "take-charge")]
+#[cfg(feature = "thread")]
+const EOPNOTSUPP: i32 = 122;
+
+/// Linux `clone` syscall wrapper. Inline asm required because child resumes
+/// at same point as parent and must jump to our thread entrypoint.
 ///
-/// This can't be implemented in `rustix` because the child starts executing at
-/// the same point as the parent and we need to use inline asm to have the
-/// child jump to our new-thread entrypoint.
+/// CLONE_CHILD_CLEARTID/SETTID unsupported (O32 ABI needs child_tid on stack).
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]
@@ -268,11 +275,16 @@ pub(super) unsafe fn clone(
     flags: u32,
     child_stack: *mut c_void,
     parent_tid: *mut RawPid,
-    child_tid: *mut RawPid,
+    _child_tid: *mut RawPid, // unused: O32 ABI needs stack passing, not implemented
     newtls: *mut c_void,
     fn_: extern "C" fn(),
     num_args: usize,
 ) -> isize {
+    // Fail explicitly for flags that require child_tid, which we don't pass.
+    if flags & (CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID) != 0 {
+        return -(EOPNOTSUPP as isize);
+    }
+
     unsafe {
         let r0;
         asm!(
@@ -318,9 +330,6 @@ pub(super) unsafe fn clone(
             lateout("$t9") _,
             options(nostack)
         );
-        // Note: child_tid handling is simplified here; full implementation would
-        // need to push it to the stack frame per O32 calling convention.
-        let _ = child_tid;
         r0
     }
 }

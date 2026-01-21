@@ -30,7 +30,6 @@ use {
 /// MIPS O32 ABI: $sp holds the stack pointer, $a0-$a3 are argument registers.
 /// At entry, argc is at 0($sp), argv at 4($sp), etc.
 // MIPS uses __start as the default entry point, not _start.
-// We provide both names for compatibility.
 #[cfg(feature = "origin-start")]
 #[unsafe(naked)]
 #[unsafe(no_mangle)]

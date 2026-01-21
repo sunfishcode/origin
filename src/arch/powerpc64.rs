@@ -253,11 +253,8 @@ pub(super) unsafe fn relocation_mprotect_readonly(ptr: usize, len: usize) {
 #[cfg(feature = "thread")]
 pub(super) const STACK_ALIGNMENT: usize = 16;
 
-/// A wrapper around the Linux `clone` system call.
-///
-/// This can't be implemented in `rustix` because the child starts executing at
-/// the same point as the parent and we need to use inline asm to have the
-/// child jump to our new-thread entrypoint.
+/// Linux `clone` syscall wrapper. Inline asm required because child resumes
+/// at same point as parent and must jump to our thread entrypoint.
 #[cfg(feature = "take-charge")]
 #[cfg(feature = "thread")]
 #[inline]

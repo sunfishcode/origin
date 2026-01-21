@@ -15,7 +15,7 @@ use linux_raw_sys::general::{__NR_mprotect, PROT_READ};
 #[cfg(feature = "thread")]
 use {
     core::ffi::c_void,
-    linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap},
+    linux_raw_sys::general::{__NR_clone, __NR_exit, __NR_munmap, __NR_set_thread_area},
     rustix::thread::RawPid,
 };
 
@@ -338,9 +338,10 @@ pub(super) unsafe fn set_thread_pointer(ptr: *mut c_void) {
         asm!(
             "move $a0, {0}",
             ".set noreorder",
-            "li $v0, 4283",  // __NR_set_thread_area
+            "li $v0, {__NR_set_thread_area}",
             "syscall",
             ".set reorder",
+            __NR_set_thread_area = const __NR_set_thread_area,
             in(reg) ptr,
             out("$v0") _,
             out("$a0") _,

@@ -33,6 +33,20 @@ using nightly Rust, enable the feature "nightly" to let origin use nightly-only
 features, which include proper support for unwinding, better safety checks, and
 better optimizations.
 
+Origin supports multiple architectures: x86-64, x86, aarch64, arm (32-bit),
+riscv64, powerpc64, and mips32. The arm, powerpc64, and mips32 ports are not
+tested in CI, for reasons that range from "Rust doesn't ship binaries for that"
+to "that one crate doesn't support this arch yet":
+
+ - **mips32**: rust-std isn't available for download. CI would need `-Zbuild-std`
+   to build the standard library from source, which is nightly-only.
+
+ - **powerpc64**: On stable, rustix uses the libc backend which is missing the
+   runtime module for signal handling. On nightly, the `unwinding` crate hasn't
+   caught up with ppc64 yet.
+
+ - **arm (32-bit)**: CI setup exists on a branch somewhere, waiting to be merged.
+
 ## Example crates
 
 Origin can also be used on its own, in several different configurations:

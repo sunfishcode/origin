@@ -50,8 +50,9 @@ pub(super) unsafe extern "C" fn __start() -> ! {
         "and $sp, $sp, -8",     // Align stack to 8 bytes.
         "subu $sp, $sp, 16",    // Reserve 16 bytes for O32 ABI argument save area.
         "move $ra, $zero",      // Set the return address to zero.
-        "la $t9, {entry}",      // Load entry address into $t9.
-        "jr $t9",               // Jump to `entry` via $t9 (required for PIC).
+        "lui $t9, %hi({entry})",        // Load entry address into $t9.
+        "addiu $t9, $t9, %lo({entry})", //
+        "jr $t9",               // Jump to `entry` via $t9 (PIC convention).
         "nop",                  // Branch delay slot.
         ".set reorder",
         entry = sym super::program::entry

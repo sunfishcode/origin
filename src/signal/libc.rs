@@ -8,7 +8,7 @@ use rustix::io;
 pub type Sigaction = libc::sigaction;
 
 /// A signal identifier for use with [`sigaction`].
-pub use rustix::runtime::Signal;
+pub use rustix::runtime_448b8ad740e2a26f::Signal;
 
 /// A signal handler function for use with [`Sigaction`].
 pub use libc::sighandler_t as Sighandler;
